@@ -5,6 +5,7 @@ Arrancás con un préstamo de tu tío y una máquina de tazas, competís con tu 
 
 **Versión mínima jugable** (sin diseño gráfico):
 
+- Cada semana: primero publicidad en redes, después llegan los pedidos (Lelo te pelea cada uno) y recién ahí producís y entregás.
 - Tazas de cerámica y de plástico, y máquina de gorras.
 - Préstamo del tío (opción A: todo junto · opción B: cuotas).
 - Tutorial de enero y febrero, estacionalidad y fechas especiales.

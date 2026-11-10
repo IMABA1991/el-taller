@@ -28,17 +28,17 @@ export const MAQUINAS = {
 // sens = cuánto aprovecha el producto el multiplicador de reputación (1 alta, 0.7 media, 0.4 baja).
 export const PRODUCTOS = {
   tazaCeramica: {
-    nombre: 'Taza de cerámica', corto: 'Taza cerámica', maquina: 'tazas',
+    nombre: 'Taza de cerámica', corto: 'Taza cerámica', singular: 'taza de cerámica', plural: 'tazas de cerámica', maquina: 'tazas',
     precio: 8000, costo: 4000, horas: 1, base: 5, sens: 1,
     temporada: { verano: 0.7, invierno: 1.5 },
   },
   tazaPlastico: {
-    nombre: 'Taza de plástico', corto: 'Taza plástico', maquina: 'tazas',
+    nombre: 'Taza de plástico', corto: 'Taza plástico', singular: 'taza de plástico', plural: 'tazas de plástico', maquina: 'tazas',
     precio: 5000, costo: 3000, horas: 1, base: 3, sens: 0.4,
     temporada: {},
   },
   gorra: {
-    nombre: 'Gorra', corto: 'Gorra', maquina: 'gorras',
+    nombre: 'Gorra', corto: 'Gorra', singular: 'gorra', plural: 'gorras', maquina: 'gorras',
     precio: 10000, costo: 2000, horas: 1.5, base: 3, sens: 0.7,
     temporada: { verano: 1.6, invierno: 0.5 },
   },
@@ -61,7 +61,7 @@ export const PRESTAMO = {
 export const GASTOS_FIJOS = { luz: 12000, internet: 10000, publicidad: 8000 };
 
 export const VENTAS = {
-  horasPorVentaRedes: 0.5, // horas de atención por cada venta en redes y Marketplace
+  horasPorVentaRedes: 0.5, // horas de publicidad (publicar y responder) por cada producto que te piden
   feria: { horas: 8, costoMesa: 10000, min: 5, max: 8 },
   reputacionMercadoLibre: 50, // desde acá Mercado Libre suma demanda
   extraMercadoLibre: 0.25,
@@ -69,7 +69,8 @@ export const VENTAS = {
 
 export const REPUTACION = {
   porVenta: 0.2, // ~5 ventas = 1 pedido bien entregado (+1)
-  porPedidoNoEntregado: -0.5,
+  porPedidoNoEntregado: -0.5, // por unidad
+  porPedidoRechazado: -0.1, // por unidad: avisar a tiempo que no llegás cuesta poco
   porPedidoMalHecho: -1.25,
   meta: 100,
 };
@@ -95,7 +96,13 @@ export const PRIMO = {
 // Defensa ante un rumor: promo de contraataque en redes.
 // El costo es el descuento (escala solo con el tamaño del taller). Si Lelo ataca, conviene;
 // si era falsa alarma, regalaste el descuento.
-export const PROMO = { descuento: 0.15, extraDemanda: 0.1, horas: 2 };
+export const CLIENTES = [
+  'Marta', 'Don Rubén', 'la profe de Lengua', 'el kiosco de la esquina', 'Sofi', 'la peluquería del barrio',
+  'Nacho', 'la abuela Chela', 'un grupo de egresados', 'la veterinaria', 'Caro', 'el club del barrio',
+  'Juanma', 'la panadería', 'Vicky', 'el gimnasio', 'Tobías', 'la escuelita de fútbol',
+];
+
+export const PROMO = { descuento: 0.1, extraDemanda: 0.2, horas: 2 };
 
 export const CURSO_CORTO = { costo: 15000, horasPorSemana: 5, semanas: 2, puntos: 10 };
 
@@ -123,11 +130,11 @@ export const MAZO = {
 
 // Mensajes del tutorial (semana -> texto del tío).
 export const TUTORIAL = {
-  1: 'Tío: "Bueno, campeón. Ya tenés la máquina de tazas. Arrancá produciendo unas cuantas: cada taza te lleva horas y cuesta el insumo. No te vuelvas loco, que en verano las tazas no se venden tanto."',
-  2: 'Tío: "Producir no alcanza: alguien las tiene que vender. Poné horas en redes para responder consultas en Instagram y Marketplace. Cada venta lleva su tiempo."',
-  3: 'Tío: "Ojo con el stock: si te piden y no tenés, quedás mal y perdés reputación. Y la reputación es lo que hace que te compren más."',
+  1: 'Tío: "Bueno, campeón. Ya tenés la máquina de tazas. Así funciona: primero hacés publicidad en redes, con eso te llegan pedidos, y recién ahí producís lo que te pidieron. Arrancá poniendo unas horas de publicidad."',
+  2: 'Tío: "Cuantas más horas de publicidad, más pedidos te llegan... pero solo hasta lo que pide el mercado esa semana. Pasarte es tiempo que le sacás a producir."',
+  3: 'Tío: "Si aceptás un pedido y no lo entregás, quedás mal y perdés reputación. Si ves que no llegás, rechazalo a tiempo: perdés poquito. Y la reputación es lo que hace que te pidan más."',
   4: 'Tío: "Fin de mes: se pagan la luz, internet y la publicidad. Y me enteré de que tu primo Lelo también arrancó a vender tazas en el barrio... A ver quién la pega. Si escuchás algún rumor sobre él, prestale atención."',
-  5: 'Tío: "¿Probaste la feria? Pagás la mesa y te lleva el día entero, pero vendés bastante más."',
+  5: 'Tío: "¿Probaste la feria? Pagás la mesa y te lleva el día entero, pero vendés bastante más. Ojo: en la feria vendés lo que tengas de stock, así que producí unas de más."',
   6: 'Tío: "En este negocio siempre pasa algo: a veces se rompe todo y a veces te cae un pedido del cielo. A la larga se compensa, pero hay que tener un colchón de plata."',
   7: 'Tío: "Si trabajás siempre al máximo te cansás y empezás a mandarte macanas. Descansá. Y hay un curso corto de sublimación: cuesta plata y horas, pero te hace mejor."',
   8: 'Tío: "¡Feliz cumpleaños! Desde marzo arranca la época fuerte: en invierno las tazas vuelan, y para el Día del Padre ni te cuento. Prepará stock. Acá termina tu entrenamiento."',

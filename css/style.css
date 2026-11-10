@@ -123,3 +123,11 @@ p { margin: 0 0 10px; }
 .opcion ul { margin: 6px 0 10px; padding-left: 18px; font-size: 0.93rem; }
 
 .chip { display: inline-block; font-size: 0.75rem; padding: 2px 8px; border-radius: 999px; background: #e9edf5; color: var(--principal); margin-left: 6px; vertical-align: middle; }
+
+.paso-semana { font-size: 0.85rem; opacity: 0.85; margin-top: 2px; }
+.pedido { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 9px 0; border-top: 1px solid var(--borde); }
+.pedido:first-of-type { border-top: 0; }
+.pedido .nombre { font-weight: 600; }
+.pedido .detalle { font-size: 0.85rem; color: var(--suave); }
+.pedido.rechazado .nombre { text-decoration: line-through; color: var(--suave); }
+button.chico { min-height: 40px; padding: 6px 12px; border-radius: 10px; border: 1px solid var(--borde); background: #fff; color: var(--principal); font-size: 0.9rem; }

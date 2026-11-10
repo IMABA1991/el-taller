@@ -2,30 +2,32 @@
 // y se comparan los resultados con lo que dice el documento de reglas.
 // Uso: node tests/simulacion.js
 import {
-  nuevaPartida, jugarSemana, demandaEsperada, horasPorUnidad, horasPorVenta, validarPlan,
-  comprarMaquina, pagarPrestamoA, costoPagoAnticipadoA, calendario, PRODUCTOS, VENTAS,
+  nuevaPartida, jugarSemana, demandaEsperada, horasPorUnidad, horasPorVenta, validarPlan, validarPublicidad,
+  comprarMaquina, pagarPrestamoA, costoPagoAnticipadoA, calendario, unidadesPedidas, horasDelPlan, PRODUCTOS, VENTAS,
 } from '../js/engine.js';
 
+// Un jugador razonable: publicidad para cubrir lo que pide el mercado, después produce
+// lo que le pidieron (+1 por si se arruina alguna) y unas de más para la feria.
 function planRazonable(e) {
-  const producir = {};
-  let redes = 0;
   const ids = Object.keys(PRODUCTOS).filter((id) => e.maquinas[PRODUCTOS[id].maquina]);
   const totalEsperado = ids.reduce((s, id) => s + demandaEsperada(e, id), 0);
-  for (const id of ids) {
-    const objetivo = Math.ceil(demandaEsperada(e, id) * 1.15) + 3; // redes + feria
-    producir[id] = Math.max(0, objetivo - e.stock[id]);
-  }
-  redes = Math.ceil(totalEsperado * 1.2 * horasPorVenta(e));
-  const plan = { producir, horasRedes: redes, feria: true, curso: false };
+  const plan = { horasRedes: Math.ceil(totalEsperado * 1.2 * horasPorVenta(e)), feria: true, curso: false };
   if (e.semana >= 7 && e.curso.semanasRestantes === 0 && e.formacion.actualizacion < 10 && e.plata > 60000) plan.curso = true;
-  // Recortar si no alcanza la plata o las horas
-  for (let i = 0; i < 200 && !validarPlan(e, plan).ok; i++) {
-    const id = ids.find((x) => plan.producir[x] > 0);
-    if (plan.curso) plan.curso = false;
-    else if (id) plan.producir[id]--;
-    else if (plan.feria) plan.feria = false;
-    else break;
-  }
+  plan.producir = (sem) => {
+    const pedidas = unidadesPedidas(sem);
+    const producir = {};
+    for (const id of ids) producir[id] = Math.max(0, pedidas[id] + (pedidas[id] ? 1 : 0) + 2 - e.stock[id]);
+    const p2 = { producir, feria: plan.feria, curso: plan.curso };
+    for (let i = 0; i < 300 && !validarPlan(e, p2).ok; i++) {
+      const id = ids.find((x) => p2.producir[x] > pedidas[x] - e.stock[x] && p2.producir[x] > 0) || ids.find((x) => p2.producir[x] > 0);
+      if (p2.curso) p2.curso = false;
+      else if (p2.feria) p2.feria = false;
+      else if (id) p2.producir[id]--;
+      else break;
+    }
+    plan.feria = p2.feria; plan.curso = p2.curso;
+    return p2.producir;
+  };
   return plan;
 }
 
@@ -126,10 +128,11 @@ for (let i = 0; i < 150; i++) {
     if (e.primo.rumor && e.semana >= 4 && !e.mejorDeLaCiudad) {
       const con = JSON.parse(JSON.stringify(e));
       const sin = JSON.parse(JSON.stringify(e));
-      const planPromo = { ...plan, promo: true };
-      if (validarPlan(con, planPromo).ok) {
+      const base = planRazonable(con);
+      const planPromo = { ...base, horasRedes: Math.ceil(base.horasRedes * 1.2), promo: true };
+      if (validarPublicidad(con, planPromo).ok) {
         jugarSemana(con, planPromo);
-        jugarSemana(sin, plan);
+        jugarSemana(sin, planRazonable(sin));
         const valor = (x) => x.plata + x.rep * 2000; // la reputación también vale
         (con.primo.comportamiento === 'agresivo' ? difs.agresivo : difs.humo).push(valor(con) - valor(sin));
       }

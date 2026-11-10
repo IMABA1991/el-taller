@@ -1,14 +1,16 @@
 // Pantallas de "El Taller" (versión sin diseño).
 import {
-  nuevaPartida, jugarSemana, validarPlan, calendario, fechaEspecial, demandaEsperada,
-  horasPorUnidad, horasPorVenta, comprarMaquina, pagarPrestamoA, costoPagoAnticipadoA,
-  gastosFijosDelMes, fmt, puedeHacerPromo, HORAS_POR_SEMANA, PRODUCTOS, MAQUINAS, CURSO_CORTO, VENTAS, PRESTAMO, TUTORIAL, PROMO,
+  nuevaPartida, publicar, cerrarSemana, validarPublicidad, validarPlan, rechazarPedido, unidadesPedidas,
+  calendario, fechaEspecial, demandaEsperada, horasPorUnidad, horasPorVenta, horasPublicidadSugeridas,
+  probabilidadError, comprarMaquina, pagarPrestamoA, costoPagoAnticipadoA, gastosFijosDelMes, nombreUnidades,
+  fmt, puedeHacerPromo, HORAS_POR_SEMANA, PRODUCTOS, MAQUINAS, CURSO_CORTO, VENTAS, PRESTAMO, TUTORIAL, PROMO,
 } from './engine.js';
 import { guardar, cargar, borrar } from './storage.js';
 
 const app = document.getElementById('app');
 let partida = null;
-let plan = null;
+let plan = null; // paso 2: producción
+let pub = null; // paso 1: publicidad
 let aviso = null; // mensaje después de una acción (compra, pago)
 let confirmarReinicio = false;
 
@@ -16,11 +18,23 @@ let confirmarReinicio = false;
 const plata = (n) => `${n < 0 ? '−' : ''}$${fmt(Math.abs(n))}`;
 const pct = (v) => `${Math.max(0, Math.min(100, v))}%`;
 
-function planInicial() {
-  const base = partida?.ultimoPlan;
+function planPublicidad() {
+  const sugeridas = partida ? horasPublicidadSugeridas(partida) : 4;
+  return { horasRedes: partida?.ultimaPublicidad ?? sugeridas, promo: false };
+}
+
+// Por defecto se produce lo que falta para cubrir los pedidos.
+function planProduccion() {
+  const sem = partida.semanaEnCurso;
+  const pedidas = unidadesPedidas(sem);
   const producir = {};
-  for (const id of Object.keys(PRODUCTOS)) producir[id] = base?.producir?.[id] ?? 0;
-  return { producir, horasRedes: base?.horasRedes ?? 4, feria: base?.feria ?? false, curso: false, promo: false };
+  for (const id of Object.keys(PRODUCTOS)) producir[id] = Math.max(0, pedidas[id] - partida.stock[id]);
+  return { producir, feria: partida.ultimaFeria ?? false, curso: false };
+}
+
+function prepararPlanes() {
+  pub = planPublicidad();
+  plan = partida.semanaEnCurso ? planProduccion() : null;
 }
 
 function guardarPartida() {
@@ -54,7 +68,7 @@ function pantallaInicio() {
   if (guardada) {
     document.getElementById('continuar').onclick = () => {
       partida = guardada;
-      plan = planInicial();
+      prepararPlanes();
       siguientePantalla();
     };
   }
@@ -91,7 +105,7 @@ function pantallaPrestamo() {
     b.onclick = () => {
       borrar();
       partida = nuevaPartida(b.dataset.opcion);
-      plan = planInicial();
+      prepararPlanes();
       aviso = `Elegiste la opción ${b.dataset.opcion}. Compraste la máquina de tazas: te quedan ${plata(partida.plata)} para insumos.`;
       guardarPartida();
       pantallaSemana();
@@ -100,41 +114,23 @@ function pantallaPrestamo() {
   document.getElementById('volver').onclick = pantallaInicio;
 }
 
-// ---------- Pantalla: planificar la semana ----------
-function pantallaSemana() {
-  const e = partida;
+// ---------- Bloques comunes ----------
+function bloqueEncabezado(e, extra = '') {
   const c = calendario(e.semana);
-  const fecha = fechaEspecial(e.semana);
-  const v = validarPlan(e, plan);
-  const horasPct = (v.horas / HORAS_POR_SEMANA) * 100;
-  const tutorial = e.semana <= 8 ? TUTORIAL[e.semana] : null;
-  const productos = Object.keys(PRODUCTOS).filter((id) => e.maquinas[PRODUCTOS[id].maquina]);
-  const demandaTotal = productos.reduce((s, id) => s + demandaEsperada(e, id), 0);
-  const horasSugeridas = Math.ceil(demandaTotal * horasPorVenta(e));
-  const p = e.prestamo;
+  return `<div class="encabezado">
+      <div class="fila"><span class="plata">${plata(e.plata)}</span><span class="fecha">Semana ${e.semana} · ${c.nombreMes} (${c.estacion})</span></div>
+      ${extra}
+    </div>`;
+}
 
+function bloqueEstado(e) {
+  const c = calendario(e.semana);
+  const p = e.prestamo;
   let estadoPrestamo;
   if (p.pagado) estadoPrestamo = 'Pagado ✔';
   else if (p.opcion === 'A') estadoPrestamo = p.vencido ? `Vencido: debés ${plata(p.deuda)}` : `Opción A · hoy saldás con ${plata(costoPagoAnticipadoA(e.semana))}`;
   else estadoPrestamo = `Opción B · ${p.cuotasPagadas + p.cuotasPerdonadas}/${PRESTAMO.B.cuotas} cuotas${p.atrasadas ? ` · ${p.atrasadas} atrasada(s)` : ''}`;
-
-  app.innerHTML = `
-    <div class="encabezado">
-      <div class="fila"><span class="plata">${plata(e.plata)}</span><span class="fecha">Semana ${e.semana} · ${c.nombreMes} (${c.estacion})</span></div>
-    </div>
-    ${aviso ? `<div class="tarjeta tio"><p>${aviso}</p></div>` : ''}
-    ${tutorial ? `<div class="tarjeta tio"><p>${tutorial}</p></div>` : ''}
-    ${puedeHacerPromo(e) ? `<div class="tarjeta rumor">
-      <p>🗣️ ${e.primo.rumor}</p>
-      <label class="interruptor">
-        <span><strong>Lanzar promo de contraataque</strong><br><span class="suave">${Math.round(PROMO.descuento * 100)}% de descuento en redes · ${PROMO.horas} h. Si Lelo ataca, no te saca clientes y atraés un ${Math.round(PROMO.extraDemanda * 100)}% más. Si era humo, regalaste el descuento.</span></span>
-        <input type="checkbox" id="promo" ${plan.promo ? 'checked' : ''}>
-      </label>
-    </div>` : ''}
-    ${fecha ? `<div class="tarjeta tio"><p><strong>${fecha.nombre}</strong>: esta semana se vende mucho más.</p></div>` : ''}
-    ${e.mejorDeLaCiudad ? '<div class="tarjeta"><p><strong>Sos el mejor de la ciudad.</strong> Lelo trabaja para vos. Lo que sigue (empleados, provincia) llega en la próxima versión.</p></div>' : ''}
-
-    <div class="tarjeta">
+  return `<div class="tarjeta">
       <div class="stats">
         <div class="stat"><div class="etiqueta">Reputación (ciudad)</div><div class="valor">${Math.floor(e.rep)}/100</div><div class="barra"><span style="width:${pct(e.rep)}"></span></div></div>
         <div class="stat"><div class="etiqueta">Lelo (tu primo)</div><div class="valor">${e.mejorDeLaCiudad ? 'Tu empleado' : `${Math.floor(e.primo.rep)}/100`}</div><div class="barra"><span style="width:${pct(e.mejorDeLaCiudad ? 0 : e.primo.rep)}"></span></div></div>
@@ -143,18 +139,144 @@ function pantallaSemana() {
         <div class="stat"><div class="etiqueta">Préstamo</div><div class="valor" style="font-size:.85rem">${estadoPrestamo}</div></div>
         <div class="stat"><div class="etiqueta">Confianza del tío</div><div class="valor">${e.tio.confianza}/100</div></div>
       </div>
-      <p class="suave" style="margin-top:8px">Gastos fijos del mes: ${plata(gastosFijosDelMes(e))} (se pagan en la última semana de ${c.nombreMes.toLowerCase()}${c.finDeMes ? ': ¡es esta!' : ''}).</p>
+      <p class="suave" style="margin-top:8px">Stock: ${Object.keys(PRODUCTOS).filter((id) => e.maquinas[PRODUCTOS[id].maquina]).map((id) => `${e.stock[id]} ${nombreUnidades(id, e.stock[id])}`).join(' · ')}</p>
+      <p class="suave">Gastos fijos del mes: ${plata(gastosFijosDelMes(e))} (se pagan en la última semana de ${c.nombreMes.toLowerCase()}${c.finDeMes ? ': ¡es esta!' : ''}).</p>
+    </div>`;
+}
+
+function barraInferior(horas, costo, errores, textoBoton, idBoton) {
+  const horasPct = (horas / HORAS_POR_SEMANA) * 100;
+  return `<div class="barra-inferior"><div class="contenido">
+      <div class="resumen-plan"><span>Horas: <strong>${String(horas).replace('.', ',')}</strong> / ${HORAS_POR_SEMANA}</span>${costo !== null ? `<span>Gastás: <strong>${plata(costo)}</strong></span>` : ''}</div>
+      <div class="barra horas ${horas > HORAS_POR_SEMANA ? 'pasado' : ''}" style="margin-bottom:8px"><span style="width:${pct(horasPct)}"></span></div>
+      ${errores.length ? `<ul class="errores">${errores.map((x) => `<li>${x}</li>`).join('')}</ul>` : ''}
+      <button class="boton" id="${idBoton}" ${errores.length ? 'disabled' : ''}>${textoBoton}</button>
+    </div></div>`;
+}
+
+function conectarComprasYReinicio() {
+  const gorras = document.getElementById('comprarGorras');
+  if (gorras) gorras.onclick = () => { const r = comprarMaquina(partida, 'gorras'); aviso = r.ok ? r.mensaje : r.motivo; if (r.ok) guardarPartida(); refrescar(true); };
+  const pagar = document.getElementById('pagarTio');
+  if (pagar) pagar.onclick = () => { const r = pagarPrestamoA(partida); aviso = r.ok ? r.mensaje : r.motivo; if (r.ok) guardarPartida(); refrescar(true); };
+  document.getElementById('reiniciar').onclick = () => {
+    if (!confirmarReinicio) { confirmarReinicio = true; refrescar(); return; }
+    confirmarReinicio = false;
+    borrar();
+    partida = null;
+    pantallaInicio();
+  };
+}
+
+function bloqueComprasYReinicio(e) {
+  const p = e.prestamo;
+  return `<div class="tarjeta">
+      <h2>Comprar y pagar</h2>
+      ${!e.maquinas.gorras ? `<button class="boton secundario" id="comprarGorras">Comprar máquina de gorras (${plata(MAQUINAS.gorras.precio)})</button>` : '<p class="suave">Ya tenés la máquina de gorras.</p>'}
+      ${p.opcion === 'A' && !p.pagado ? `<button class="boton secundario" id="pagarTio">Pagarle al tío ahora (${plata(p.vencido ? p.deuda : costoPagoAnticipadoA(e.semana))})</button>` : ''}
+    </div>
+    <div class="tarjeta">
+      <button class="boton peligro" id="reiniciar">${confirmarReinicio ? 'Tocá de nuevo para borrar la partida' : 'Empezar de nuevo'}</button>
+    </div>`;
+}
+
+// ---------- Paso 1: publicidad en redes ----------
+function pantallaPublicidad() {
+  const e = partida;
+  const fecha = fechaEspecial(e.semana);
+  const tutorial = e.semana <= 8 ? TUTORIAL[e.semana] : null;
+  const productos = Object.keys(PRODUCTOS).filter((id) => e.maquinas[PRODUCTOS[id].maquina]);
+  const mercado = productos.reduce((s, id) => s + demandaEsperada(e, id), 0) * (pub.promo ? 1 + PROMO.extraDemanda : 1);
+  const porHora = 1 / horasPorVenta(e);
+  const sugeridas = Math.ceil(mercado / porHora);
+  const v = validarPublicidad(e, pub);
+  const horas = pub.horasRedes + (pub.promo ? PROMO.horas : 0) + (e.curso.semanasRestantes > 0 ? CURSO_CORTO.horasPorSemana : 0);
+
+  app.innerHTML = `
+    ${bloqueEncabezado(e, '<div class="paso-semana">Paso 1 de 2 · Publicidad</div>')}
+    ${aviso ? `<div class="tarjeta tio"><p>${aviso}</p></div>` : ''}
+    ${tutorial ? `<div class="tarjeta tio"><p>${tutorial}</p></div>` : ''}
+    ${fecha ? `<div class="tarjeta tio"><p><strong>${fecha.nombre}</strong>: esta semana llegan muchos más pedidos.</p></div>` : ''}
+    ${e.mejorDeLaCiudad ? '<div class="tarjeta"><p><strong>Sos el mejor de la ciudad.</strong> Lelo trabaja para vos. Lo que sigue (empleados, provincia) llega en la próxima versión.</p></div>' : ''}
+    ${puedeHacerPromo(e) ? `<div class="tarjeta rumor">
+      <p>🗣️ ${e.primo.rumor}</p>
+      <label class="interruptor">
+        <span><strong>Lanzar promo de contraataque</strong><br><span class="suave">${Math.round(PROMO.descuento * 100)}% de descuento en los pedidos de esta semana · ${PROMO.horas} h. Si Lelo ataca, no te saca ningún pedido y te llegan un ${Math.round(PROMO.extraDemanda * 100)}% más. Si era humo, regalaste el descuento.</span></span>
+        <input type="checkbox" id="promo" ${pub.promo ? 'checked' : ''}>
+      </label>
+    </div>` : ''}
+
+    <div class="tarjeta">
+      <h2>Publicidad en redes</h2>
+      <p class="suave">Publicás en Instagram y Marketplace y respondés consultas. <strong>Así te llegan los pedidos</strong>: cada hora atrae unos ${String(Math.round(porHora * 10) / 10).replace('.', ',')} productos pedidos.</p>
+      <p class="suave">Esta semana el mercado pide unos <strong>${Math.round(mercado)}</strong> productos: con <strong>${sugeridas} h</strong> llegás a todos. Más horas no suman pedidos.</p>
+      <div class="producto">
+        <div class="info"><div class="nombre">Horas de publicidad</div><div class="detalle">Después de ver los pedidos vas a producir con las horas que te queden.</div></div>
+        <div class="paso">
+          <button data-redes="-1" aria-label="Menos horas">−</button>
+          <span class="numero">${pub.horasRedes}</span>
+          <button data-redes="1" aria-label="Más horas">+</button>
+        </div>
+      </div>
+    </div>
+
+    ${bloqueEstado(e)}
+    ${bloqueComprasYReinicio(e)}
+    ${barraInferior(horas, null, v.errores, 'Publicar y ver los pedidos', 'publicar')}
+  `;
+  aviso = null;
+
+  app.querySelectorAll('[data-redes]').forEach((b) => { b.onclick = () => { pub.horasRedes = Math.max(0, pub.horasRedes + Number(b.dataset.redes)); refrescar(); }; });
+  const promo = document.getElementById('promo');
+  if (promo) promo.onchange = (ev) => { pub.promo = ev.target.checked; refrescar(); };
+  conectarComprasYReinicio();
+  document.getElementById('publicar').onclick = () => {
+    const r = publicar(partida, pub);
+    if (!r.ok) { aviso = r.errores.join(' '); refrescar(true); return; }
+    partida.ultimaPublicidad = pub.horasRedes;
+    guardarPartida();
+    plan = planProduccion();
+    window.scrollTo(0, 0);
+    pantallaSemana();
+  };
+}
+
+// ---------- Paso 2: pedidos y producción ----------
+function pantallaPedidos() {
+  const e = partida;
+  const sem = e.semanaEnCurso;
+  const pedidas = unidadesPedidas(sem);
+  const productos = Object.keys(PRODUCTOS).filter((id) => e.maquinas[PRODUCTOS[id].maquina]);
+  const v = validarPlan(e, plan);
+  const precio = (p) => Math.round(p.cantidad * PRODUCTOS[p.producto].precio * (sem.promo ? 1 - PROMO.descuento : 1));
+
+  app.innerHTML = `
+    ${bloqueEncabezado(e, '<div class="paso-semana">Paso 2 de 2 · Pedidos y producción</div>')}
+    ${aviso ? `<div class="tarjeta tio"><p>${aviso}</p></div>` : ''}
+    ${sem.eventos.length ? `<div class="tarjeta"><ul class="eventos">${sem.eventos.map((ev) => `<li class="${ev.tipo}">${ev.texto}</li>`).join('')}</ul></div>` : ''}
+
+    <div class="tarjeta">
+      <h2>Pedidos de la semana (${sem.pedidos.filter((p) => !p.rechazado).length})</h2>
+      ${sem.pedidos.length ? sem.pedidos.map((p) => `
+        <div class="pedido ${p.rechazado ? 'rechazado' : ''}">
+          <div class="info">
+            <div class="nombre">${p.cantidad} ${nombreUnidades(p.producto, p.cantidad)}</div>
+            <div class="detalle">${p.cliente} · ${plata(precio(p))}${p.rechazado ? ' · rechazado' : ''}</div>
+          </div>
+          <button class="chico" data-rechazar="${p.id}">${p.rechazado ? 'Aceptar' : 'Rechazar'}</button>
+        </div>`).join('') : '<p class="suave">No llegaron pedidos. Probá con más horas de publicidad la semana que viene.</p>'}
+      <p class="suave" style="margin-top:8px">Si no entregás un pedido aceptado perdés reputación. Si sabés que no llegás, rechazalo: perdés mucho menos.</p>
     </div>
 
     <div class="tarjeta">
       <h2>Producir</h2>
       ${productos.map((id) => {
         const pr = PRODUCTOS[id];
-        const h = horasPorUnidad(e, id);
+        const faltan = Math.max(0, pedidas[id] - e.stock[id]);
         return `<div class="producto">
           <div class="info">
             <div class="nombre">${pr.nombre}</div>
-            <div class="detalle">Stock ${e.stock[id]} · piden ~${Math.round(demandaEsperada(e, id))}/sem<br>${Math.round(h * 60)} min · costo ${plata(pr.costo)} → venta ${plata(pr.precio)}</div>
+            <div class="detalle">Pedidos ${pedidas[id]} · stock ${e.stock[id]} · <strong>faltan ${faltan}</strong><br>${Math.round(horasPorUnidad(e, id) * 60)} min c/u · costo ${plata(pr.costo)}</div>
           </div>
           <div class="paso">
             <button data-menos="${id}" aria-label="Menos">−</button>
@@ -163,23 +285,9 @@ function pantallaSemana() {
           </div>
         </div>`;
       }).join('')}
-    </div>
-
-    <div class="tarjeta">
-      <h2>Vender</h2>
-      <div class="producto">
-        <div class="info">
-          <div class="nombre">Horas en redes y Marketplace</div>
-          <div class="detalle">Cada venta lleva ~${Math.round(horasPorVenta(e) * 60)} min de atención. Para esta semana se sugieren ~${horasSugeridas} h.</div>
-        </div>
-        <div class="paso">
-          <button data-redes="-1" aria-label="Menos horas">−</button>
-          <span class="numero">${plan.horasRedes}</span>
-          <button data-redes="1" aria-label="Más horas">+</button>
-        </div>
-      </div>
+      <p class="suave" style="margin-top:8px">Alguna puede salir mal en la prensa (hoy ~${Math.round(probabilidadError(e) * 100)}%): producir una de más te cubre.</p>
       <label class="interruptor">
-        <span><strong>Ir a la feria</strong><br><span class="suave">Mesa ${plata(VENTAS.feria.costoMesa)} · ${VENTAS.feria.horas} h · vende de tu stock</span></span>
+        <span><strong>Ir a la feria</strong><br><span class="suave">Mesa ${plata(VENTAS.feria.costoMesa)} · ${VENTAS.feria.horas} h · vende lo que te sobre de stock (5 a 8 productos)</span></span>
         <input type="checkbox" id="feria" ${plan.feria ? 'checked' : ''}>
       </label>
     </div>
@@ -194,48 +302,34 @@ function pantallaSemana() {
               <input type="checkbox" id="curso" ${plan.curso ? 'checked' : ''}>
             </label>`
           : '<p class="suave">Los cursos se habilitan en la semana 7.</p>'}
-      <p class="suave">Formación actual: ${Math.round(e.formacion.fija + e.formacion.actualizacion)}/100 (menos errores).</p>
     </div>
 
-    <div class="tarjeta">
-      <h2>Comprar y pagar</h2>
-      ${!e.maquinas.gorras ? `<button class="boton secundario" id="comprarGorras">Comprar máquina de gorras (${plata(MAQUINAS.gorras.precio)})</button>` : '<p class="suave">Ya tenés la máquina de gorras.</p>'}
-      ${p.opcion === 'A' && !p.pagado ? `<button class="boton secundario" id="pagarTio">Pagarle al tío ahora (${plata(p.vencido ? p.deuda : costoPagoAnticipadoA(e.semana))})</button>` : ''}
-    </div>
-
-    <div class="tarjeta">
-      <button class="boton peligro" id="reiniciar">${confirmarReinicio ? 'Tocá de nuevo para borrar la partida' : 'Empezar de nuevo'}</button>
-    </div>
-
-    <div class="barra-inferior"><div class="contenido">
-      <div class="resumen-plan"><span>Horas: <strong>${v.horas}</strong> / ${HORAS_POR_SEMANA}</span><span>Gastás: <strong>${plata(v.costo)}</strong></span></div>
-      <div class="barra horas ${v.horas > HORAS_POR_SEMANA ? 'pasado' : ''}" style="margin-bottom:8px"><span style="width:${pct(horasPct)}"></span></div>
-      ${v.ok ? '' : `<ul class="errores">${v.errores.map((x) => `<li>${x}</li>`).join('')}</ul>`}
-      <button class="boton" id="terminar" ${v.ok ? '' : 'disabled'}>Terminar la semana</button>
-    </div></div>
+    ${bloqueEstado(e)}
+    ${barraInferior(v.horas, v.costo, v.errores, 'Producir, entregar y cerrar la semana', 'terminar')}
   `;
   aviso = null;
 
+  app.querySelectorAll('[data-rechazar]').forEach((b) => {
+    b.onclick = () => {
+      const p = sem.pedidos.find((x) => x.id === b.dataset.rechazar);
+      rechazarPedido(partida, p.id, !p.rechazado);
+      const ped = unidadesPedidas(partida.semanaEnCurso);
+      plan.producir[p.producto] = Math.max(0, ped[p.producto] - e.stock[p.producto]);
+      guardarPartida();
+      refrescar();
+    };
+  });
   app.querySelectorAll('[data-mas]').forEach((b) => { b.onclick = () => { plan.producir[b.dataset.mas]++; refrescar(); }; });
   app.querySelectorAll('[data-menos]').forEach((b) => { b.onclick = () => { plan.producir[b.dataset.menos] = Math.max(0, plan.producir[b.dataset.menos] - 1); refrescar(); }; });
-  app.querySelectorAll('[data-redes]').forEach((b) => { b.onclick = () => { plan.horasRedes = Math.max(0, plan.horasRedes + Number(b.dataset.redes)); refrescar(); }; });
   document.getElementById('feria').onchange = (ev) => { plan.feria = ev.target.checked; refrescar(); };
-  const promo = document.getElementById('promo');
-  if (promo) promo.onchange = (ev) => { plan.promo = ev.target.checked; refrescar(); };
   const curso = document.getElementById('curso');
   if (curso) curso.onchange = (ev) => { plan.curso = ev.target.checked; refrescar(); };
-  const gorras = document.getElementById('comprarGorras');
-  if (gorras) gorras.onclick = () => { const r = comprarMaquina(partida, 'gorras'); aviso = r.ok ? r.mensaje : r.motivo; if (r.ok) guardarPartida(); refrescar(true); };
-  const pagar = document.getElementById('pagarTio');
-  if (pagar) pagar.onclick = () => { const r = pagarPrestamoA(partida); aviso = r.ok ? r.mensaje : r.motivo; if (r.ok) guardarPartida(); refrescar(true); };
-  document.getElementById('reiniciar').onclick = () => {
-    if (!confirmarReinicio) { confirmarReinicio = true; refrescar(); return; }
-    confirmarReinicio = false;
-    borrar();
-    partida = null;
-    pantallaInicio();
-  };
   document.getElementById('terminar').onclick = terminarSemana;
+}
+
+function pantallaSemana() {
+  if (partida.semanaEnCurso) pantallaPedidos();
+  else pantallaPublicidad();
 }
 
 function refrescar(arriba = false) {
@@ -245,12 +339,12 @@ function refrescar(arriba = false) {
 }
 
 function terminarSemana() {
-  const planJugado = JSON.parse(JSON.stringify(plan));
-  const r = jugarSemana(partida, plan);
+  const feria = plan.feria;
+  const r = cerrarSemana(partida, plan);
   if (!r.ok) { aviso = r.errores.join(' '); refrescar(true); return; }
-  partida.ultimoPlan = { ...planJugado, curso: false, promo: false };
+  partida.ultimaFeria = feria;
   guardarPartida();
-  plan = planInicial();
+  pub = planPublicidad();
   pantallaResumen(r.resumen);
 }
 
