@@ -1,0 +1,103 @@
+// Simulación de balance: un "jugador razonable" juega muchas partidas automáticas
+// y se comparan los resultados con lo que dice el documento de reglas.
+// Uso: node tests/simulacion.js
+import {
+  nuevaPartida, jugarSemana, demandaEsperada, horasPorUnidad, horasPorVenta, validarPlan,
+  comprarMaquina, pagarPrestamoA, costoPagoAnticipadoA, calendario, PRODUCTOS, VENTAS,
+} from '../js/engine.js';
+
+function planRazonable(e) {
+  const producir = {};
+  let redes = 0;
+  const ids = Object.keys(PRODUCTOS).filter((id) => e.maquinas[PRODUCTOS[id].maquina]);
+  const totalEsperado = ids.reduce((s, id) => s + demandaEsperada(e, id), 0);
+  for (const id of ids) {
+    const objetivo = Math.ceil(demandaEsperada(e, id) * 1.15) + 3; // redes + feria
+    producir[id] = Math.max(0, objetivo - e.stock[id]);
+  }
+  redes = Math.ceil(totalEsperado * 1.2 * horasPorVenta(e));
+  const plan = { producir, horasRedes: redes, feria: true, curso: false };
+  if (e.semana >= 7 && e.curso.semanasRestantes === 0 && e.formacion.actualizacion < 10 && e.plata > 60000) plan.curso = true;
+  // Recortar si no alcanza la plata o las horas
+  for (let i = 0; i < 200 && !validarPlan(e, plan).ok; i++) {
+    const id = ids.find((x) => plan.producir[x] > 0);
+    if (plan.curso) plan.curso = false;
+    else if (id) plan.producir[id]--;
+    else if (plan.feria) plan.feria = false;
+    else break;
+  }
+  return plan;
+}
+
+function jugarPartida(opcion, semilla, semanas = 104) {
+  const e = nuevaPartida(opcion, semilla);
+  const registro = { tutorial: 0, semanaGorras: null, semanaMejorCiudad: null, semanaPagoA: null, quiebra: false, meses: [] };
+  for (let s = 1; s <= semanas && !e.fin; s++) {
+    if (!e.maquinas.gorras && e.semana > 8 && e.plata > 150000 + 60000) {
+      comprarMaquina(e, 'gorras');
+      registro.semanaGorras = e.semana;
+    }
+    if (opcion === 'A' && !e.prestamo.pagado && e.plata > costoPagoAnticipadoA(e.semana) + 80000) {
+      if (pagarPrestamoA(e).ok) registro.semanaPagoA = e.semana;
+    }
+    const plataAntes = e.plata;
+    const res = jugarSemana(e, planRazonable(e));
+    if (!res.ok) throw new Error(`Plan inválido en semana ${e.semana}: ${res.errores.join(' ')}`);
+    if (res.resumen.semana <= 8) registro.tutorial += 0; // se mide por meses abajo
+    if (res.resumen.gananciaMes !== undefined) registro.meses.push(res.resumen.gananciaMes);
+    if (Number.isNaN(e.plata) || Number.isNaN(e.rep)) throw new Error('Apareció un NaN');
+    if (res.resumen.hito === 'mejorDeLaCiudad') registro.semanaMejorCiudad = res.resumen.semana;
+    void plataAntes;
+  }
+  registro.quiebra = e.fin === 'quiebra';
+  registro.final = { plata: e.plata, rep: e.rep, exp: e.exp, primo: e.primo.rep, prestamo: e.prestamo, confianza: e.tio.confianza };
+  return registro;
+}
+
+const promedio = (xs) => (xs.length ? xs.reduce((s, x) => s + x, 0) / xs.length : NaN);
+const fmt = (n) => Math.round(n).toLocaleString('es-AR');
+
+let fallas = 0;
+const chequear = (cond, texto) => { console.log(`${cond ? 'OK  ' : 'FALLA'} ${texto}`); if (!cond) fallas++; };
+
+for (const opcion of ['A', 'B']) {
+  const partidas = Array.from({ length: 200 }, (_, i) => jugarPartida(opcion, 1000 + i));
+  // Ganancia de enero y febrero (sin contar cuota en A): meses[0], meses[1]
+  const tutorialMes = promedio(partidas.map((p) => promedio(p.meses.slice(0, 2))));
+  const ciudad = partidas.map((p) => p.semanaMejorCiudad).filter(Boolean);
+  const gorras = partidas.map((p) => p.semanaGorras).filter(Boolean);
+  const quiebras = partidas.filter((p) => p.quiebra).length;
+  console.log(`\n=== Opción ${opcion} (200 partidas) ===`);
+  console.log(`Resultado neto por mes en el tutorial: $${fmt(tutorialMes)} (después de gastos fijos${opcion === 'B' ? ' y cuota' : ''})`);
+  console.log(`Compra de la máquina de gorras: semana ${fmt(promedio(gorras))} en promedio (${gorras.length}/200 partidas)`);
+  console.log(`Mejor de la ciudad: semana ${fmt(promedio(ciudad))} en promedio (${ciudad.length}/200 partidas)`);
+  if (opcion === 'A') {
+    const pagos = partidas.map((p) => p.semanaPagoA).filter(Boolean);
+    console.log(`Pago anticipado al tío: semana ${fmt(promedio(pagos))} (${pagos.length}/200)`);
+  } else {
+    console.log(`Préstamo B saldado: ${partidas.filter((p) => p.final.prestamo.pagado).length}/200`);
+  }
+  console.log(`Quiebras: ${quiebras}/200. Plata final (2 años): $${fmt(promedio(partidas.map((p) => p.final.plata)))}. Primo: ${promedio(partidas.map((p) => p.final.primo)).toFixed(1)}`);
+
+  chequear(quiebras === 0, `Opción ${opcion}: un jugador razonable no quiebra`);
+  chequear(ciudad.length >= 180, `Opción ${opcion}: casi siempre llega a ser el mejor de la ciudad en 2 años`);
+  chequear(promedio(ciudad) >= 18 && promedio(ciudad) <= 45, `Opción ${opcion}: ser el mejor de la ciudad lleva entre 18 y 45 semanas (objetivo ~26)`);
+  chequear(promedio(gorras) <= 24, `Opción ${opcion}: la máquina de gorras llega antes de mitad de año`);
+}
+
+// Chequeos puntuales del calendario y del préstamo
+chequear(calendario(8).finDeMes && calendario(8).nombreMes === 'Febrero', 'La semana 8 cierra febrero (fin del tutorial)');
+chequear(calendario(52).nombreMes === 'Diciembre' && calendario(53).nombreMes === 'Enero', 'El año tiene 52 semanas');
+chequear(costoPagoAnticipadoA(26) === 220000, 'Pago anticipado en la semana 26 = $220.000');
+chequear(VENTAS.feria.costoMesa === 10000, 'La mesa de la feria cuesta $10.000');
+chequear(Math.abs(horasPorUnidad({ exp: 35 }, 'tazaCeramica') - 0.44) < 0.01, 'Con 35 de experiencia una taza lleva ~26 minutos');
+
+const b = nuevaPartida('B', 7);
+let pagadoB = 0;
+for (let s = 0; s < 52; s++) { const antes = b.plata; jugarSemana(b, { producir: {}, horasRedes: 0, feria: false }); void antes; }
+pagadoB = b.prestamo.cuotasPagadas;
+chequear(b.prestamo.cuotasPerdonadas === 1, 'Opción B: se perdona la cuota de febrero');
+void pagadoB;
+
+console.log(fallas ? `\n${fallas} chequeo(s) fallaron.` : '\nTodos los chequeos pasaron.');
+process.exit(fallas ? 1 : 0);

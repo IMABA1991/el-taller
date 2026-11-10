@@ -1,0 +1,123 @@
+/* El Taller — versión sin diseño: simple, legible y pensada para celular. */
+:root {
+  --fondo: #f4f5f7;
+  --tarjeta: #ffffff;
+  --texto: #1d2433;
+  --suave: #5c6578;
+  --borde: #dde1e8;
+  --principal: #1f2a44;
+  --acento: #2f6fde;
+  --bien: #1e8a4c;
+  --bien-fondo: #e7f5ec;
+  --mal: #c0392b;
+  --mal-fondo: #fbecea;
+  --aviso-fondo: #fff6df;
+  --radio: 12px;
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  background: var(--fondo);
+  color: var(--texto);
+  font-size: 16px;
+  line-height: 1.45;
+}
+#app {
+  max-width: 480px;
+  margin: 0 auto;
+  padding: 12px 12px calc(96px + env(safe-area-inset-bottom));
+}
+h1 { font-size: 1.6rem; margin: 8px 0 4px; }
+h2 { font-size: 1.1rem; margin: 0 0 8px; }
+p { margin: 0 0 10px; }
+.suave { color: var(--suave); font-size: 0.92rem; }
+.cargando { text-align: center; color: var(--suave); padding: 40px 0; }
+
+.tarjeta {
+  background: var(--tarjeta);
+  border: 1px solid var(--borde);
+  border-radius: var(--radio);
+  padding: 14px;
+  margin-bottom: 12px;
+}
+
+.encabezado {
+  position: sticky; top: 0; z-index: 2;
+  background: var(--principal); color: #fff;
+  border-radius: var(--radio);
+  padding: 10px 14px; margin-bottom: 12px;
+}
+.encabezado .fila { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.encabezado .plata { font-size: 1.35rem; font-weight: 700; }
+.encabezado .fecha { font-size: 0.9rem; opacity: 0.85; }
+
+.stats { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 12px; }
+.stat .etiqueta { font-size: 0.8rem; color: var(--suave); }
+.stat .valor { font-weight: 600; }
+.barra { height: 8px; background: #e7e9ee; border-radius: 4px; overflow: hidden; margin-top: 3px; }
+.barra > span { display: block; height: 100%; background: var(--acento); }
+.barra.cansancio > span { background: #e08a1e; }
+.barra.horas > span { background: var(--bien); }
+.barra.horas.pasado > span { background: var(--mal); }
+
+.tio { background: var(--aviso-fondo); border-color: #f0dca4; }
+
+.producto { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 0; border-top: 1px solid var(--borde); }
+.producto:first-of-type { border-top: 0; }
+.producto .info { flex: 1; min-width: 0; }
+.producto .nombre { font-weight: 600; }
+.producto .detalle { font-size: 0.82rem; color: var(--suave); }
+
+.paso { display: flex; align-items: center; gap: 6px; }
+.paso button {
+  width: 44px; height: 44px; border-radius: 10px;
+  border: 1px solid var(--borde); background: #fff;
+  font-size: 1.4rem; line-height: 1; color: var(--principal);
+}
+.paso button:active { background: #eef1f6; }
+.paso .numero { min-width: 34px; text-align: center; font-weight: 700; font-size: 1.1rem; }
+
+.interruptor { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 0; border-top: 1px solid var(--borde); }
+.interruptor input { width: 26px; height: 26px; }
+
+.boton {
+  display: block; width: 100%;
+  min-height: 48px; padding: 12px 16px;
+  border-radius: var(--radio); border: 0;
+  background: var(--acento); color: #fff;
+  font-size: 1.05rem; font-weight: 600;
+  margin-bottom: 10px; cursor: pointer;
+}
+.boton.secundario { background: #fff; color: var(--principal); border: 1px solid var(--borde); }
+.boton.peligro { background: #fff; color: var(--mal); border: 1px solid #efc2bc; }
+.boton:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.barra-inferior {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 3;
+  background: rgba(244, 245, 247, 0.97);
+  border-top: 1px solid var(--borde);
+  padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
+}
+.barra-inferior .contenido { max-width: 480px; margin: 0 auto; }
+.barra-inferior .resumen-plan { display: flex; justify-content: space-between; font-size: 0.88rem; margin-bottom: 6px; }
+.barra-inferior .boton { margin-bottom: 0; }
+
+.errores { color: var(--mal); font-size: 0.88rem; margin: 0 0 6px; padding-left: 18px; }
+
+.eventos { list-style: none; padding: 0; margin: 0; }
+.eventos li { padding: 9px 10px; border-radius: 8px; margin-bottom: 6px; background: #f1f3f7; font-size: 0.95rem; }
+.eventos li.buena { background: var(--bien-fondo); }
+.eventos li.mala { background: #fbecea; }
+.eventos li.hito { background: var(--principal); color: #fff; font-weight: 600; }
+
+.numeros { display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; font-size: 0.95rem; }
+.positivo { color: var(--bien); font-weight: 600; }
+.negativo { color: var(--mal); font-weight: 600; }
+
+.opcion { border: 2px solid var(--borde); }
+.opcion h2 { margin-bottom: 4px; }
+.opcion ul { margin: 6px 0 10px; padding-left: 18px; font-size: 0.93rem; }
+
+.chip { display: inline-block; font-size: 0.75rem; padding: 2px 8px; border-radius: 999px; background: #e9edf5; color: var(--principal); margin-left: 6px; vertical-align: middle; }
