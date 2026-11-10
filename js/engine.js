@@ -1,6 +1,6 @@
 // Motor del juego "El Taller". Lógica pura: no toca la pantalla ni el guardado.
 import {
-  HORAS_POR_SEMANA, SEMANAS_POR_ANIO, MESES, MAQUINAS, PRODUCTOS, FECHAS_ESPECIALES,
+  HORAS_POR_SEMANA, SEMANAS_POR_ANIO, MESES, MAQUINAS, PRODUCTOS, FECHAS_ESPECIALES, RAMPA_FECHA,
   PRESTAMO, GASTOS_FIJOS, VENTAS, REPUTACION, PRIMO, CURSO_CORTO, MAZO, TUTORIAL, PROMO, CLIENTES,
 } from './data.js';
 
@@ -37,9 +37,36 @@ export function calendario(semana) {
   throw new Error('Semana fuera de calendario');
 }
 
-export function fechaEspecial(semana) {
-  const c = calendario(semana);
-  return FECHAS_ESPECIALES.find((f) => f.mes === c.mes && f.semanas.includes(c.semanaDelMes)) || null;
+function semanaPico(f) {
+  return MESES.slice(0, f.mes).reduce((s, m) => s + m.semanas, 0) + f.semana;
+}
+
+// Fecha especial que se viene (o es esta semana): { fecha, faltan } con faltan entre 0 y 3.
+export function fechaProxima(semana) {
+  const enAnio = calendario(semana).semanaEnAnio;
+  for (const f of FECHAS_ESPECIALES) {
+    const faltan = semanaPico(f) - enAnio;
+    if (faltan >= 0 && faltan <= 3) return { fecha: f, faltan };
+  }
+  return null;
+}
+
+export function multiplicadorFecha(semana, idProducto) {
+  const p = fechaProxima(semana);
+  const efecto = p?.fecha.efecto[idProducto];
+  if (!efecto) return 1;
+  return 1 + (efecto - 1) * RAMPA_FECHA[p.faltan];
+}
+
+// Pista sin números para el jugador.
+export function avisoFecha(semana) {
+  const p = fechaProxima(semana);
+  if (!p) return null;
+  const n = p.fecha.nombre;
+  if (p.faltan === 3) return `Se viene ${n}: la gente empieza a pedir más, ya están buscando regalos.`;
+  if (p.faltan === 2) return `Faltan 2 semanas para ${n}: cada vez más gente busca regalos.`;
+  if (p.faltan === 1) return `Falta 1 semana para ${n}: hay mucha gente buscando regalos.`;
+  return `¡Esta semana termina con ${n}! Es la última para comprar regalos: hay muchísima gente buscando.`;
 }
 
 // ---------- Fórmulas ----------
@@ -91,8 +118,7 @@ export function demandaEsperada(e, idProducto, semana = e.semana) {
   if (!e.maquinas[p.maquina]) return 0;
   const c = calendario(semana);
   const temporada = p.temporada[c.estacion] ?? 1;
-  const fecha = fechaEspecial(semana);
-  const especial = fecha?.efecto[idProducto] ?? 1;
+  const especial = multiplicadorFecha(semana, idProducto);
   const ml = e.rep >= VENTAS.reputacionMercadoLibre ? 1 + VENTAS.extraMercadoLibre : 1;
   return p.base * multiplicadorProducto(e.rep, p.sens) * temporada * especial * ml;
 }
@@ -267,12 +293,18 @@ export function validarPublicidad(e, pub) {
   return { ok: errores.length === 0, errores };
 }
 
+export const DIAS = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+
 export function publicar(e, pub) {
   const v = validarPublicidad(e, pub);
   if (!v.ok) return { ok: false, errores: v.errores };
-  const eventos = [];
+  const eventos = []; // resumen que queda visible en el paso 2
   const evento = (t, tipo = 'info') => eventos.push({ texto: t, tipo });
+  const dias = DIAS.map((nombre) => ({ nombre, items: [] })); // línea de tiempo para la animación
+  const enDia = (d, texto, tipo = 'info') => dias[d].items.push({ texto, tipo });
+  const diaAlAzar = () => Math.floor(siguienteAzar(e) * 7);
   const compite = e.semana >= 4 && !e.mejorDeLaCiudad;
+  const horas = pub.horasRedes || 0;
 
   // Lelo hace lo que planeó la semana anterior
   const comp = PRIMO.comportamientos.find((x) => x.id === (e.primo.proximo || sortearComportamiento(e)));
@@ -280,21 +312,28 @@ export function publicar(e, pub) {
   e.primo.comportamiento = comp.id;
   if (compite) {
     if (pub.promo) {
-      if (comp.id === 'agresivo') evento('¡Tu promo frenó a Lelo! Su campaña no te sacó ningún pedido y encima atrajiste clientes nuevos.', 'buena');
-      else evento('Lanzaste la promo, pero el rumor era humo: Lelo ni apareció. Igual atrajiste algunos clientes.', 'info');
+      enDia(0, '📣 Lanzaste la promo de contraataque.', 'buena');
+      if (comp.id === 'agresivo') {
+        enDia(1, '😤 Lelo salió con volantes y precios de remate... pero tu promo ya estaba en todos lados.', 'info');
+        evento('¡Tu promo frenó a Lelo! Su campaña no te sacó ningún pedido y encima te llegaron clientes nuevos.', 'buena');
+      } else {
+        evento('Lanzaste la promo, pero el rumor era humo: Lelo ni apareció. Igual te llegaron algunos clientes más.', 'info');
+      }
     } else {
       if (habiaRumor && comp.id !== 'agresivo') evento('El rumor era humo: Lelo no hizo ninguna campaña agresiva.', 'buena');
       else if (habiaRumor) evento('El rumor era cierto.', 'mala');
       evento(comp.texto, comp.id === 'tranquilo' ? 'info' : 'mala');
+      if (comp.id === 'agresivo') enDia(1, '😤 Lelo salió con todo: volantes y precios de remate.', 'mala');
+      if (comp.id === 'ofertas') enDia(2, '🏷️ Lelo publicó un 2x1 en tazas.', 'mala');
     }
   }
   const sacaLelo = compite && !pub.promo ? comp.saca : 0;
   const extraPromo = pub.promo ? 1 + PROMO.extraDemanda : 1;
 
-  const fecha = fechaEspecial(e.semana);
-  if (fecha) evento(`¡${fecha.nombre}! Llegan muchos más pedidos de algunos productos.`, 'buena');
+  const aviso = avisoFecha(e.semana);
+  if (aviso) enDia(0, `📅 ${aviso}`, 'buena');
 
-  // Lo que pide el mercado esta semana
+  // Lo que pide el mercado esta semana (el jugador no lo ve)
   const mercado = {};
   let totalMercado = 0;
   for (const id of Object.keys(PRODUCTOS)) {
@@ -303,7 +342,7 @@ export function publicar(e, pub) {
   }
 
   // Cuánto alcanza tu publicidad
-  const alcance = Math.min(totalMercado, Math.floor((pub.horasRedes || 0) / horasPorVenta(e) + 1e-9));
+  const alcance = Math.min(totalMercado, Math.floor(horas / horasPorVenta(e) + 1e-9));
   const captadas = {};
   let resto = alcance;
   const ids = Object.keys(mercado).filter((id) => mercado[id] > 0);
@@ -313,7 +352,7 @@ export function publicar(e, pub) {
     if (captadas[id] < mercado[id]) { captadas[id]++; resto--; }
   }
 
-  // Se arman los pedidos (1 a 3 unidades cada uno) y Lelo te pelea cada uno
+  // Se arman los pedidos (1 a 3 unidades cada uno), llegan en distintos días y Lelo te pelea cada uno
   const pedidos = [];
   const deLelo = [];
   let n = 0;
@@ -323,27 +362,56 @@ export function publicar(e, pub) {
       const cantidad = Math.min(quedan, enteroEntre(e, 1, 3));
       quedan -= cantidad;
       const cliente = CLIENTES[Math.floor(siguienteAzar(e) * CLIENTES.length)];
-      const pedido = { id: `p${e.semana}-${++n}`, producto: id, cantidad, cliente, rechazado: false };
+      const pedido = { id: `p${e.semana}-${++n}`, producto: id, cantidad, cliente, rechazado: false, dia: diaAlAzar() };
       if (siguienteAzar(e) < sacaLelo) deLelo.push(pedido);
       else pedidos.push(pedido);
     }
   }
-  mezclar(e, pedidos);
+  pedidos.sort((a, b) => a.dia - b.dia);
+  for (const p of pedidos) enDia(p.dia, `📩 ${capitalizar(p.cliente)} te pidió ${p.cantidad} ${nombreUnidades(p.producto, p.cantidad)}.`, 'pedido');
+  for (const p of deLelo) enDia(p.dia, `😤 Lelo le ganó el pedido a ${p.cliente} (${p.cantidad} ${nombreUnidades(p.producto, p.cantidad)}).`, 'mala');
   if (deLelo.length) {
     const u = unidadesPedidas({ pedidos: deLelo });
     const detalle = Object.keys(u).filter((id) => u[id]).map((id) => `${u[id]} ${nombreUnidades(id, u[id])}`).join(', ');
     evento(`Lelo se quedó con ${deLelo.length} pedido${deLelo.length > 1 ? 's' : ''} (${detalle}).`, 'mala');
   }
-  const sinCaptar = totalMercado - alcance;
-  if (sinCaptar > 0 && totalMercado > 0) {
-    evento(`Con más horas de publicidad te podrían haber pedido ${sinCaptar} producto${sinCaptar > 1 ? 's' : ''} más.`, 'mala');
+
+  // Me gusta: la publicidad se reparte en los días; si te pasaste, los últimos avisos no tienen respuesta
+  const horasUtiles = totalMercado * horasPorVenta(e);
+  const sobrante = horas - horasUtiles;
+  const diasConAvisos = Math.min(7, horas);
+  for (let d = 0; d < diasConAvisos; d++) {
+    const ultimo = d >= diasConAvisos - Math.min(2, Math.ceil(Math.max(0, sobrante) / Math.max(1, horas / diasConAvisos)));
+    if (sobrante >= 1 && ultimo) enDia(d, '🦗 Tu aviso no tuvo ni un me gusta.', 'mala');
+    else enDia(d, `❤️ ${Math.max(1, Math.round(entre(e, 3, 9) * (1 + e.rep / 25)))} me gusta en tu publicación.`, 'info');
   }
 
+  // Balance del sábado (sin números exactos: siempre 2 pedidos menos de lo real)
+  const sinCaptar = totalMercado - alcance;
+  if (horas === 0) {
+    enDia(6, 'Sin publicidad, nadie se enteró de que vendés.', 'mala');
+    evento('No hiciste publicidad: nadie se enteró de que vendés.', 'mala');
+  } else if (sinCaptar > 0) {
+    const pedidosPerdidos = Math.ceil(sinCaptar / 2);
+    const texto = pedidosPerdidos - 2 >= 1
+      ? `En el mercado había más pedidos: al menos ${pedidosPerdidos - 2} quedaron sin atender.`
+      : 'Puede que algún cliente no te haya encontrado.';
+    enDia(6, `🔎 ${texto}`, 'mala');
+    evento(texto, 'mala');
+  } else if (sobrante >= 1) {
+    evento('Tus últimos avisos no tuvieron ni un me gusta.', 'mala');
+  }
+  enDia(6, pedidos.length ? `📦 Cierra la semana con ${pedidos.length} pedido${pedidos.length > 1 ? 's' : ''} para entregar el domingo.` : '📦 Cierra la semana sin pedidos.', 'cierre');
+
   e.semanaEnCurso = {
-    semana: e.semana, horasRedes: pub.horasRedes || 0, promo: Boolean(pub.promo),
-    pedidos, pedidosLelo: deLelo.length, mercado: totalMercado, eventos,
+    semana: e.semana, horasRedes: horas, promo: Boolean(pub.promo),
+    pedidos, pedidosLelo: deLelo.length, eventos, dias,
   };
   return { ok: true, semana: e.semanaEnCurso };
+}
+
+function capitalizar(t) {
+  return t.charAt(0).toUpperCase() + t.slice(1);
 }
 
 export function rechazarPedido(e, idPedido, rechazar = true) {

@@ -131,3 +131,32 @@ p { margin: 0 0 10px; }
 .pedido .detalle { font-size: 0.85rem; color: var(--suave); }
 .pedido.rechazado .nombre { text-decoration: line-through; color: var(--suave); }
 button.chico { min-height: 40px; padding: 6px 12px; border-radius: 10px; border: 1px solid var(--borde); background: #fff; color: var(--principal); font-size: 0.9rem; }
+
+/* Menú de tres puntitos */
+.encabezado { position: sticky; }
+.encabezado .fila { align-items: center; }
+.menu-boton { background: transparent; border: 0; color: #fff; font-size: 1.5rem; line-height: 1; padding: 4px 2px 4px 10px; cursor: pointer; }
+.menu { position: absolute; right: 10px; top: 52px; background: #fff; border: 1px solid var(--borde); border-radius: 10px; box-shadow: 0 6px 20px rgba(0,0,0,.15); overflow: hidden; z-index: 5; min-width: 230px; }
+.menu button { display: block; width: 100%; text-align: left; padding: 14px 16px; background: #fff; border: 0; border-top: 1px solid var(--borde); font-size: 1rem; color: var(--texto); }
+.menu button:first-child { border-top: 0; }
+.menu button.peligro { color: var(--mal); }
+
+/* Producción */
+.faltan { color: #c26a00; font-weight: 700; background: #fff1dc; padding: 1px 6px; border-radius: 6px; }
+.cubierto { color: var(--bien); font-weight: 600; }
+
+/* Animación de la semana */
+.dias { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; margin-bottom: 12px; }
+.dia { text-align: center; padding: 8px 0; border-radius: 8px; background: #e7e9ee; color: var(--suave); font-weight: 600; font-size: 0.85rem; transition: background .25s, color .25s; }
+.dia.pasado { background: #cfd8ea; color: var(--principal); }
+.dia.activo { background: var(--acento); color: #fff; transform: scale(1.05); }
+.feed { list-style: none; margin: 0; padding: 0; }
+.feed li { padding: 8px 10px; border-radius: 8px; margin-bottom: 6px; background: #f1f3f7; font-size: 0.95rem; }
+.feed li.titulo-dia { background: transparent; font-weight: 700; color: var(--principal); padding: 8px 2px 2px; margin: 0; }
+.feed li.pedido { background: #e8f0fd; }
+.feed li.buena { background: var(--bien-fondo); }
+.feed li.mala { background: #fbecea; }
+.feed li.cierre { background: var(--principal); color: #fff; font-weight: 600; }
+.feed li.vacio { background: transparent; color: var(--suave); font-size: 0.85rem; padding-top: 0; }
+.feed li.nuevo { animation: aparecer .35s ease-out; }
+@keyframes aparecer { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }

@@ -44,13 +44,16 @@ export const PRODUCTOS = {
   },
 };
 
-// Fechas especiales: mes (0-11), semanas del mes (1-based) y multiplicador por producto.
+// Fechas especiales. Los turnos van de domingo a domingo: el pico es el turno que termina el día
+// de la fecha (mes 0-11, semana del mes 1-based). Se anuncian 3 semanas antes y la demanda extra
+// sube de forma exponencial: 1/8, 1/4, 1/2 y todo el efecto en el pico. Después vuelve a lo normal.
 export const FECHAS_ESPECIALES = [
-  { mes: 5, semanas: [3], nombre: 'Día del Padre', efecto: { tazaCeramica: 2, tazaPlastico: 2, gorra: 1.5 } },
-  { mes: 7, semanas: [3], nombre: 'Día del Niño', efecto: { tazaPlastico: 2 } },
-  { mes: 9, semanas: [3], nombre: 'Día de la Madre', efecto: { tazaCeramica: 2, tazaPlastico: 2 } },
-  { mes: 11, semanas: [3, 4, 5], nombre: 'Fin de clases y Navidad', efecto: { tazaCeramica: 2, tazaPlastico: 2 } },
+  { mes: 5, semana: 3, nombre: 'el Día del Padre', efecto: { tazaCeramica: 2, tazaPlastico: 2, gorra: 1.5 } },
+  { mes: 7, semana: 3, nombre: 'el Día del Niño', efecto: { tazaPlastico: 2 } },
+  { mes: 9, semana: 3, nombre: 'el Día de la Madre', efecto: { tazaCeramica: 2, tazaPlastico: 2 } },
+  { mes: 11, semana: 4, nombre: 'Navidad', efecto: { tazaCeramica: 2, tazaPlastico: 2 } },
 ];
+export const RAMPA_FECHA = { 3: 1 / 8, 2: 1 / 4, 1: 1 / 2, 0: 1 }; // semanas que faltan → parte del efecto
 
 export const PRESTAMO = {
   monto: 200000,
@@ -130,8 +133,8 @@ export const MAZO = {
 
 // Mensajes del tutorial (semana -> texto del tío).
 export const TUTORIAL = {
-  1: 'Tío: "Bueno, campeón. Ya tenés la máquina de tazas. Así funciona: primero hacés publicidad en redes, con eso te llegan pedidos, y recién ahí producís lo que te pidieron. Arrancá poniendo unas horas de publicidad."',
-  2: 'Tío: "Cuantas más horas de publicidad, más pedidos te llegan... pero solo hasta lo que pide el mercado esa semana. Pasarte es tiempo que le sacás a producir."',
+  1: 'Tío: "Bueno, campeón. Ya tenés la máquina de tazas. Así funciona: el domingo arrancás la semana haciendo publicidad en redes, durante la semana te llegan pedidos, el sábado producís y el domingo entregás. Cuando yo arranqué, con un par de horas de publicidad me alcanzaba."',
+  2: 'Tío: "Cuantas más horas de publicidad, más pedidos te llegan... hasta que el mercado se agota. Fijate qué te dicen al final de la semana y ajustá: eso no te lo enseña nadie."',
   3: 'Tío: "Si aceptás un pedido y no lo entregás, quedás mal y perdés reputación. Si ves que no llegás, rechazalo a tiempo: perdés poquito. Y la reputación es lo que hace que te pidan más."',
   4: 'Tío: "Fin de mes: se pagan la luz, internet y la publicidad. Y me enteré de que tu primo Lelo también arrancó a vender tazas en el barrio... A ver quién la pega. Si escuchás algún rumor sobre él, prestale atención."',
   5: 'Tío: "¿Probaste la feria? Pagás la mesa y te lleva el día entero, pero vendés bastante más. Ojo: en la feria vendés lo que tengas de stock, así que producí unas de más."',

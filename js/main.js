@@ -1,7 +1,7 @@
 // Pantallas de "El Taller" (versión sin diseño).
 import {
   nuevaPartida, publicar, cerrarSemana, validarPublicidad, validarPlan, rechazarPedido, unidadesPedidas,
-  calendario, fechaEspecial, demandaEsperada, horasPorUnidad, horasPorVenta, horasPublicidadSugeridas,
+  calendario, avisoFecha, horasPorUnidad,
   probabilidadError, comprarMaquina, pagarPrestamoA, costoPagoAnticipadoA, gastosFijosDelMes, nombreUnidades,
   fmt, puedeHacerPromo, HORAS_POR_SEMANA, PRODUCTOS, MAQUINAS, CURSO_CORTO, VENTAS, PRESTAMO, TUTORIAL, PROMO,
 } from './engine.js';
@@ -13,22 +13,22 @@ let plan = null; // paso 2: producción
 let pub = null; // paso 1: publicidad
 let aviso = null; // mensaje después de una acción (compra, pago)
 let confirmarReinicio = false;
+let menuAbierto = false;
+let temporizadores = [];
+const DIAS_LARGOS = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
 
 // ---------- Utilidades ----------
 const plata = (n) => `${n < 0 ? '−' : ''}$${fmt(Math.abs(n))}`;
 const pct = (v) => `${Math.max(0, Math.min(100, v))}%`;
 
 function planPublicidad() {
-  const sugeridas = partida ? horasPublicidadSugeridas(partida) : 4;
-  return { horasRedes: partida?.ultimaPublicidad ?? sugeridas, promo: false };
+  return { horasRedes: partida?.ultimaPublicidad ?? 0, promo: false };
 }
 
-// Por defecto se produce lo que falta para cubrir los pedidos.
+// La producción siempre arranca en cero: lo que falta se muestra resaltado y lo carga el jugador.
 function planProduccion() {
-  const sem = partida.semanaEnCurso;
-  const pedidas = unidadesPedidas(sem);
   const producir = {};
-  for (const id of Object.keys(PRODUCTOS)) producir[id] = Math.max(0, pedidas[id] - partida.stock[id]);
+  for (const id of Object.keys(PRODUCTOS)) producir[id] = 0;
   return { producir, feria: partida.ultimaFeria ?? false, curso: false };
 }
 
@@ -118,9 +118,32 @@ function pantallaPrestamo() {
 function bloqueEncabezado(e, extra = '') {
   const c = calendario(e.semana);
   return `<div class="encabezado">
-      <div class="fila"><span class="plata">${plata(e.plata)}</span><span class="fecha">Semana ${e.semana} · ${c.nombreMes} (${c.estacion})</span></div>
+      <div class="fila">
+        <span class="plata">${plata(e.plata)}</span>
+        <span class="fecha">Semana ${e.semana} · ${c.nombreMes} (${c.estacion})</span>
+        <button class="menu-boton" id="menuBoton" aria-label="Menú">⋮</button>
+      </div>
       ${extra}
+      ${menuAbierto ? `<div class="menu">
+        <button id="menuInicio">Volver al inicio</button>
+        <button id="reiniciar" class="peligro">${confirmarReinicio ? 'Tocá de nuevo para borrar la partida' : 'Empezar de nuevo'}</button>
+      </div>` : ''}
     </div>`;
+}
+
+function conectarMenu() {
+  document.getElementById('menuBoton').onclick = () => { menuAbierto = !menuAbierto; confirmarReinicio = false; refrescar(); };
+  const inicio = document.getElementById('menuInicio');
+  if (inicio) inicio.onclick = () => { menuAbierto = false; pantallaInicio(); };
+  const reiniciar = document.getElementById('reiniciar');
+  if (reiniciar) reiniciar.onclick = () => {
+    if (!confirmarReinicio) { confirmarReinicio = true; refrescar(); return; }
+    confirmarReinicio = false;
+    menuAbierto = false;
+    borrar();
+    partida = null;
+    pantallaInicio();
+  };
 }
 
 function bloqueEstado(e) {
@@ -159,13 +182,6 @@ function conectarComprasYReinicio() {
   if (gorras) gorras.onclick = () => { const r = comprarMaquina(partida, 'gorras'); aviso = r.ok ? r.mensaje : r.motivo; if (r.ok) guardarPartida(); refrescar(true); };
   const pagar = document.getElementById('pagarTio');
   if (pagar) pagar.onclick = () => { const r = pagarPrestamoA(partida); aviso = r.ok ? r.mensaje : r.motivo; if (r.ok) guardarPartida(); refrescar(true); };
-  document.getElementById('reiniciar').onclick = () => {
-    if (!confirmarReinicio) { confirmarReinicio = true; refrescar(); return; }
-    confirmarReinicio = false;
-    borrar();
-    partida = null;
-    pantallaInicio();
-  };
 }
 
 function bloqueComprasYReinicio(e) {
@@ -174,29 +190,22 @@ function bloqueComprasYReinicio(e) {
       <h2>Comprar y pagar</h2>
       ${!e.maquinas.gorras ? `<button class="boton secundario" id="comprarGorras">Comprar máquina de gorras (${plata(MAQUINAS.gorras.precio)})</button>` : '<p class="suave">Ya tenés la máquina de gorras.</p>'}
       ${p.opcion === 'A' && !p.pagado ? `<button class="boton secundario" id="pagarTio">Pagarle al tío ahora (${plata(p.vencido ? p.deuda : costoPagoAnticipadoA(e.semana))})</button>` : ''}
-    </div>
-    <div class="tarjeta">
-      <button class="boton peligro" id="reiniciar">${confirmarReinicio ? 'Tocá de nuevo para borrar la partida' : 'Empezar de nuevo'}</button>
     </div>`;
 }
 
 // ---------- Paso 1: publicidad en redes ----------
 function pantallaPublicidad() {
   const e = partida;
-  const fecha = fechaEspecial(e.semana);
+  const fecha = avisoFecha(e.semana);
   const tutorial = e.semana <= 8 ? TUTORIAL[e.semana] : null;
-  const productos = Object.keys(PRODUCTOS).filter((id) => e.maquinas[PRODUCTOS[id].maquina]);
-  const mercado = productos.reduce((s, id) => s + demandaEsperada(e, id), 0) * (pub.promo ? 1 + PROMO.extraDemanda : 1);
-  const porHora = 1 / horasPorVenta(e);
-  const sugeridas = Math.ceil(mercado / porHora);
   const v = validarPublicidad(e, pub);
   const horas = pub.horasRedes + (pub.promo ? PROMO.horas : 0) + (e.curso.semanasRestantes > 0 ? CURSO_CORTO.horasPorSemana : 0);
 
   app.innerHTML = `
-    ${bloqueEncabezado(e, '<div class="paso-semana">Paso 1 de 2 · Publicidad</div>')}
+    ${bloqueEncabezado(e, '<div class="paso-semana">Domingo · Publicidad</div>')}
     ${aviso ? `<div class="tarjeta tio"><p>${aviso}</p></div>` : ''}
     ${tutorial ? `<div class="tarjeta tio"><p>${tutorial}</p></div>` : ''}
-    ${fecha ? `<div class="tarjeta tio"><p><strong>${fecha.nombre}</strong>: esta semana llegan muchos más pedidos.</p></div>` : ''}
+    ${fecha ? `<div class="tarjeta tio"><p>📅 ${fecha}</p></div>` : ''}
     ${e.mejorDeLaCiudad ? '<div class="tarjeta"><p><strong>Sos el mejor de la ciudad.</strong> Lelo trabaja para vos. Lo que sigue (empleados, provincia) llega en la próxima versión.</p></div>' : ''}
     ${puedeHacerPromo(e) ? `<div class="tarjeta rumor">
       <p>🗣️ ${e.primo.rumor}</p>
@@ -208,10 +217,9 @@ function pantallaPublicidad() {
 
     <div class="tarjeta">
       <h2>Publicidad en redes</h2>
-      <p class="suave">Publicás en Instagram y Marketplace y respondés consultas. <strong>Así te llegan los pedidos</strong>: cada hora atrae unos ${String(Math.round(porHora * 10) / 10).replace('.', ',')} productos pedidos.</p>
-      <p class="suave">Esta semana el mercado pide unos <strong>${Math.round(mercado)}</strong> productos: con <strong>${sugeridas} h</strong> llegás a todos. Más horas no suman pedidos.</p>
+      <p class="suave">Publicás en Instagram y Marketplace y respondés consultas: <strong>así te llegan los pedidos</strong>. Cuantas más horas, más pedidos, hasta que el mercado se agota. Al final de la semana te vas a enterar si te quedaste corto o si te pasaste.</p>
       <div class="producto">
-        <div class="info"><div class="nombre">Horas de publicidad</div><div class="detalle">Después de ver los pedidos vas a producir con las horas que te queden.</div></div>
+        <div class="info"><div class="nombre">Horas de publicidad</div><div class="detalle">El resto de las horas te quedan para producir el sábado.</div></div>
         <div class="paso">
           <button data-redes="-1" aria-label="Menos horas">−</button>
           <span class="numero">${pub.horasRedes}</span>
@@ -222,9 +230,10 @@ function pantallaPublicidad() {
 
     ${bloqueEstado(e)}
     ${bloqueComprasYReinicio(e)}
-    ${barraInferior(horas, null, v.errores, 'Publicar y ver los pedidos', 'publicar')}
+    ${barraInferior(horas, null, v.errores, 'Arrancar la semana de publicidad', 'publicar')}
   `;
   aviso = null;
+  conectarMenu();
 
   app.querySelectorAll('[data-redes]').forEach((b) => { b.onclick = () => { pub.horasRedes = Math.max(0, pub.horasRedes + Number(b.dataset.redes)); refrescar(); }; });
   const promo = document.getElementById('promo');
@@ -236,9 +245,81 @@ function pantallaPublicidad() {
     partida.ultimaPublicidad = pub.horasRedes;
     guardarPartida();
     plan = planProduccion();
-    window.scrollTo(0, 0);
-    pantallaSemana();
+    pantallaAnimacion(r.semana);
   };
+}
+
+
+// ---------- La semana de publicidad, día por día ----------
+function frenarAnimacion() {
+  temporizadores.forEach(clearTimeout);
+  temporizadores = [];
+}
+
+function pantallaAnimacion(sem) {
+  frenarAnimacion();
+  window.scrollTo(0, 0);
+  const e = partida;
+  const c = calendario(e.semana);
+  app.innerHTML = `
+    <div class="encabezado">
+      <div class="fila"><span class="plata">${plata(e.plata)}</span><span class="fecha">Semana ${e.semana} · ${c.nombreMes}</span></div>
+      <div class="paso-semana">Publicidad en marcha · ${sem.horasRedes} h</div>
+    </div>
+    <div class="dias">${sem.dias.map((d, i) => `<span class="dia" data-dia="${i}">${d.nombre}</span>`).join('')}</div>
+    <div class="tarjeta"><ul class="feed" id="feed"></ul></div>
+    <div class="barra-inferior"><div class="contenido">
+      <button class="boton secundario" id="saltar">Saltar</button>
+    </div></div>
+  `;
+  const feed = document.getElementById('feed');
+  const marcarDia = (i) => app.querySelectorAll('.dia').forEach((el) => {
+    const n = Number(el.dataset.dia);
+    el.classList.toggle('activo', n === i);
+    el.classList.toggle('pasado', n < i);
+  });
+  const agregar = (item) => {
+    const li = document.createElement('li');
+    li.className = `nuevo ${item.tipo}`;
+    li.textContent = item.texto;
+    feed.appendChild(li);
+    li.scrollIntoView({ block: 'nearest' });
+  };
+  const terminar = () => {
+    frenarAnimacion();
+    marcarDia(7);
+    feed.innerHTML = '';
+    sem.dias.forEach((d, i) => {
+      const titulo = document.createElement('li');
+      titulo.className = 'titulo-dia';
+      titulo.textContent = DIAS_LARGOS[i];
+      feed.appendChild(titulo);
+      if (!d.items.length) agregar({ texto: 'Sin novedades.', tipo: 'vacio' });
+      d.items.forEach(agregar);
+    });
+    const barra = app.querySelector('.barra-inferior .contenido');
+    barra.innerHTML = '<button class="boton" id="aProducir">Es sábado: ir a producir</button>';
+    document.getElementById('aProducir').onclick = () => { window.scrollTo(0, 0); pantallaSemana(); };
+  };
+  let t = 300;
+  sem.dias.forEach((d, i) => {
+    temporizadores.push(setTimeout(() => {
+      marcarDia(i);
+      const titulo = document.createElement('li');
+      titulo.className = 'titulo-dia';
+      titulo.textContent = DIAS_LARGOS[i];
+      feed.appendChild(titulo);
+      if (!d.items.length) agregar({ texto: 'Sin novedades.', tipo: 'vacio' });
+    }, t));
+    t += 350;
+    d.items.forEach((item) => {
+      temporizadores.push(setTimeout(() => agregar(item), t));
+      t += 450;
+    });
+    t += 300;
+  });
+  temporizadores.push(setTimeout(terminar, t + 400));
+  document.getElementById('saltar').onclick = terminar;
 }
 
 // ---------- Paso 2: pedidos y producción ----------
@@ -251,7 +332,7 @@ function pantallaPedidos() {
   const precio = (p) => Math.round(p.cantidad * PRODUCTOS[p.producto].precio * (sem.promo ? 1 - PROMO.descuento : 1));
 
   app.innerHTML = `
-    ${bloqueEncabezado(e, '<div class="paso-semana">Paso 2 de 2 · Pedidos y producción</div>')}
+    ${bloqueEncabezado(e, '<div class="paso-semana">Sábado · Pedidos y producción</div>')}
     ${aviso ? `<div class="tarjeta tio"><p>${aviso}</p></div>` : ''}
     ${sem.eventos.length ? `<div class="tarjeta"><ul class="eventos">${sem.eventos.map((ev) => `<li class="${ev.tipo}">${ev.texto}</li>`).join('')}</ul></div>` : ''}
 
@@ -272,11 +353,11 @@ function pantallaPedidos() {
       <h2>Producir</h2>
       ${productos.map((id) => {
         const pr = PRODUCTOS[id];
-        const faltan = Math.max(0, pedidas[id] - e.stock[id]);
+        const faltan = Math.max(0, pedidas[id] - e.stock[id] - plan.producir[id]);
         return `<div class="producto">
           <div class="info">
             <div class="nombre">${pr.nombre}</div>
-            <div class="detalle">Pedidos ${pedidas[id]} · stock ${e.stock[id]} · <strong>faltan ${faltan}</strong><br>${Math.round(horasPorUnidad(e, id) * 60)} min c/u · costo ${plata(pr.costo)}</div>
+            <div class="detalle">Pedidos ${pedidas[id]} · stock ${e.stock[id]} · ${faltan > 0 ? `<span class="faltan">faltan ${faltan}</span>` : pedidas[id] ? '<span class="cubierto">cubierto ✔</span>' : 'sin pedidos'}<br>${Math.round(horasPorUnidad(e, id) * 60)} min c/u · costo ${plata(pr.costo)}</div>
           </div>
           <div class="paso">
             <button data-menos="${id}" aria-label="Menos">−</button>
@@ -305,16 +386,15 @@ function pantallaPedidos() {
     </div>
 
     ${bloqueEstado(e)}
-    ${barraInferior(v.horas, v.costo, v.errores, 'Producir, entregar y cerrar la semana', 'terminar')}
+    ${barraInferior(v.horas, v.costo, v.errores, 'Producir y entregar el domingo', 'terminar')}
   `;
   aviso = null;
+  conectarMenu();
 
   app.querySelectorAll('[data-rechazar]').forEach((b) => {
     b.onclick = () => {
       const p = sem.pedidos.find((x) => x.id === b.dataset.rechazar);
       rechazarPedido(partida, p.id, !p.rechazado);
-      const ped = unidadesPedidas(partida.semanaEnCurso);
-      plan.producir[p.producto] = Math.max(0, ped[p.producto] - e.stock[p.producto]);
       guardarPartida();
       refrescar();
     };
@@ -328,6 +408,7 @@ function pantallaPedidos() {
 }
 
 function pantallaSemana() {
+  frenarAnimacion();
   if (partida.semanaEnCurso) pantallaPedidos();
   else pantallaPublicidad();
 }
