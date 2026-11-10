@@ -63,6 +63,7 @@ p { margin: 0 0 10px; }
 .barra.horas.pasado > span { background: var(--mal); }
 
 .tio { background: var(--aviso-fondo); border-color: #f0dca4; }
+.rumor { background: #f3ecfb; border-color: #d9c8f0; }
 
 .producto { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 0; border-top: 1px solid var(--borde); }
 .producto:first-of-type { border-top: 0; }
@@ -110,6 +111,7 @@ p { margin: 0 0 10px; }
 .eventos li { padding: 9px 10px; border-radius: 8px; margin-bottom: 6px; background: #f1f3f7; font-size: 0.95rem; }
 .eventos li.buena { background: var(--bien-fondo); }
 .eventos li.mala { background: #fbecea; }
+.eventos li.rumor { background: #f3ecfb; }
 .eventos li.hito { background: var(--principal); color: #fff; font-weight: 600; }
 
 .numeros { display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; font-size: 0.95rem; }

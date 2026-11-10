@@ -75,12 +75,21 @@ export const REPUTACION = {
 };
 
 export const PRIMO = {
+  nombre: 'Lelo',
   comportamientos: [
-    { id: 'tranquilo', prob: 0.5, saca: 0.05, texto: 'Tu primo anda tranquilo esta semana.' },
-    { id: 'ofertas', prob: 0.3, saca: 0.15, texto: 'Tu primo sacó un 2x1 en tazas. Algunos clientes se fueron con él.' },
-    { id: 'agresivo', prob: 0.2, saca: 0.25, texto: 'Tu primo salió con todo: bajó precios y te sacó clientes.' },
+    { id: 'tranquilo', prob: 0.5, saca: 0.05, texto: 'Lelo anda tranquilo esta semana.' },
+    { id: 'ofertas', prob: 0.3, saca: 0.15, texto: 'Lelo sacó un 2x1 en tazas. Algunos clientes se fueron con él.' },
+    { id: 'agresivo', prob: 0.2, saca: 0.25, texto: 'Lelo salió con todo: bajó precios y te sacó clientes.' },
   ],
   repMax: 70,
+  // Rumor una semana antes: siempre aparece si Lelo prepara una campaña agresiva,
+  // y a veces aparece aunque no la haga (falsa alarma). Así puede o no ejecutarse (~60%).
+  rumor: { probFalsaAlarma: 0.15 },
+  rumores: [
+    'Rumor: dicen que Lelo está preparando una campaña agresiva para la semana que viene. Puede ser puro humo... o no.',
+    'Rumor: tu tía comentó en el grupo de la familia que Lelo anda imprimiendo volantes con precios de remate.',
+    'Rumor: un cliente te contó que Lelo le prometió "precios que te van a hacer llorar" la semana que viene.',
+  ],
 };
 
 export const CURSO_CORTO = { costo: 15000, horasPorSemana: 5, semanas: 2, puntos: 10 };
@@ -112,7 +121,7 @@ export const TUTORIAL = {
   1: 'Tío: "Bueno, campeón. Ya tenés la máquina de tazas. Arrancá produciendo unas cuantas: cada taza te lleva horas y cuesta el insumo. No te vuelvas loco, que en verano las tazas no se venden tanto."',
   2: 'Tío: "Producir no alcanza: alguien las tiene que vender. Poné horas en redes para responder consultas en Instagram y Marketplace. Cada venta lleva su tiempo."',
   3: 'Tío: "Ojo con el stock: si te piden y no tenés, quedás mal y perdés reputación. Y la reputación es lo que hace que te compren más."',
-  4: 'Tío: "Fin de mes: se pagan la luz, internet y la publicidad. Y me enteré de que tu primo también arrancó a vender tazas en el barrio... A ver quién la pega."',
+  4: 'Tío: "Fin de mes: se pagan la luz, internet y la publicidad. Y me enteré de que tu primo Lelo también arrancó a vender tazas en el barrio... A ver quién la pega. Si escuchás algún rumor sobre él, prestale atención."',
   5: 'Tío: "¿Probaste la feria? Pagás la mesa y te lleva el día entero, pero vendés bastante más."',
   6: 'Tío: "En este negocio siempre pasa algo: a veces se rompe todo y a veces te cae un pedido del cielo. A la larga se compensa, pero hay que tener un colchón de plata."',
   7: 'Tío: "Si trabajás siempre al máximo te cansás y empezás a mandarte macanas. Descansá. Y hay un curso corto de sublimación: cuesta plata y horas, pero te hace mejor."',

@@ -35,7 +35,7 @@ function pantallaInicio() {
     <p class="suave">Simulador de emprendedor de sublimación. De una máquina de tazas a ser el mejor de la ciudad (y algún día, del mundo).</p>
     <div class="tarjeta">
       <p>Terminaste el secundario en diciembre y no sabés qué hacer. En las fiestas tu tío, que conoce el rubro, te cuenta que la sublimación puede ser un buen negocio y te ofrece prestarte la plata para arrancar.</p>
-      <p>Pero el tío es justo: <strong>le presta lo mismo a tu primo</strong>, que va a arrancar con lo mismo en tu ciudad.</p>
+      <p>Pero el tío es justo: <strong>le presta lo mismo a tu primo Lelo</strong>, que va a arrancar con lo mismo en tu ciudad.</p>
     </div>
     ${guardada ? `<button class="boton" id="continuar">Continuar partida (semana ${guardada.semana})</button>` : ''}
     <button class="boton ${guardada ? 'secundario' : ''}" id="nueva">Nueva partida</button>
@@ -124,13 +124,14 @@ function pantallaSemana() {
     </div>
     ${aviso ? `<div class="tarjeta tio"><p>${aviso}</p></div>` : ''}
     ${tutorial ? `<div class="tarjeta tio"><p>${tutorial}</p></div>` : ''}
+    ${e.primo.rumor && !e.mejorDeLaCiudad ? `<div class="tarjeta rumor"><p>🗣️ ${e.primo.rumor}</p></div>` : ''}
     ${fecha ? `<div class="tarjeta tio"><p><strong>${fecha.nombre}</strong>: esta semana se vende mucho más.</p></div>` : ''}
-    ${e.mejorDeLaCiudad ? '<div class="tarjeta"><p><strong>Sos el mejor de la ciudad.</strong> Tu primo trabaja para vos. Lo que sigue (empleados, provincia) llega en la próxima versión.</p></div>' : ''}
+    ${e.mejorDeLaCiudad ? '<div class="tarjeta"><p><strong>Sos el mejor de la ciudad.</strong> Lelo trabaja para vos. Lo que sigue (empleados, provincia) llega en la próxima versión.</p></div>' : ''}
 
     <div class="tarjeta">
       <div class="stats">
         <div class="stat"><div class="etiqueta">Reputación (ciudad)</div><div class="valor">${Math.floor(e.rep)}/100</div><div class="barra"><span style="width:${pct(e.rep)}"></span></div></div>
-        <div class="stat"><div class="etiqueta">Primo</div><div class="valor">${e.mejorDeLaCiudad ? 'Tu empleado' : `${Math.floor(e.primo.rep)}/100`}</div><div class="barra"><span style="width:${pct(e.mejorDeLaCiudad ? 0 : e.primo.rep)}"></span></div></div>
+        <div class="stat"><div class="etiqueta">Lelo (tu primo)</div><div class="valor">${e.mejorDeLaCiudad ? 'Tu empleado' : `${Math.floor(e.primo.rep)}/100`}</div><div class="barra"><span style="width:${pct(e.mejorDeLaCiudad ? 0 : e.primo.rep)}"></span></div></div>
         <div class="stat"><div class="etiqueta">Experiencia</div><div class="valor">${Math.floor(e.exp)}/100</div><div class="barra"><span style="width:${pct(e.exp)}"></span></div></div>
         <div class="stat"><div class="etiqueta">Cansancio</div><div class="valor">${Math.round(e.cansancio)}/100</div><div class="barra cansancio"><span style="width:${pct(e.cansancio)}"></span></div></div>
         <div class="stat"><div class="etiqueta">Préstamo</div><div class="valor" style="font-size:.85rem">${estadoPrestamo}</div></div>
@@ -283,11 +284,11 @@ function pantallaLogro() {
   app.innerHTML = `
     <h1>¡Sos el mejor de la ciudad! 🏆</h1>
     <div class="tarjeta">
-      <p>Tu primo no pudo competir y cerró el taller. En el almuerzo del domingo, el tío anunció que <strong>ahora trabaja para vos</strong>.</p>
+      <p>Lelo no pudo competir y cerró el taller. En el almuerzo del domingo, el tío anunció que <strong>ahora trabaja para vos</strong>.</p>
       <p>Lo lograste en la semana ${e.semana - 1}, con ${plata(e.plata)} en la caja y ${e.totales.vendidas} productos vendidos.</p>
     </div>
     <div class="tarjeta tio">
-      <p>Hasta acá llega la <strong>versión mínima</strong>. En la próxima versión: el primo como empleado, las demás máquinas y la pelea por ser el mejor de la provincia.</p>
+      <p>Hasta acá llega la <strong>versión mínima</strong>. En la próxima versión: Lelo como empleado, las demás máquinas y la pelea por ser el mejor de la provincia.</p>
     </div>
     <button class="boton" id="seguir">Seguir jugando</button>
   `;
@@ -299,7 +300,7 @@ function pantallaQuiebra() {
   app.innerHTML = `
     <h1>Fundiste 😬</h1>
     <div class="tarjeta">
-      <p>Tres meses seguidos en rojo y el taller cerró. Tu primo, en las fiestas, no para de mirarte.</p>
+      <p>Tres meses seguidos en rojo y el taller cerró. Lelo, en las fiestas, no para de mirarte.</p>
       <p>Llegaste a la semana ${partida.semana - 1} con reputación ${Math.floor(partida.rep)}/100.</p>
     </div>
     <button class="boton" id="otra">Empezar de nuevo</button>

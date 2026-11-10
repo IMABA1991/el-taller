@@ -116,7 +116,7 @@ export function nuevaPartida(opcionPrestamo, semilla = Date.now() >>> 0) {
       ? { opcion: 'A', pagado: false, deuda: PRESTAMO.A.total, vencido: false }
       : { opcion: 'B', cuotasPagadas: 0, cuotasPerdonadas: 0, atrasadas: 0, pagado: false },
     tio: { confianza: 50, enojado: false },
-    primo: { rep: 0, comportamiento: 'tranquilo' },
+    primo: { nombre: PRIMO.nombre, rep: 0, comportamiento: 'tranquilo', proximo: null, rumor: null },
     mazo: { trimestre: -1, cartas: [] },
     finanzas: { mesActual: 0, meses: [] },
     mesesEnRojo: 0,
@@ -126,7 +126,23 @@ export function nuevaPartida(opcionPrestamo, semilla = Date.now() >>> 0) {
     totales: { vendidas: 0, producidas: 0 },
   };
   prepararMazo(e);
+  planearPrimo(e);
   return e;
+}
+
+// ---------- Lelo, el primo ----------
+function sortearComportamiento(e) {
+  const tirada = siguienteAzar(e);
+  let acumulado = 0;
+  return (PRIMO.comportamientos.find((x) => (acumulado += x.prob) >= tirada) || PRIMO.comportamientos[0]).id;
+}
+
+// Decide qué va a hacer Lelo la semana siguiente y si corre un rumor (una semana antes).
+function planearPrimo(e) {
+  e.primo.proximo = sortearComportamiento(e);
+  const compite = e.semana >= 4 && !e.mejorDeLaCiudad;
+  const hayRumor = compite && (e.primo.proximo === 'agresivo' || siguienteAzar(e) < PRIMO.rumor.probFalsaAlarma);
+  e.primo.rumor = hayRumor ? PRIMO.rumores[Math.floor(siguienteAzar(e) * PRIMO.rumores.length)] : null;
 }
 
 // ---------- Mazo de eventos (balanceado por trimestre) ----------
@@ -227,7 +243,7 @@ export function validarPlan(e, plan) {
   const horas = horasDelPlan(e, plan);
   if (horas > HORAS_POR_SEMANA) errores.push(`Te pasaste de horas: ${horas} de ${HORAS_POR_SEMANA}.`);
   const costo = costoDelPlan(plan);
-  if (costo > e.plata) errores.push(`No te alcanza la plata: necesitás $${fmt(costo)} y tenés $${fmt(e.plata)}.`);
+  if (costo > 0 && costo > e.plata) errores.push(`No te alcanza la plata: necesitás $${fmt(costo)} y tenés $${fmt(e.plata)}.`);
   return { ok: errores.length === 0, errores, horas, costo };
 }
 
@@ -261,12 +277,16 @@ export function jugarSemana(e, plan) {
   if (producidas + arruinadas > 0) linea(`Produjiste ${producidas} unidades.`);
   if (arruinadas > 0) evento(`Se te arruinaron ${arruinadas} en la prensa (perdiste el insumo).`, 'mala');
 
-  // 2. El primo
-  const tirada = siguienteAzar(e);
-  let acumulado = 0;
-  const comp = PRIMO.comportamientos.find((x) => (acumulado += x.prob) >= tirada) || PRIMO.comportamientos[0];
+  // 2. Lelo (lo que planeó la semana anterior)
+  const idComp = e.primo.proximo || sortearComportamiento(e);
+  const comp = PRIMO.comportamientos.find((x) => x.id === idComp);
+  const habiaRumor = Boolean(e.primo.rumor);
   e.primo.comportamiento = comp.id;
-  if (e.semana >= 4 && !e.mejorDeLaCiudad) evento(comp.texto, comp.id === 'tranquilo' ? 'info' : 'mala');
+  if (e.semana >= 4 && !e.mejorDeLaCiudad) {
+    if (habiaRumor && comp.id !== 'agresivo') evento('El rumor era humo: Lelo no hizo ninguna campaña agresiva.', 'buena');
+    else if (habiaRumor) evento('El rumor era cierto.', 'mala');
+    evento(comp.texto, comp.id === 'tranquilo' ? 'info' : 'mala');
+  }
   const sacaPrimo = e.semana >= 4 && !e.mejorDeLaCiudad ? comp.saca : 0;
 
   // 3. Demanda de la semana
@@ -389,7 +409,7 @@ export function jugarSemana(e, plan) {
   if (!e.mejorDeLaCiudad && e.rep >= REPUTACION.meta) {
     e.mejorDeLaCiudad = true;
     r.hito = 'mejorDeLaCiudad';
-    evento('¡Lograste ser el mejor de la ciudad! Tu primo no pudo competir y cerró: ahora es empleado tuyo.', 'hito');
+    evento('¡Lograste ser el mejor de la ciudad! Lelo no pudo competir y cerró: ahora es empleado tuyo.', 'hito');
   }
   if (repInicial < VENTAS.reputacionMercadoLibre && e.rep >= VENTAS.reputacionMercadoLibre) {
     evento('Con tu reputación, Mercado Libre empieza a venderte en serio: más consultas cada semana.', 'buena');
@@ -399,6 +419,10 @@ export function jugarSemana(e, plan) {
   r.rep = e.rep;
   r.repDelta = redondear(e.rep - repInicial);
   e.semana += 1;
+
+  // 14. Lelo planea la semana que viene (puede correr un rumor)
+  planearPrimo(e);
+  if (e.primo.rumor) evento(e.primo.rumor, 'rumor');
   e.ultimoResumen = r;
   return { ok: true, resumen: r };
 }
@@ -483,9 +507,9 @@ function finDeAnio(e, r, evento) {
   const tuyo = e.rep;
   const delPrimo = e.primo.rep;
   r.fiestas = { tuyo, delPrimo };
-  if (e.mejorDeLaCiudad) evento('Fiestas: el primo brinda por su jefe. Todos te miran con respeto.', 'buena');
-  else if (tuyo >= delPrimo) evento(`Fiestas: el tío los compara delante de toda la familia. Tu reputación ${Math.round(tuyo)} contra ${Math.round(delPrimo)} del primo. "¡Este pibe va a llegar lejos!"`, 'buena');
-  else evento(`Fiestas: el tío los compara delante de toda la familia. Tu reputación ${Math.round(tuyo)} contra ${Math.round(delPrimo)} del primo. "Che, ¿y vos qué estuviste haciendo todo el año?"`, 'mala');
+  if (e.mejorDeLaCiudad) evento('Fiestas: Lelo brinda por su jefe. Todos te miran con respeto.', 'buena');
+  else if (tuyo >= delPrimo) evento(`Fiestas: el tío los compara delante de toda la familia. Tu reputación ${Math.round(tuyo)} contra ${Math.round(delPrimo)} de Lelo. "¡Este pibe va a llegar lejos!"`, 'buena');
+  else evento(`Fiestas: el tío los compara delante de toda la familia. Tu reputación ${Math.round(tuyo)} contra ${Math.round(delPrimo)} de Lelo. "Che, ¿y vos qué estuviste haciendo todo el año?"`, 'mala');
 }
 
 export function fmt(n) {

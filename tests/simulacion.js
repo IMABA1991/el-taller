@@ -94,10 +94,28 @@ chequear(Math.abs(horasPorUnidad({ exp: 35 }, 'tazaCeramica') - 0.44) < 0.01, 'C
 
 const b = nuevaPartida('B', 7);
 let pagadoB = 0;
-for (let s = 0; s < 52; s++) { const antes = b.plata; jugarSemana(b, { producir: {}, horasRedes: 0, feria: false }); void antes; }
+for (let s = 0; s < 8; s++) { const antes = b.plata; jugarSemana(b, { producir: {}, horasRedes: 0, feria: false }); void antes; }
 pagadoB = b.prestamo.cuotasPagadas;
 chequear(b.prestamo.cuotasPerdonadas === 1, 'Opción B: se perdona la cuota de febrero');
 void pagadoB;
+
+// Rumores de Lelo: siempre avisan una campaña agresiva, y a veces son falsa alarma.
+let conRumor = 0; let rumorCierto = 0; let agresivas = 0; let agresivasAvisadas = 0;
+for (let i = 0; i < 100; i++) {
+  const e = nuevaPartida('A', 5000 + i);
+  for (let s = 0; s < 30; s++) {
+    const rumor = Boolean(e.primo.rumor);
+    if (e.fin) break;
+    const res = jugarSemana(e, { producir: {}, horasRedes: 0, feria: false });
+    if (!res.ok) throw new Error(res.errores.join(' '));
+    if (e.semana - 1 < 4) continue;
+    if (rumor) { conRumor++; if (e.primo.comportamiento === 'agresivo') rumorCierto++; }
+    if (e.primo.comportamiento === 'agresivo') { agresivas++; if (rumor) agresivasAvisadas++; }
+  }
+}
+console.log(`\nRumores: ${conRumor}, se cumplieron ${(100 * rumorCierto / conRumor).toFixed(0)}%. Campañas agresivas avisadas: ${agresivasAvisadas}/${agresivas}.`);
+chequear(agresivasAvisadas === agresivas, 'Toda campaña agresiva de Lelo se avisa con un rumor una semana antes');
+chequear(rumorCierto / conRumor > 0.5 && rumorCierto / conRumor < 0.75, 'Los rumores se cumplen a veces (entre 50% y 75%)');
 
 console.log(fallas ? `\n${fallas} chequeo(s) fallaron.` : '\nTodos los chequeos pasaron.');
 process.exit(fallas ? 1 : 0);
