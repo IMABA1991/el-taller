@@ -82,18 +82,32 @@ export const PRIMO = {
   nombre: 'Lelo',
   comportamientos: [
     { id: 'tranquilo', prob: 0.5, saca: 0.05, texto: 'Lelo anda tranquilo esta semana.' },
-    { id: 'ofertas', prob: 0.3, saca: 0.15, texto: 'Lelo sacó un 2x1 en tazas. Algunos clientes se fueron con él.' },
-    { id: 'agresivo', prob: 0.2, saca: 0.25, texto: 'Lelo salió con todo: bajó precios y te sacó clientes.' },
+    { id: 'ofertas', prob: 0.3, saca: 0.15 },
+    { id: 'agresivo', prob: 0.2, saca: 0.25 },
+  ],
+  // Ofertas chicas (sin rumor previo)
+  ofertas: [
+    'Lelo sacó un 2x1 en tazas. Algunos clientes se fueron con él.',
+    'Lelo publicó "envío gratis en el barrio" y te sacó algunos pedidos.',
+    'Lelo regaló un llavero con cada compra. Algunos clientes picaron.',
+  ],
+  // Diez jugadas agresivas: cada una tiene su rumor (una semana antes) y su texto cuando pasa.
+  jugadas: [
+    { rumor: 'dicen que Lelo está imprimiendo volantes con precios de remate.', ataque: 'Lelo repartió volantes con precios de remate por todo el barrio.' },
+    { rumor: 'Lelo anda anunciando "un sorteo bomba" en Instagram.', ataque: 'Lelo hizo un sorteo en Instagram: "seguime y compartí". Medio barrio lo compartió.' },
+    { rumor: 'te contaron que Lelo prepara un 2x1 relámpago.', ataque: 'Lelo lanzó un 2x1 relámpago de 48 horas.' },
+    { rumor: 'Lelo consiguió que lo entrevisten en la radio del barrio.', ataque: 'Lelo salió en la radio del barrio contando "su emprendimiento".' },
+    { rumor: 'Lelo está hablando con unos influencers amigos.', ataque: 'Tres influencers amigos de Lelo lo recomendaron en sus historias.' },
+    { rumor: 'Lelo está armando combos con regalo incluido.', ataque: 'Lelo sacó combos "taza + llavero + bombón" a precio de taza sola.' },
+    { rumor: 'tu tía dice que Lelo anda hablando mal de tus tazas.', ataque: 'Lelo le dijo a tus clientes que tus tazas se despintan en el lavavajillas.' },
+    { rumor: 'Lelo anda prometiendo entregas en 24 horas.', ataque: 'Lelo promete "pedido hoy, taza mañana" y la gente le cree.' },
+    { rumor: 'te parece que Lelo te está copiando los diseños...', ataque: 'Lelo copió tus diseños más vendidos y los ofrece más baratos.' },
+    { rumor: 'Lelo averiguó cuánto sale una mesa en la feria.', ataque: 'Lelo puso un puesto en la feria justo al lado del tuyo, con precios más bajos.' },
   ],
   repMax: 70,
-  // Rumor una semana antes: siempre aparece si Lelo prepara una campaña agresiva,
+  // Rumor una semana antes: siempre aparece si Lelo prepara una jugada agresiva,
   // y a veces aparece aunque no la haga (falsa alarma). Así puede o no ejecutarse (~60%).
   rumor: { probFalsaAlarma: 0.15 },
-  rumores: [
-    'Rumor: dicen que Lelo está preparando una campaña agresiva para la semana que viene. Puede ser puro humo... o no.',
-    'Rumor: tu tía comentó en el grupo de la familia que Lelo anda imprimiendo volantes con precios de remate.',
-    'Rumor: un cliente te contó que Lelo le prometió "precios que te van a hacer llorar" la semana que viene.',
-  ],
 };
 
 // Defensa ante un rumor: promo de contraataque en redes.
@@ -105,9 +119,53 @@ export const CLIENTES = [
   'Juanma', 'la panadería', 'Vicky', 'el gimnasio', 'Tobías', 'la escuelita de fútbol',
 ];
 
-export const PROMO = { descuento: 0.1, extraDemanda: 0.2, horas: 2 };
+export const PROMO = { descuento: 0.15, extraDemanda: 0.2, horas: 2 };
 
-export const CURSO_CORTO = { costo: 15000, horasPorSemana: 5, semanas: 2, puntos: 10 };
+// Cursos cortos: 2 semanas, 5 horas por semana, $15.000. Suman puntos de actualización
+// (cada uno hasta 40) que bajan 5 por mes.
+export const CURSOS = {
+  sublimacion: { nombre: 'Sublimación', efecto: 'menos errores en la prensa', costo: 15000, horasPorSemana: 5, semanas: 2, puntos: 10 },
+  redes: { nombre: 'Redes', efecto: 'cada hora de publicidad atrae más pedidos', costo: 15000, horasPorSemana: 5, semanas: 2, puntos: 10 },
+  ventas: { nombre: 'Ventas', efecto: 'vendés más en la feria', costo: 15000, horasPorSemana: 5, semanas: 2, puntos: 10 },
+};
+export const CURSO_MAX_PUNTOS = 40;
+export const CURSO_BAJA_POR_MES = 5;
+
+// Mazo de la feria: pares de eventos (uno malo y uno bueno de valor parecido), mezclados.
+// Cuando se termina, se arma de nuevo. En cada feria sale una carta con esta probabilidad:
+export const PROB_CARTA_FERIA = 0.5;
+export const MAZO_FERIA = [
+  [
+    { tipo: 'mala', efecto: 'plata', monto: -5000, texto: 'Diste mal un vuelto y perdiste $5.000.' },
+    { tipo: 'buena', efecto: 'plata', monto: 5000, texto: 'Un turista te dejó $5.000 de propina.' },
+  ],
+  [
+    { tipo: 'mala', efecto: 'plata', monto: -10000, texto: 'El municipio pasó a cobrar un permiso extra: $10.000.' },
+    { tipo: 'buena', efecto: 'plata', monto: 10000, texto: 'Se olvidaron de cobrarte la mesa: te ahorraste $10.000.' },
+  ],
+  [
+    { tipo: 'mala', efecto: 'rotos', unidades: 2, texto: 'Se te cayó una caja del puesto: se rompieron {n}.' },
+    { tipo: 'buena', efecto: 'extra', unidades: 2, texto: 'Otro feriante te pasó un cliente: te compró {n} más.' },
+  ],
+  [
+    { tipo: 'mala', efecto: 'robo', unidades: 2, texto: 'Mientras atendías, te robaron {n} del puesto.' },
+    { tipo: 'buena', efecto: 'sinRetirar', unidades: 2, texto: 'Te pagaron {n} y nunca vinieron a retirarlas: cobraste y siguen en tu stock.' },
+  ],
+  [
+    { tipo: 'mala', efecto: 'lluvia', texto: 'Se largó a llover y la feria se levantó a la mitad: vendiste la mitad.' },
+    { tipo: 'buena', efecto: 'todo', texto: 'Un comerciante pasó al final y te compró todo lo que te quedaba.' },
+  ],
+];
+
+// Merma mensual del stock guardado ({u} = la unidad, por ejemplo "una taza de cerámica").
+export const MERMA = [
+  'Hubo una gotera donde guardás los productos y se arruinó {u}.',
+  'Dejaste la producción arriba de la mesa, se cayó {u} y se rompió.',
+  'Te olvidaste de un cumpleaños y saliste del paso regalando {u}.',
+  'Tu hermanito agarró {u} para tomar la leche y no apareció más.',
+  'El perro tiró la caja y se rompió {u}.',
+  'Tu vieja le regaló {u} a la vecina sin avisarte.',
+];
 
 export const MAZO = {
   // Valores de cada par (gasto y ganancia del mismo monto), como fracción de la base mensual.
@@ -133,12 +191,12 @@ export const MAZO = {
 
 // Mensajes del tutorial (semana -> texto del tío).
 export const TUTORIAL = {
-  1: 'Tío: "Bueno, campeón. Ya tenés la máquina de tazas. Así funciona: el domingo arrancás la semana haciendo publicidad en redes, durante la semana te llegan pedidos, el sábado producís y el domingo entregás. Cuando yo arranqué, con un par de horas de publicidad me alcanzaba."',
+  1: 'Tío: "Bueno, campeón. Ya tenés la máquina de tazas. Así funciona: el domingo arrancás la semana haciendo publicidad en redes, durante la semana te llegan pedidos, el sábado producís y el domingo entregás. Cuando yo arranqué, con un par de horas de publicidad me alcanzaba. Y las horas que te sobren, aprovechalas para estudiar."',
   2: 'Tío: "Cuantas más horas de publicidad, más pedidos te llegan... hasta que el mercado se agota. Fijate qué te dicen al final de la semana y ajustá: eso no te lo enseña nadie."',
   3: 'Tío: "Si aceptás un pedido y no lo entregás, quedás mal y perdés reputación. Si ves que no llegás, rechazalo a tiempo: perdés poquito. Y la reputación es lo que hace que te pidan más."',
   4: 'Tío: "Fin de mes: se pagan la luz, internet y la publicidad. Y me enteré de que tu primo Lelo también arrancó a vender tazas en el barrio... A ver quién la pega. Si escuchás algún rumor sobre él, prestale atención."',
-  5: 'Tío: "¿Probaste la feria? Pagás la mesa y te lleva el día entero, pero vendés bastante más. Ojo: en la feria vendés lo que tengas de stock, así que producí unas de más."',
+  5: 'Tío: "¿Probaste la feria? Es el domingo: llevás lo que te sobró de stock, pagás la mesa y te lleva el día, pero vendés. Si el sábado producís unas de más, el domingo tenés qué llevar. Y no acumules mucho: lo que queda guardado siempre se termina rompiendo."',
   6: 'Tío: "En este negocio siempre pasa algo: a veces se rompe todo y a veces te cae un pedido del cielo. A la larga se compensa, pero hay que tener un colchón de plata."',
-  7: 'Tío: "Si trabajás siempre al máximo te cansás y empezás a mandarte macanas. Descansá. Y hay un curso corto de sublimación: cuesta plata y horas, pero te hace mejor."',
+  7: 'Tío: "Si trabajás siempre al máximo te cansás y empezás a mandarte macanas. Descansá. Y si te sobran horas, estudiá: un curso corto cuesta plata y tiempo, pero te hace mejor."',
   8: 'Tío: "¡Feliz cumpleaños! Desde marzo arranca la época fuerte: en invierno las tazas vuelan, y para el Día del Padre ni te cuento. Prepará stock. Acá termina tu entrenamiento."',
 };

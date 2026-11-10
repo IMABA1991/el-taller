@@ -1,7 +1,8 @@
 // Motor del juego "El Taller". Lógica pura: no toca la pantalla ni el guardado.
 import {
   HORAS_POR_SEMANA, SEMANAS_POR_ANIO, MESES, MAQUINAS, PRODUCTOS, FECHAS_ESPECIALES, RAMPA_FECHA,
-  PRESTAMO, GASTOS_FIJOS, VENTAS, REPUTACION, PRIMO, CURSO_CORTO, MAZO, TUTORIAL, PROMO, CLIENTES,
+  PRESTAMO, GASTOS_FIJOS, VENTAS, REPUTACION, PRIMO, CURSOS, CURSO_MAX_PUNTOS, CURSO_BAJA_POR_MES, MAZO, TUTORIAL, PROMO, CLIENTES,
+  MAZO_FERIA, PROB_CARTA_FERIA, MERMA,
 } from './data.js';
 
 export const VERSION_PARTIDA = 1;
@@ -83,19 +84,43 @@ export function multiplicadorProducto(rep, sens) {
 }
 
 export function formacionTotal(e) {
-  return limitar(e.formacion.fija + e.formacion.actualizacion, 0, 100);
+  const c = e.formacion.cursos;
+  return limitar(e.formacion.fija + c.sublimacion + c.redes + c.ventas, 0, 100);
+}
+
+// Pone al día partidas guardadas con versiones anteriores del juego.
+export function migrarPartida(e) {
+  if (!e.formacion.cursos) {
+    e.formacion.cursos = { sublimacion: e.formacion.actualizacion || 0, redes: 0, ventas: 0 };
+    delete e.formacion.actualizacion;
+  }
+  if (e.curso.id === undefined) e.curso.id = e.curso.semanasRestantes > 0 ? 'sublimacion' : null;
+  if (!e.mazoFeria) e.mazoFeria = [];
+  return e;
 }
 
 export function horasPorUnidad(e, idProducto) {
   return PRODUCTOS[idProducto].horas * Math.max(0.35, 1 - e.exp * 0.016);
 }
 
+// Curso de redes: cada punto hace que la publicidad rinda un 1% más.
 export function horasPorVenta(e) {
-  return VENTAS.horasPorVentaRedes * (1 - e.exp / 200);
+  return VENTAS.horasPorVentaRedes * (1 - e.exp / 200) * (1 - e.formacion.cursos.redes / 100);
 }
 
+// Curso de sublimación: 10 puntos bajan los errores un 12,5% (40 puntos, a la mitad).
 export function probabilidadError(e) {
-  return limitar(0.04 * (1 - e.exp / 125) * (1 + e.cansancio / 40) * (1 - formacionTotal(e) / 200), 0.005, 0.5);
+  const f = e.formacion;
+  return limitar(0.04 * (1 - e.exp / 125) * (1 + e.cansancio / 40) * (1 - f.fija / 200) * (1 - f.cursos.sublimacion / 80), 0.005, 0.5);
+}
+
+// Curso de ventas: 10 puntos venden un 25% más en la feria.
+export function multiplicadorFeria(e) {
+  return (1 + (multiplicadorReputacion(e.rep) - 1) * 0.5) * (1 + e.formacion.cursos.ventas / 40);
+}
+
+export function stockTotal(e) {
+  return Object.values(e.stock).reduce((s, x) => s + x, 0);
 }
 
 export function luzDelMes(e) {
@@ -136,8 +161,8 @@ export function nuevaPartida(opcionPrestamo, semilla = Date.now() >>> 0) {
     rep: 0,
     exp: 0,
     cansancio: 0,
-    formacion: { fija: 0, actualizacion: 0 },
-    curso: { semanasRestantes: 0 },
+    formacion: { fija: 0, cursos: { sublimacion: 0, redes: 0, ventas: 0 } },
+    curso: { id: null, semanasRestantes: 0 },
     prestamo: opcionPrestamo === 'A'
       ? { opcion: 'A', pagado: false, deuda: PRESTAMO.A.total, vencido: false }
       : { opcion: 'B', cuotasPagadas: 0, cuotasPerdonadas: 0, atrasadas: 0, pagado: false },
@@ -151,6 +176,7 @@ export function nuevaPartida(opcionPrestamo, semilla = Date.now() >>> 0) {
     ultimoResumen: null,
     totales: { vendidas: 0, producidas: 0 },
     semanaEnCurso: null,
+    mazoFeria: [],
   };
   prepararMazo(e);
   planearPrimo(e);
@@ -167,9 +193,11 @@ function sortearComportamiento(e) {
 // Decide qué va a hacer Lelo la semana siguiente y si corre un rumor (una semana antes).
 function planearPrimo(e) {
   e.primo.proximo = sortearComportamiento(e);
+  e.primo.jugada = Math.floor(siguienteAzar(e) * PRIMO.jugadas.length);
   const compite = e.semana >= 4 && !e.mejorDeLaCiudad;
   const hayRumor = compite && (e.primo.proximo === 'agresivo' || siguienteAzar(e) < PRIMO.rumor.probFalsaAlarma);
-  e.primo.rumor = hayRumor ? PRIMO.rumores[Math.floor(siguienteAzar(e) * PRIMO.rumores.length)] : null;
+  // Si es falsa alarma, el rumor habla de una jugada que no va a pasar.
+  e.primo.rumor = hayRumor ? `Rumor: ${PRIMO.jugadas[e.primo.jugada].rumor} Puede ser puro humo... o no.` : null;
 }
 
 // ---------- Mazo de eventos (balanceado por trimestre) ----------
@@ -245,25 +273,23 @@ export function puedeHacerPromo(e) {
 }
 
 // ---------- Horas y costos ----------
-function horasFijas(e, sem) {
-  let horas = sem ? sem.horasRedes + (sem.promo ? PROMO.horas : 0) : 0;
-  if (e.curso.semanasRestantes > 0) horas += CURSO_CORTO.horasPorSemana;
+// Horas del domingo: publicidad, promo, feria y curso (el que está en marcha o el que arranca).
+export function horasDomingo(e, pub) {
+  let horas = (pub.horasRedes || 0) + (pub.promo ? PROMO.horas : 0) + (pub.feria ? VENTAS.feria.horas : 0);
+  const idCurso = e.curso.semanasRestantes > 0 ? e.curso.id : pub.curso;
+  if (idCurso) horas += CURSOS[idCurso].horasPorSemana;
   return horas;
 }
 
 export function horasDelPlan(e, plan, sem = e.semanaEnCurso) {
-  let horas = horasFijas(e, sem);
+  let horas = sem ? sem.horasDomingo : 0;
   for (const [id, n] of Object.entries(plan.producir || {})) horas += (n || 0) * horasPorUnidad(e, id);
-  if (plan.feria) horas += VENTAS.feria.horas;
-  if (plan.curso && e.curso.semanasRestantes === 0) horas += CURSO_CORTO.horasPorSemana;
   return redondear(horas, 1);
 }
 
 export function costoDelPlan(plan) {
   let costo = 0;
   for (const [id, n] of Object.entries(plan.producir || {})) costo += (n || 0) * PRODUCTOS[id].costo;
-  if (plan.feria) costo += VENTAS.feria.costoMesa;
-  if (plan.curso) costo += CURSO_CORTO.costo;
   return costo;
 }
 
@@ -288,9 +314,14 @@ export function validarPublicidad(e, pub) {
   const horas = pub.horasRedes || 0;
   if (horas < 0 || !Number.isInteger(horas)) errores.push('Horas de publicidad inválidas.');
   if (pub.promo && !puedeHacerPromo(e)) errores.push('La promo de contraataque solo se puede lanzar cuando hay un rumor sobre Lelo.');
-  const total = horas + (pub.promo ? PROMO.horas : 0) + (e.curso.semanasRestantes > 0 ? CURSO_CORTO.horasPorSemana : 0);
+  if (pub.feria && stockTotal(e) === 0) errores.push('No tenés stock para llevar a la feria.');
+  if (pub.curso && !CURSOS[pub.curso]) errores.push('Ese curso no existe.');
+  if (pub.curso && e.curso.semanasRestantes > 0) errores.push('Ya estás haciendo un curso.');
+  const total = horasDomingo(e, pub);
   if (total > HORAS_POR_SEMANA) errores.push(`Te pasaste de horas: ${total} de ${HORAS_POR_SEMANA}.`);
-  return { ok: errores.length === 0, errores };
+  const costo = (pub.feria ? VENTAS.feria.costoMesa : 0) + (pub.curso ? CURSOS[pub.curso].costo : 0);
+  if (costo > 0 && costo > e.plata) errores.push(`No te alcanza la plata: necesitás $${fmt(costo)} y tenés $${fmt(e.plata)}.`);
+  return { ok: errores.length === 0, errores, horas: total, costo };
 }
 
 export const DIAS = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
@@ -310,21 +341,29 @@ export function publicar(e, pub) {
   const comp = PRIMO.comportamientos.find((x) => x.id === (e.primo.proximo || sortearComportamiento(e)));
   const habiaRumor = Boolean(e.primo.rumor);
   e.primo.comportamiento = comp.id;
+  const ataque = PRIMO.jugadas[e.primo.jugada ?? Math.floor(siguienteAzar(e) * PRIMO.jugadas.length)].ataque;
+  const oferta = PRIMO.ofertas[Math.floor(siguienteAzar(e) * PRIMO.ofertas.length)];
   if (compite) {
     if (pub.promo) {
       enDia(0, '📣 Lanzaste la promo de contraataque.', 'buena');
       if (comp.id === 'agresivo') {
-        enDia(1, '😤 Lelo salió con volantes y precios de remate... pero tu promo ya estaba en todos lados.', 'info');
+        enDia(1, `😤 ${ataque}.. pero tu promo ya estaba en todos lados.`, 'info');
         evento('¡Tu promo frenó a Lelo! Su campaña no te sacó ningún pedido y encima te llegaron clientes nuevos.', 'buena');
       } else {
         evento('Lanzaste la promo, pero el rumor era humo: Lelo ni apareció. Igual te llegaron algunos clientes más.', 'info');
       }
     } else {
-      if (habiaRumor && comp.id !== 'agresivo') evento('El rumor era humo: Lelo no hizo ninguna campaña agresiva.', 'buena');
+      if (habiaRumor && comp.id !== 'agresivo') evento('El rumor era humo: Lelo no hizo ninguna jugada agresiva.', 'buena');
       else if (habiaRumor) evento('El rumor era cierto.', 'mala');
-      evento(comp.texto, comp.id === 'tranquilo' ? 'info' : 'mala');
-      if (comp.id === 'agresivo') enDia(1, '😤 Lelo salió con todo: volantes y precios de remate.', 'mala');
-      if (comp.id === 'ofertas') enDia(2, '🏷️ Lelo publicó un 2x1 en tazas.', 'mala');
+      if (comp.id === 'agresivo') {
+        evento(`${ataque} Te sacó clientes.`, 'mala');
+        enDia(1, `😤 ${ataque}`, 'mala');
+      } else if (comp.id === 'ofertas') {
+        evento(oferta, 'mala');
+        enDia(2, `🏷️ ${oferta}`, 'mala');
+      } else {
+        evento(comp.texto, 'info');
+      }
     }
   }
   const sacaLelo = compite && !pub.promo ? comp.saca : 0;
@@ -332,6 +371,25 @@ export function publicar(e, pub) {
 
   const aviso = avisoFecha(e.semana);
   if (aviso) enDia(0, `📅 ${aviso}`, 'buena');
+
+  // Curso que arranca esta semana
+  let gastosDomingo = 0;
+  if (pub.curso) {
+    const cu = CURSOS[pub.curso];
+    e.plata -= cu.costo;
+    gastosDomingo += cu.costo;
+    e.curso = { id: pub.curso, semanasRestantes: cu.semanas };
+    enDia(0, `📚 Arrancaste el curso de ${cu.nombre.toLowerCase()} (${cu.semanas} semanas).`, 'buena');
+  } else if (e.curso.semanasRestantes > 0) {
+    enDia(2, `📚 Seguís con el curso de ${CURSOS[e.curso.id].nombre.toLowerCase()}.`, 'info');
+  }
+
+  // Feria del domingo: se vende el stock que sobró de semanas anteriores
+  const feria = pub.feria ? hacerFeria(e) : null;
+  if (feria) {
+    gastosDomingo += feria.gastos;
+    feria.textos.forEach((t) => enDia(0, t.texto, t.tipo));
+  }
 
   // Lo que pide el mercado esta semana (el jugador no lo ve)
   const mercado = {};
@@ -404,10 +462,95 @@ export function publicar(e, pub) {
   enDia(6, pedidos.length ? `📦 Cierra la semana con ${pedidos.length} pedido${pedidos.length > 1 ? 's' : ''} para entregar el domingo.` : '📦 Cierra la semana sin pedidos.', 'cierre');
 
   e.semanaEnCurso = {
-    semana: e.semana, horasRedes: horas, promo: Boolean(pub.promo),
-    pedidos, pedidosLelo: deLelo.length, eventos, dias,
+    semana: e.semana, horasRedes: horas, promo: Boolean(pub.promo), horasDomingo: horasDomingo(e, { ...pub, curso: null }),
+    pedidos, pedidosLelo: deLelo.length, eventos, dias, feria, gastosDomingo,
   };
   return { ok: true, semana: e.semanaEnCurso };
+}
+
+// ---------- Feria del domingo ----------
+function sacarCartaFeria(e) {
+  if (!e.mazoFeria.length) {
+    e.mazoFeria = mezclar(e, MAZO_FERIA.flat().map((c) => ({ ...c })));
+  }
+  return e.mazoFeria.pop();
+}
+
+function venderUnaDelStock(e) {
+  const conStock = Object.keys(e.stock).filter((id) => e.stock[id] > 0);
+  if (!conStock.length) return null;
+  const total = conStock.reduce((s, id) => s + e.stock[id], 0);
+  let t = siguienteAzar(e) * total;
+  const id = conStock.find((x) => (t -= e.stock[x]) < 0) || conStock[0];
+  e.stock[id]--;
+  return id;
+}
+
+function describirUnidades(cuenta) {
+  return Object.keys(cuenta).filter((id) => cuenta[id]).map((id) => `${cuenta[id]} ${nombreUnidades(id, cuenta[id])}`).join(' y ');
+}
+
+function hacerFeria(e) {
+  const f = { ingresos: 0, gastos: VENTAS.feria.costoMesa, vendidas: 0, textos: [], linea: '' };
+  e.plata -= VENTAS.feria.costoMesa;
+  const stockInicial = stockTotal(e);
+  let cupo = Math.round(enteroEntre(e, VENTAS.feria.min, VENTAS.feria.max) * multiplicadorFeria(e));
+  const carta = siguienteAzar(e) < PROB_CARTA_FERIA ? sacarCartaFeria(e) : null;
+  const vender = (n, precio = 1) => {
+    const cuenta = {};
+    for (let i = 0; i < n; i++) {
+      const id = venderUnaDelStock(e);
+      if (!id) break;
+      cuenta[id] = (cuenta[id] || 0) + 1;
+      const ingreso = Math.round(PRODUCTOS[id].precio * precio);
+      e.plata += ingreso;
+      f.ingresos += ingreso;
+      f.vendidas++;
+    }
+    return cuenta;
+  };
+  const sacar = (n) => {
+    const cuenta = {};
+    for (let i = 0; i < n; i++) { const id = venderUnaDelStock(e); if (!id) break; cuenta[id] = (cuenta[id] || 0) + 1; }
+    return cuenta;
+  };
+
+  if (carta?.efecto === 'lluvia') cupo = Math.ceil(cupo / 2);
+  if (carta?.efecto === 'todo') cupo = stockInicial;
+  if (carta?.efecto === 'extra') cupo += carta.unidades;
+  const vendido = vender(cupo);
+  const quedaSinStock = stockTotal(e) === 0 && f.vendidas < cupo;
+  f.linea = `En la feria vendiste ${f.vendidas}${f.vendidas ? ` (${describirUnidades(vendido)})` : ''}${quedaSinStock ? ' y te quedaste sin nada para vender' : ''}.`;
+  f.textos.push({ texto: `🛍️ ${f.linea}`, tipo: f.vendidas ? 'buena' : 'info' });
+
+  if (carta) {
+    let texto = carta.texto;
+    if (carta.efecto === 'plata') {
+      e.plata += carta.monto;
+      if (carta.monto > 0) f.ingresos += carta.monto; else f.gastos -= carta.monto;
+    } else if (carta.efecto === 'rotos' || carta.efecto === 'robo') {
+      const perdidas = sacar(carta.unidades);
+      const d = describirUnidades(perdidas);
+      texto = d ? texto.replace('{n}', d) : 'Casi se te cae una caja, pero ya no te quedaba nada en el puesto.';
+    } else if (carta.efecto === 'sinRetirar') {
+      // Cobrás el valor de productos que siguen en tu stock
+      const ids = Object.keys(e.stock).filter((id) => e.stock[id] > 0);
+      const id = ids[0] || Object.keys(PRODUCTOS).find((x) => e.maquinas[PRODUCTOS[x].maquina]);
+      const monto = PRODUCTOS[id].precio * carta.unidades;
+      e.plata += monto;
+      f.ingresos += monto;
+      texto = texto.replace('{n}', `${carta.unidades} ${nombreUnidades(id, carta.unidades)}`);
+    } else if (carta.efecto === 'extra') {
+      texto = quedaSinStock
+        ? 'Otro feriante te pasó un cliente, pero ya no tenías nada para venderle.'
+        : texto.replace('{n}', `${carta.unidades} producto${carta.unidades > 1 ? 's' : ''}`);
+    } else if (carta.efecto === 'todo' && f.vendidas === 0) {
+      texto = 'Un comerciante quería comprarte todo lo que quedaba... pero no te quedaba nada.';
+    }
+    f.textos.push({ texto: `${carta.tipo === 'mala' ? '😖' : '🍀'} ${texto}`, tipo: carta.tipo });
+  }
+  f.rep = f.vendidas * REPUTACION.porVenta;
+  return f;
 }
 
 function capitalizar(t) {
@@ -427,8 +570,6 @@ export function validarPlan(e, plan) {
     if (n < 0 || !Number.isInteger(n)) errores.push('Cantidad inválida.');
     if (n > 0 && !e.maquinas[PRODUCTOS[id].maquina]) errores.push(`No tenés máquina para ${PRODUCTOS[id].nombre.toLowerCase()}.`);
   }
-  if (plan.curso && e.curso.semanasRestantes > 0) errores.push('Ya estás haciendo el curso.');
-  if (plan.curso && e.semana < 7) errores.push('El curso se habilita en la semana 7.');
   const horas = horasDelPlan(e, plan);
   if (horas > HORAS_POR_SEMANA) errores.push(`Te pasaste de horas: ${horas} de ${HORAS_POR_SEMANA}.`);
   const costo = costoDelPlan(plan);
@@ -500,28 +641,16 @@ export function cerrarSemana(e, plan) {
   if (activos) linea(`Entregaste ${entregados} de ${activos} pedidos (${unidadesEntregadas} productos).`);
   else if (!sem.pedidos.length) linea('No llegaron pedidos esta semana.');
 
-  // 3. Feria (vende del stock que te sobró)
+  // 3. Lo del domingo: feria y curso
+  const feria = sem.feria;
   let vendidasFeria = 0;
-  if (plan.feria) {
-    e.plata -= VENTAS.feria.costoMesa;
-    r.gastos += VENTAS.feria.costoMesa;
-    const multFeria = 1 + (multiplicadorReputacion(e.rep) - 1) * 0.5;
-    let cupo = Math.round(enteroEntre(e, VENTAS.feria.min, VENTAS.feria.max) * multFeria);
-    while (cupo > 0) {
-      const conStock = Object.keys(e.stock).filter((id) => e.stock[id] > 0);
-      if (!conStock.length) break;
-      const totalStock = conStock.reduce((s, id) => s + e.stock[id], 0);
-      let t = siguienteAzar(e) * totalStock;
-      const id = conStock.find((x) => (t -= e.stock[x]) < 0) || conStock[0];
-      e.stock[id]--;
-      e.plata += PRODUCTOS[id].precio;
-      r.ingresos += PRODUCTOS[id].precio;
-      deltaRep += REPUTACION.porVenta;
-      vendidasFeria++;
-      cupo--;
-    }
-    linea(`En la feria vendiste ${vendidasFeria}${cupo > 0 ? ` (te quedaste sin stock: podrías haber vendido ${cupo} más)` : ''}.`);
+  if (feria) {
+    r.ingresos += feria.ingresos;
+    deltaRep += feria.rep;
+    vendidasFeria = feria.vendidas;
+    linea(feria.linea);
   }
+  r.gastos += sem.gastosDomingo || 0;
 
   // 4. Reputación (el cansancio trae pedidos mal hechos)
   const vendidas = unidadesEntregadas + vendidasFeria;
@@ -543,16 +672,13 @@ export function cerrarSemana(e, plan) {
     : limitar(e.cansancio - (40 - horas) * 1.5, 0, 100);
   e.cansancio = redondear(e.cansancio, 1);
   if (e.cansancio >= 80) evento('Estás reventado. Si seguís así te vas a mandar macanas: descansá.', 'mala');
-  if (plan.curso) {
-    e.plata -= CURSO_CORTO.costo;
-    r.gastos += CURSO_CORTO.costo;
-    e.curso.semanasRestantes = CURSO_CORTO.semanas;
-  }
   if (e.curso.semanasRestantes > 0) {
     e.curso.semanasRestantes--;
     if (e.curso.semanasRestantes === 0) {
-      e.formacion.actualizacion = limitar(e.formacion.actualizacion + CURSO_CORTO.puntos, 0, 40);
-      evento(`Terminaste el curso corto: +${CURSO_CORTO.puntos} de formación.`, 'buena');
+      const cu = CURSOS[e.curso.id];
+      e.formacion.cursos[e.curso.id] = limitar(e.formacion.cursos[e.curso.id] + cu.puntos, 0, CURSO_MAX_PUNTOS);
+      evento(`Terminaste el curso de ${cu.nombre.toLowerCase()}: ${cu.efecto} (+${cu.puntos} puntos).`, 'buena');
+      e.curso = { id: null, semanasRestantes: 0 };
     }
   }
 
@@ -601,10 +727,10 @@ export function cerrarSemana(e, plan) {
 // Atajo para simulaciones: publicidad + producción en una sola llamada.
 // plan.producir puede ser un objeto o una función (semanaEnCurso) => objeto.
 export function jugarSemana(e, plan) {
-  const p = publicar(e, { horasRedes: plan.horasRedes || 0, promo: plan.promo });
+  const p = publicar(e, { horasRedes: plan.horasRedes || 0, promo: plan.promo, feria: plan.feria, curso: plan.curso });
   if (!p.ok) return p;
   const producir = typeof plan.producir === 'function' ? plan.producir(e.semanaEnCurso) : (plan.producir || {});
-  const res = cerrarSemana(e, { producir, feria: plan.feria, curso: plan.curso });
+  const res = cerrarSemana(e, { producir });
   if (!res.ok) e.semanaEnCurso = null;
   return res;
 }
@@ -659,8 +785,15 @@ function cierreDeMes(e, c, r, evento) {
     evento(`La deuda con el tío sigue creciendo: ahora es $${fmt(p.deuda)}.`, 'mala');
   }
 
-  // Actualización de formación: baja 5 por mes
-  e.formacion.actualizacion = Math.max(0, e.formacion.actualizacion - 5);
+  // Los cursos se olvidan: cada uno baja 5 puntos por mes
+  for (const id of Object.keys(e.formacion.cursos)) e.formacion.cursos[id] = Math.max(0, e.formacion.cursos[id] - CURSO_BAJA_POR_MES);
+
+  // Merma: una vez por mes se pierde un producto del stock guardado
+  if (stockTotal(e) > 0) {
+    const id = venderUnaDelStock(e);
+    const texto = MERMA[Math.floor(siguienteAzar(e) * MERMA.length)].replace('{u}', `una ${PRODUCTOS[id].singular}`);
+    evento(`📦 ${texto}`, 'mala');
+  }
 
   e.finanzas.meses.push(e.finanzas.mesActual);
   r.gananciaMes = e.finanzas.mesActual;
@@ -708,4 +841,4 @@ export function fmt(n) {
   return Math.round(n).toLocaleString('es-AR');
 }
 
-export { HORAS_POR_SEMANA, PRODUCTOS, MAQUINAS, CURSO_CORTO, VENTAS, PRESTAMO, TUTORIAL, PROMO };
+export { HORAS_POR_SEMANA, PRODUCTOS, MAQUINAS, CURSOS, VENTAS, PRESTAMO, TUTORIAL, PROMO };

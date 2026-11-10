@@ -3,7 +3,7 @@
 // Uso: node tests/simulacion.js
 import {
   nuevaPartida, jugarSemana, demandaEsperada, horasPorUnidad, horasPorVenta, validarPlan, validarPublicidad,
-  comprarMaquina, pagarPrestamoA, costoPagoAnticipadoA, calendario, unidadesPedidas, horasDelPlan, PRODUCTOS, VENTAS,
+  comprarMaquina, pagarPrestamoA, costoPagoAnticipadoA, calendario, unidadesPedidas, horasDelPlan, stockTotal, PRODUCTOS, VENTAS,
 } from '../js/engine.js';
 
 // Un jugador razonable: publicidad para cubrir lo que pide el mercado, después produce
@@ -11,21 +11,24 @@ import {
 function planRazonable(e) {
   const ids = Object.keys(PRODUCTOS).filter((id) => e.maquinas[PRODUCTOS[id].maquina]);
   const totalEsperado = ids.reduce((s, id) => s + demandaEsperada(e, id), 0);
-  const plan = { horasRedes: Math.ceil(totalEsperado * 1.2 * horasPorVenta(e)), feria: true, curso: false };
-  if (e.semana >= 7 && e.curso.semanasRestantes === 0 && e.formacion.actualizacion < 10 && e.plata > 60000) plan.curso = true;
+  const plan = { horasRedes: Math.ceil(totalEsperado * 1.2 * horasPorVenta(e)), feria: stockTotal(e) >= 2, curso: null };
+  if (e.curso.semanasRestantes === 0 && e.plata > 80000) {
+    const c = e.formacion.cursos;
+    plan.curso = ['redes', 'sublimacion', 'ventas'].sort((a, b) => c[a] - c[b])[0];
+  }
+  for (let i = 0; i < 3 && !validarPublicidad(e, plan).ok; i++) {
+    if (plan.curso) plan.curso = null; else if (plan.feria) plan.feria = false; else plan.horasRedes = Math.max(0, plan.horasRedes - 1);
+  }
   plan.producir = (sem) => {
     const pedidas = unidadesPedidas(sem);
     const producir = {};
+    // lo que falta (+1 por si se arruina) y 2 de más para la feria del domingo que viene
     for (const id of ids) producir[id] = Math.max(0, pedidas[id] + (pedidas[id] ? 1 : 0) + 2 - e.stock[id]);
-    const p2 = { producir, feria: plan.feria, curso: plan.curso };
+    const p2 = { producir };
     for (let i = 0; i < 300 && !validarPlan(e, p2).ok; i++) {
       const id = ids.find((x) => p2.producir[x] > pedidas[x] - e.stock[x] && p2.producir[x] > 0) || ids.find((x) => p2.producir[x] > 0);
-      if (p2.curso) p2.curso = false;
-      else if (p2.feria) p2.feria = false;
-      else if (id) p2.producir[id]--;
-      else break;
+      if (id) p2.producir[id]--; else break;
     }
-    plan.feria = p2.feria; plan.curso = p2.curso;
     return p2.producir;
   };
   return plan;

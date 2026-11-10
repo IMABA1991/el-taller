@@ -2,8 +2,8 @@
 import {
   nuevaPartida, publicar, cerrarSemana, validarPublicidad, validarPlan, rechazarPedido, unidadesPedidas,
   calendario, avisoFecha, horasPorUnidad,
-  probabilidadError, comprarMaquina, pagarPrestamoA, costoPagoAnticipadoA, gastosFijosDelMes, nombreUnidades,
-  fmt, puedeHacerPromo, HORAS_POR_SEMANA, PRODUCTOS, MAQUINAS, CURSO_CORTO, VENTAS, PRESTAMO, TUTORIAL, PROMO,
+  comprarMaquina, pagarPrestamoA, costoPagoAnticipadoA, gastosFijosDelMes, nombreUnidades, migrarPartida, stockTotal, horasDomingo,
+  fmt, puedeHacerPromo, HORAS_POR_SEMANA, PRODUCTOS, MAQUINAS, CURSOS, VENTAS, PRESTAMO, TUTORIAL, PROMO,
 } from './engine.js';
 import { guardar, cargar, borrar } from './storage.js';
 
@@ -22,14 +22,14 @@ const plata = (n) => `${n < 0 ? '−' : ''}$${fmt(Math.abs(n))}`;
 const pct = (v) => `${Math.max(0, Math.min(100, v))}%`;
 
 function planPublicidad() {
-  return { horasRedes: partida?.ultimaPublicidad ?? 0, promo: false };
+  return { horasRedes: partida?.ultimaPublicidad ?? 0, promo: false, feria: false, curso: null };
 }
 
 // La producción siempre arranca en cero: lo que falta se muestra resaltado y lo carga el jugador.
 function planProduccion() {
   const producir = {};
   for (const id of Object.keys(PRODUCTOS)) producir[id] = 0;
-  return { producir, feria: partida.ultimaFeria ?? false, curso: false };
+  return { producir };
 }
 
 function prepararPlanes() {
@@ -67,7 +67,7 @@ function pantallaInicio() {
   };
   if (guardada) {
     document.getElementById('continuar').onclick = () => {
-      partida = guardada;
+      partida = migrarPartida(guardada);
       prepararPlanes();
       siguientePantalla();
     };
@@ -199,7 +199,7 @@ function pantallaPublicidad() {
   const fecha = avisoFecha(e.semana);
   const tutorial = e.semana <= 8 ? TUTORIAL[e.semana] : null;
   const v = validarPublicidad(e, pub);
-  const horas = pub.horasRedes + (pub.promo ? PROMO.horas : 0) + (e.curso.semanasRestantes > 0 ? CURSO_CORTO.horasPorSemana : 0);
+  const horas = horasDomingo(e, pub);
 
   app.innerHTML = `
     ${bloqueEncabezado(e, '<div class="paso-semana">Domingo · Publicidad</div>')}
@@ -228,9 +228,29 @@ function pantallaPublicidad() {
       </div>
     </div>
 
+    <div class="tarjeta">
+      <h2>Feria del domingo</h2>
+      <label class="interruptor" style="border-top:0">
+        <span><strong>Ir a la feria</strong><br><span class="suave">Mesa ${plata(VENTAS.feria.costoMesa)} · ${VENTAS.feria.horas} h · vendés lo que te sobró de stock (${stockTotal(e) ? `tenés ${stockTotal(e)}` : 'hoy no tenés nada'}). En la feria siempre pasa algo.</span></span>
+        <input type="checkbox" id="feria" ${pub.feria ? 'checked' : ''} ${stockTotal(e) ? '' : 'disabled'}>
+      </label>
+    </div>
+
+    <div class="tarjeta">
+      <h2>Estudiar</h2>
+      ${e.curso.semanasRestantes > 0
+        ? `<p>Estás haciendo el curso de <strong>${CURSOS[e.curso.id].nombre.toLowerCase()}</strong>: ${CURSOS[e.curso.id].horasPorSemana} h esta semana y termina ${e.curso.semanasRestantes === 1 ? 'esta semana' : `en ${e.curso.semanasRestantes} semanas`}.</p>`
+        : `<p class="suave">Un curso corto dura ${Object.values(CURSOS)[0].semanas} semanas, ${Object.values(CURSOS)[0].horasPorSemana} h por semana, y cuesta ${plata(Object.values(CURSOS)[0].costo)}. Lo aprendido se va olvidando de a poco si no te actualizás.</p>
+          ${Object.entries(CURSOS).map(([id, cu]) => `<label class="interruptor">
+            <span><strong>${cu.nombre}</strong><br><span class="suave">${cu.efecto.charAt(0).toUpperCase() + cu.efecto.slice(1)}. Nivel: ${e.formacion.cursos[id]}/40</span></span>
+            <input type="radio" name="curso" value="${id}" ${pub.curso === id ? 'checked' : ''}>
+          </label>`).join('')}
+          ${pub.curso ? '<button class="chico" id="sinCurso" style="margin-top:8px">No estudiar esta semana</button>' : ''}`}
+    </div>
+
     ${bloqueEstado(e)}
     ${bloqueComprasYReinicio(e)}
-    ${barraInferior(horas, null, v.errores, 'Arrancar la semana de publicidad', 'publicar')}
+    ${barraInferior(horas, v.costo || null, v.errores, 'Arrancar la semana', 'publicar')}
   `;
   aviso = null;
   conectarMenu();
@@ -238,11 +258,16 @@ function pantallaPublicidad() {
   app.querySelectorAll('[data-redes]').forEach((b) => { b.onclick = () => { pub.horasRedes = Math.max(0, pub.horasRedes + Number(b.dataset.redes)); refrescar(); }; });
   const promo = document.getElementById('promo');
   if (promo) promo.onchange = (ev) => { pub.promo = ev.target.checked; refrescar(); };
+  document.getElementById('feria').onchange = (ev) => { pub.feria = ev.target.checked; refrescar(); };
+  app.querySelectorAll('input[name="curso"]').forEach((r) => { r.onchange = () => { pub.curso = r.value; refrescar(); }; });
+  const sinCurso = document.getElementById('sinCurso');
+  if (sinCurso) sinCurso.onclick = () => { pub.curso = null; refrescar(); };
   conectarComprasYReinicio();
   document.getElementById('publicar').onclick = () => {
     const r = publicar(partida, pub);
     if (!r.ok) { aviso = r.errores.join(' '); refrescar(true); return; }
     partida.ultimaPublicidad = pub.horasRedes;
+    pub = planPublicidad();
     guardarPartida();
     plan = planProduccion();
     pantallaAnimacion(r.semana);
@@ -366,23 +391,8 @@ function pantallaPedidos() {
           </div>
         </div>`;
       }).join('')}
-      <p class="suave" style="margin-top:8px">Alguna puede salir mal en la prensa (hoy ~${Math.round(probabilidadError(e) * 100)}%): producir una de más te cubre.</p>
-      <label class="interruptor">
-        <span><strong>Ir a la feria</strong><br><span class="suave">Mesa ${plata(VENTAS.feria.costoMesa)} · ${VENTAS.feria.horas} h · vende lo que te sobre de stock (5 a 8 productos)</span></span>
-        <input type="checkbox" id="feria" ${plan.feria ? 'checked' : ''}>
-      </label>
-    </div>
-
-    <div class="tarjeta">
-      <h2>Formación</h2>
-      ${e.curso.semanasRestantes > 0
-        ? `<p>Estás haciendo el curso corto: ${CURSO_CORTO.horasPorSemana} h por semana, te quedan ${e.curso.semanasRestantes} semana(s).</p>`
-        : e.semana >= 7
-          ? `<label class="interruptor" style="border-top:0">
-              <span><strong>Curso corto de sublimación</strong><br><span class="suave">${plata(CURSO_CORTO.costo)} · ${CURSO_CORTO.horasPorSemana} h por semana durante ${CURSO_CORTO.semanas} semanas · +${CURSO_CORTO.puntos} de formación (baja 5 por mes)</span></span>
-              <input type="checkbox" id="curso" ${plan.curso ? 'checked' : ''}>
-            </label>`
-          : '<p class="suave">Los cursos se habilitan en la semana 7.</p>'}
+      <p class="suave" style="margin-top:8px">Alguna puede salir mal en la prensa. Cuanta más experiencia tengas, menos errores vas a cometer: producir una de más te cubre.</p>
+      <p class="suave">Lo que te sobre queda en stock para llevar a la feria del domingo. Pero no acumules mucho: lo guardado siempre se termina rompiendo.</p>
     </div>
 
     ${bloqueEstado(e)}
@@ -401,9 +411,6 @@ function pantallaPedidos() {
   });
   app.querySelectorAll('[data-mas]').forEach((b) => { b.onclick = () => { plan.producir[b.dataset.mas]++; refrescar(); }; });
   app.querySelectorAll('[data-menos]').forEach((b) => { b.onclick = () => { plan.producir[b.dataset.menos] = Math.max(0, plan.producir[b.dataset.menos] - 1); refrescar(); }; });
-  document.getElementById('feria').onchange = (ev) => { plan.feria = ev.target.checked; refrescar(); };
-  const curso = document.getElementById('curso');
-  if (curso) curso.onchange = (ev) => { plan.curso = ev.target.checked; refrescar(); };
   document.getElementById('terminar').onclick = terminarSemana;
 }
 
@@ -420,10 +427,8 @@ function refrescar(arriba = false) {
 }
 
 function terminarSemana() {
-  const feria = plan.feria;
   const r = cerrarSemana(partida, plan);
   if (!r.ok) { aviso = r.errores.join(' '); refrescar(true); return; }
-  partida.ultimaFeria = feria;
   guardarPartida();
   pub = planPublicidad();
   pantallaResumen(r.resumen);
