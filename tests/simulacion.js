@@ -117,5 +117,31 @@ console.log(`\nRumores: ${conRumor}, se cumplieron ${(100 * rumorCierto / conRum
 chequear(agresivasAvisadas === agresivas, 'Toda campaña agresiva de Lelo se avisa con un rumor una semana antes');
 chequear(rumorCierto / conRumor > 0.5 && rumorCierto / conRumor < 0.75, 'Los rumores se cumplen a veces (entre 50% y 75%)');
 
+// Promo de contraataque: conviene si Lelo ataca, pierde plata si era humo; en promedio, cerca de neutra.
+const difs = { agresivo: [], humo: [] };
+for (let i = 0; i < 150; i++) {
+  const e = nuevaPartida('A', 9000 + i);
+  for (let s = 0; s < 40 && !e.fin; s++) {
+    const plan = planRazonable(e);
+    if (e.primo.rumor && e.semana >= 4 && !e.mejorDeLaCiudad) {
+      const con = JSON.parse(JSON.stringify(e));
+      const sin = JSON.parse(JSON.stringify(e));
+      const planPromo = { ...plan, promo: true };
+      if (validarPlan(con, planPromo).ok) {
+        jugarSemana(con, planPromo);
+        jugarSemana(sin, plan);
+        const valor = (x) => x.plata + x.rep * 2000; // la reputación también vale
+        (con.primo.comportamiento === 'agresivo' ? difs.agresivo : difs.humo).push(valor(con) - valor(sin));
+      }
+    }
+    jugarSemana(e, plan);
+  }
+}
+const pa = promedio(difs.agresivo); const ph = promedio(difs.humo);
+const total = promedio([...difs.agresivo, ...difs.humo]);
+console.log(`\nPromo: si Lelo ataca, ${pa >= 0 ? '+' : ''}$${fmt(pa)}; si era humo, ${ph >= 0 ? '+' : ''}$${fmt(ph)}; promedio ${total >= 0 ? '+' : ''}$${fmt(total)} (${difs.agresivo.length + difs.humo.length} casos).`);
+chequear(pa > 0, 'La promo conviene cuando Lelo ataca');
+chequear(ph < pa, 'La promo rinde menos cuando el rumor era humo');
+
 console.log(fallas ? `\n${fallas} chequeo(s) fallaron.` : '\nTodos los chequeos pasaron.');
 process.exit(fallas ? 1 : 0);

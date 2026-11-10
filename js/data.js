@@ -92,6 +92,11 @@ export const PRIMO = {
   ],
 };
 
+// Defensa ante un rumor: promo de contraataque en redes.
+// El costo es el descuento (escala solo con el tamaño del taller). Si Lelo ataca, conviene;
+// si era falsa alarma, regalaste el descuento.
+export const PROMO = { descuento: 0.15, extraDemanda: 0.1, horas: 2 };
+
 export const CURSO_CORTO = { costo: 15000, horasPorSemana: 5, semanas: 2, puntos: 10 };
 
 export const MAZO = {

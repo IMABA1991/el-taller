@@ -2,7 +2,7 @@
 import {
   nuevaPartida, jugarSemana, validarPlan, calendario, fechaEspecial, demandaEsperada,
   horasPorUnidad, horasPorVenta, comprarMaquina, pagarPrestamoA, costoPagoAnticipadoA,
-  gastosFijosDelMes, fmt, HORAS_POR_SEMANA, PRODUCTOS, MAQUINAS, CURSO_CORTO, VENTAS, PRESTAMO, TUTORIAL,
+  gastosFijosDelMes, fmt, puedeHacerPromo, HORAS_POR_SEMANA, PRODUCTOS, MAQUINAS, CURSO_CORTO, VENTAS, PRESTAMO, TUTORIAL, PROMO,
 } from './engine.js';
 import { guardar, cargar, borrar } from './storage.js';
 
@@ -20,7 +20,7 @@ function planInicial() {
   const base = partida?.ultimoPlan;
   const producir = {};
   for (const id of Object.keys(PRODUCTOS)) producir[id] = base?.producir?.[id] ?? 0;
-  return { producir, horasRedes: base?.horasRedes ?? 4, feria: base?.feria ?? false, curso: false };
+  return { producir, horasRedes: base?.horasRedes ?? 4, feria: base?.feria ?? false, curso: false, promo: false };
 }
 
 function guardarPartida() {
@@ -124,7 +124,13 @@ function pantallaSemana() {
     </div>
     ${aviso ? `<div class="tarjeta tio"><p>${aviso}</p></div>` : ''}
     ${tutorial ? `<div class="tarjeta tio"><p>${tutorial}</p></div>` : ''}
-    ${e.primo.rumor && !e.mejorDeLaCiudad ? `<div class="tarjeta rumor"><p>🗣️ ${e.primo.rumor}</p></div>` : ''}
+    ${puedeHacerPromo(e) ? `<div class="tarjeta rumor">
+      <p>🗣️ ${e.primo.rumor}</p>
+      <label class="interruptor">
+        <span><strong>Lanzar promo de contraataque</strong><br><span class="suave">${Math.round(PROMO.descuento * 100)}% de descuento en redes · ${PROMO.horas} h. Si Lelo ataca, no te saca clientes y atraés un ${Math.round(PROMO.extraDemanda * 100)}% más. Si era humo, regalaste el descuento.</span></span>
+        <input type="checkbox" id="promo" ${plan.promo ? 'checked' : ''}>
+      </label>
+    </div>` : ''}
     ${fecha ? `<div class="tarjeta tio"><p><strong>${fecha.nombre}</strong>: esta semana se vende mucho más.</p></div>` : ''}
     ${e.mejorDeLaCiudad ? '<div class="tarjeta"><p><strong>Sos el mejor de la ciudad.</strong> Lelo trabaja para vos. Lo que sigue (empleados, provincia) llega en la próxima versión.</p></div>' : ''}
 
@@ -214,6 +220,8 @@ function pantallaSemana() {
   app.querySelectorAll('[data-menos]').forEach((b) => { b.onclick = () => { plan.producir[b.dataset.menos] = Math.max(0, plan.producir[b.dataset.menos] - 1); refrescar(); }; });
   app.querySelectorAll('[data-redes]').forEach((b) => { b.onclick = () => { plan.horasRedes = Math.max(0, plan.horasRedes + Number(b.dataset.redes)); refrescar(); }; });
   document.getElementById('feria').onchange = (ev) => { plan.feria = ev.target.checked; refrescar(); };
+  const promo = document.getElementById('promo');
+  if (promo) promo.onchange = (ev) => { plan.promo = ev.target.checked; refrescar(); };
   const curso = document.getElementById('curso');
   if (curso) curso.onchange = (ev) => { plan.curso = ev.target.checked; refrescar(); };
   const gorras = document.getElementById('comprarGorras');
@@ -240,7 +248,7 @@ function terminarSemana() {
   const planJugado = JSON.parse(JSON.stringify(plan));
   const r = jugarSemana(partida, plan);
   if (!r.ok) { aviso = r.errores.join(' '); refrescar(true); return; }
-  partida.ultimoPlan = { ...planJugado, curso: false };
+  partida.ultimoPlan = { ...planJugado, curso: false, promo: false };
   guardarPartida();
   plan = planInicial();
   pantallaResumen(r.resumen);

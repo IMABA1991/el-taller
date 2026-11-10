@@ -1,7 +1,7 @@
 // Motor del juego "El Taller". Lógica pura: no toca la pantalla ni el guardado.
 import {
   HORAS_POR_SEMANA, SEMANAS_POR_ANIO, MESES, MAQUINAS, PRODUCTOS, FECHAS_ESPECIALES,
-  PRESTAMO, GASTOS_FIJOS, VENTAS, REPUTACION, PRIMO, CURSO_CORTO, MAZO, TUTORIAL,
+  PRESTAMO, GASTOS_FIJOS, VENTAS, REPUTACION, PRIMO, CURSO_CORTO, MAZO, TUTORIAL, PROMO,
 } from './data.js';
 
 export const VERSION_PARTIDA = 1;
@@ -213,6 +213,10 @@ export function pagarPrestamoA(e) {
   return { ok: true, mensaje: `Saldaste la deuda de $${fmt(monto)}. El tío se ablandó un poco.` };
 }
 
+export function puedeHacerPromo(e) {
+  return Boolean(e.primo.rumor) && e.semana >= 4 && !e.mejorDeLaCiudad;
+}
+
 // ---------- Validación del plan semanal ----------
 export function horasDelPlan(e, plan) {
   let horas = 0;
@@ -220,6 +224,7 @@ export function horasDelPlan(e, plan) {
   horas += plan.horasRedes || 0;
   if (plan.feria) horas += VENTAS.feria.horas;
   if (e.curso.semanasRestantes > 0 || plan.curso) horas += CURSO_CORTO.horasPorSemana;
+  if (plan.promo) horas += PROMO.horas;
   return redondear(horas, 1);
 }
 
@@ -240,6 +245,7 @@ export function validarPlan(e, plan) {
   if ((plan.horasRedes || 0) < 0) errores.push('Horas de redes inválidas.');
   if (plan.curso && e.curso.semanasRestantes > 0) errores.push('Ya estás haciendo el curso.');
   if (plan.curso && e.semana < 7) errores.push('El curso se habilita en la semana 7.');
+  if (plan.promo && !puedeHacerPromo(e)) errores.push('La promo de contraataque solo se puede lanzar cuando hay un rumor sobre Lelo.');
   const horas = horasDelPlan(e, plan);
   if (horas > HORAS_POR_SEMANA) errores.push(`Te pasaste de horas: ${horas} de ${HORAS_POR_SEMANA}.`);
   const costo = costoDelPlan(plan);
@@ -283,17 +289,24 @@ export function jugarSemana(e, plan) {
   const habiaRumor = Boolean(e.primo.rumor);
   e.primo.comportamiento = comp.id;
   if (e.semana >= 4 && !e.mejorDeLaCiudad) {
-    if (habiaRumor && comp.id !== 'agresivo') evento('El rumor era humo: Lelo no hizo ninguna campaña agresiva.', 'buena');
-    else if (habiaRumor) evento('El rumor era cierto.', 'mala');
-    evento(comp.texto, comp.id === 'tranquilo' ? 'info' : 'mala');
+    if (plan.promo) {
+      if (comp.id === 'agresivo') evento('¡Tu promo frenó a Lelo! Su campaña no te sacó clientes y encima atrajiste gente nueva.', 'buena');
+      else evento('Lanzaste la promo, pero el rumor era humo: Lelo ni apareció. Igual atrajiste algunos clientes.', 'info');
+    } else {
+      if (habiaRumor && comp.id !== 'agresivo') evento('El rumor era humo: Lelo no hizo ninguna campaña agresiva.', 'buena');
+      else if (habiaRumor) evento('El rumor era cierto.', 'mala');
+      evento(comp.texto, comp.id === 'tranquilo' ? 'info' : 'mala');
+    }
   }
-  const sacaPrimo = e.semana >= 4 && !e.mejorDeLaCiudad ? comp.saca : 0;
+  const sacaPrimo = e.semana >= 4 && !e.mejorDeLaCiudad && !plan.promo ? comp.saca : 0;
+  const extraPromo = plan.promo ? 1 + PROMO.extraDemanda : 1;
+  const precioRedes = plan.promo ? 1 - PROMO.descuento : 1;
 
   // 3. Demanda de la semana
   const demanda = {};
   let demandaTotal = 0;
   for (const id of Object.keys(PRODUCTOS)) {
-    const esperada = demandaEsperada(e, id) * (1 - sacaPrimo);
+    const esperada = demandaEsperada(e, id) * (1 - sacaPrimo) * extraPromo;
     demanda[id] = Math.max(0, Math.round(esperada * entre(e, 0.8, 1.2)));
     demandaTotal += demanda[id];
   }
@@ -320,7 +333,7 @@ export function jugarSemana(e, plan) {
       e.stock[id] -= vende;
       vendidasRedes += vende;
       sinStock += asignadas[id] - vende;
-      const ingreso = vende * PRODUCTOS[id].precio;
+      const ingreso = Math.round(vende * PRODUCTOS[id].precio * precioRedes);
       e.plata += ingreso;
       r.ingresos += ingreso;
     }
@@ -516,4 +529,4 @@ export function fmt(n) {
   return Math.round(n).toLocaleString('es-AR');
 }
 
-export { HORAS_POR_SEMANA, PRODUCTOS, MAQUINAS, CURSO_CORTO, VENTAS, PRESTAMO, TUTORIAL };
+export { HORAS_POR_SEMANA, PRODUCTOS, MAQUINAS, CURSO_CORTO, VENTAS, PRESTAMO, TUTORIAL, PROMO };
