@@ -1,19 +1,5 @@
 /* El Taller — versión sin diseño: simple, legible y pensada para celular. */
-:root {
-  --fondo: #f4f5f7;
-  --tarjeta: #ffffff;
-  --texto: #1d2433;
-  --suave: #5c6578;
-  --borde: #dde1e8;
-  --principal: #1f2a44;
-  --acento: #2f6fde;
-  --bien: #1e8a4c;
-  --bien-fondo: #e7f5ec;
-  --mal: #c0392b;
-  --mal-fondo: #fbecea;
-  --aviso-fondo: #fff6df;
-  --radio: 12px;
-}
+/* Los colores y medidas están en css/tema.css */
 * { box-sizing: border-box; }
 html { -webkit-text-size-adjust: 100%; }
 body {
@@ -56,14 +42,14 @@ p { margin: 0 0 10px; }
 .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 12px; }
 .stat .etiqueta { font-size: 0.8rem; color: var(--suave); }
 .stat .valor { font-weight: 600; }
-.barra { height: 8px; background: #e7e9ee; border-radius: 4px; overflow: hidden; margin-top: 3px; }
+.barra { height: 8px; background: var(--barra-fondo); border-radius: 4px; overflow: hidden; margin-top: 3px; }
 .barra > span { display: block; height: 100%; background: var(--acento); }
-.barra.cansancio > span { background: #e08a1e; }
+.barra.cansancio > span { background: var(--cansancio); }
 .barra.horas > span { background: var(--bien); }
 .barra.horas.pasado > span { background: var(--mal); }
 
-.tio { background: var(--aviso-fondo); border-color: #f0dca4; }
-.rumor { background: #f3ecfb; border-color: #d9c8f0; }
+.tio { background: var(--aviso-fondo); border-color: var(--aviso-borde); }
+.rumor { background: var(--rumor-fondo); border-color: var(--rumor-borde); }
 
 .producto { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 0; border-top: 1px solid var(--borde); }
 .producto:first-of-type { border-top: 0; }
@@ -110,8 +96,8 @@ p { margin: 0 0 10px; }
 .eventos { list-style: none; padding: 0; margin: 0; }
 .eventos li { padding: 9px 10px; border-radius: 8px; margin-bottom: 6px; background: #f1f3f7; font-size: 0.95rem; }
 .eventos li.buena { background: var(--bien-fondo); }
-.eventos li.mala { background: #fbecea; }
-.eventos li.rumor { background: #f3ecfb; }
+.eventos li.mala { background: var(--mal-fondo); }
+.eventos li.rumor { background: var(--rumor-fondo); }
 .eventos li.hito { background: var(--principal); color: #fff; font-weight: 600; }
 
 .numeros { display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; font-size: 0.95rem; }
@@ -153,10 +139,35 @@ button.chico { min-height: 40px; padding: 6px 12px; border-radius: 10px; border:
 .feed { list-style: none; margin: 0; padding: 0; }
 .feed li { padding: 8px 10px; border-radius: 8px; margin-bottom: 6px; background: #f1f3f7; font-size: 0.95rem; }
 .feed li.titulo-dia { background: transparent; font-weight: 700; color: var(--principal); padding: 8px 2px 2px; margin: 0; }
-.feed li.pedido { background: #e8f0fd; }
+.feed li.pedido { background: var(--pedido-fondo); }
 .feed li.buena { background: var(--bien-fondo); }
-.feed li.mala { background: #fbecea; }
+.feed li.mala { background: var(--mal-fondo); }
 .feed li.cierre { background: var(--principal); color: #fff; font-weight: 600; }
 .feed li.vacio { background: transparent; color: var(--suave); font-size: 0.85rem; padding-top: 0; }
 .feed li.nuevo { animation: aparecer .35s ease-out; }
 @keyframes aparecer { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
+/* Equipo */
+.empleado { padding: 10px 0; border-top: 1px solid var(--borde); }
+.empleado:first-of-type { border-top: 0; }
+.empleado .cabeza { display: flex; align-items: flex-start; gap: 10px; }
+.empleado .nombre { font-weight: 600; }
+.empleado .detalle { font-size: 0.85rem; color: var(--suave); }
+.empleado .acciones { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.rasgo { display: inline-block; font-size: 0.75rem; padding: 1px 8px; border-radius: 999px; background: var(--chip-fondo); color: var(--principal); }
+.rasgo.bueno { background: var(--bien-fondo); color: var(--bien); }
+.rasgo.malo { background: var(--mal-fondo); color: var(--mal); }
+.subtitulo { font-weight: 700; margin: 14px 0 4px; padding-top: 10px; border-top: 1px solid var(--borde); }
+.alterna { display: flex; gap: 6px; margin: 6px 0; }
+.alterna button { flex: 1; }
+.alterna button.activo { background: var(--principal); color: #fff; border-color: var(--principal); }
+.chuchu { background: var(--chuchu-fondo); border-radius: 8px; padding: 8px 10px; margin: 6px 0; font-size: 0.93rem; }
+
+/* Imágenes (con emoji de respaldo mientras no haya arte) */
+.avatar { display: inline-flex; align-items: center; justify-content: center; width: var(--avatar); height: var(--avatar); flex: 0 0 var(--avatar); border-radius: 50%; background: var(--chip-fondo); font-size: calc(var(--avatar) * 0.55); overflow: hidden; vertical-align: middle; }
+.avatar img { width: 100%; height: 100%; object-fit: cover; }
+.con-avatar { display: flex; gap: 10px; align-items: flex-start; }
+.con-avatar > p, .con-avatar > div { flex: 1; margin: 0; }
+.logo { display: block; width: 96px; height: 96px; margin: 8px auto 0; font-size: 64px; text-align: center; line-height: 96px; }
+.logo img { width: 100%; height: 100%; object-fit: contain; }
+button.chico.peligro { color: var(--mal); border-color: #efc2bc; }

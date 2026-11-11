@@ -2,10 +2,11 @@
 import {
   HORAS_POR_SEMANA, SEMANAS_POR_ANIO, MESES, MAQUINAS, PRODUCTOS, FECHAS_ESPECIALES, RAMPA_FECHA,
   PRESTAMO, GASTOS_FIJOS, VENTAS, REPUTACION, PRIMO, CURSOS, CURSO_MAX_PUNTOS, CURSO_BAJA_POR_MES, MAZO, TUTORIAL, PROMO, CLIENTES,
-  MAZO_FERIA, PROB_CARTA_FERIA, MERMA,
+  MAZO_FERIA, PROB_CARTA_FERIA, MERMA, CANSANCIO, PUESTOS, RASGOS, NOMBRES_EMPLEADOS, EQUIPO, CAPACITACION,
+  LELO_EMPLEADO, CHUCHU, NOMBRES_FEMENINOS,
 } from './data.js';
 
-export const VERSION_PARTIDA = 1;
+export const VERSION_PARTIDA = 2;
 
 // ---------- Azar con semilla (para poder guardar y reproducir partidas) ----------
 function siguienteAzar(estado) {
@@ -96,6 +97,11 @@ export function migrarPartida(e) {
   }
   if (e.curso.id === undefined) e.curso.id = e.curso.semanasRestantes > 0 ? 'sublimacion' : null;
   if (!e.mazoFeria) e.mazoFeria = [];
+  if (!e.equipo) {
+    e.equipo = equipoVacio();
+    if (e.mejorDeLaCiudad) sumarLelo(e);
+  }
+  e.version = VERSION_PARTIDA;
   return e;
 }
 
@@ -112,6 +118,12 @@ export function horasPorVenta(e) {
 export function probabilidadError(e) {
   const f = e.formacion;
   return limitar(0.04 * (1 - e.exp / 125) * (1 + e.cansancio / 40) * (1 - f.fija / 200) * (1 - f.cursos.sublimacion / 80), 0.005, 0.5);
+}
+
+export function probabilidadErrorEmpleado(emp) {
+  const variante = emp.esLelo ? 1 : PUESTOS[emp.puesto].variantes[emp.variante].errores ?? 1;
+  const rasgo = emp.rasgo === 'prolijo' ? 0.5 : emp.rasgo === 'distraido' ? 1.5 : 1;
+  return limitar(0.04 * (1 - emp.exp / 125) * variante * rasgo, 0.005, 0.5);
 }
 
 // Curso de ventas: 10 puntos venden un 25% más en la feria.
@@ -148,6 +160,379 @@ export function demandaEsperada(e, idProducto, semana = e.semana) {
   return p.base * multiplicadorProducto(e.rep, p.sens) * temporada * especial * ml;
 }
 
+// ---------- Equipo: empleados, contratación y capacitación ----------
+const FALTAS = [
+  'dice que se le murió la abuela (es la tercera abuela este año)',
+  'dice que se intoxicó con un choripán de la cancha',
+  'se quedó dormido el lunes y no vino más en toda la semana',
+  'tuvo "un tema familiar" que nadie entendió',
+  'se fue a un recital y volvió sin voz y sin ganas',
+];
+
+function equipoVacio() {
+  return {
+    empleados: [], mercado: 1, siguienteId: 1,
+    bolsa: null, // { semana, candidatos }
+    chuchu: { afueraHasta: 0, excusa: null, candidato: null, llamadoSemana: 0 },
+    anuncio: null, // { puesto, sueldo, semana, candidato }
+  };
+}
+
+export function mediaSueldo(e, puesto, variante) {
+  return Math.round((PUESTOS[puesto].variantes[variante].sueldo * e.equipo.mercado) / 1000) * 1000;
+}
+
+export function cupoEquipo() {
+  return EQUIPO.cupoCiudad;
+}
+
+export function empleadosContratados(e) {
+  return e.equipo.empleados.filter((x) => !x.esLelo).length;
+}
+
+export function chuchuDisponible(e) {
+  return e.semana >= e.equipo.chuchu.afueraHasta;
+}
+
+function nombreLibre(e) {
+  const usados = new Set(e.equipo.empleados.map((x) => x.nombre));
+  const libres = NOMBRES_EMPLEADOS.filter((n) => !usados.has(n));
+  const lista = libres.length ? libres : NOMBRES_EMPLEADOS;
+  return lista[Math.floor(siguienteAzar(e) * lista.length)];
+}
+
+function sortearRasgo(e, puesto, probMalo = 0.5) {
+  const lista = PUESTOS[puesto].rasgos;
+  const buenos = lista.filter((r) => RASGOS[r].bueno);
+  const malos = lista.filter((r) => !RASGOS[r].bueno);
+  const grupo = siguienteAzar(e) < probMalo ? malos : buenos;
+  return grupo[Math.floor(siguienteAzar(e) * grupo.length)];
+}
+
+function productosPosibles(e) {
+  const conMaquina = Object.keys(PRODUCTOS).filter((id) => e.maquinas[PRODUCTOS[id].maquina]);
+  return conMaquina.length >= 2 ? conMaquina : Object.keys(PRODUCTOS);
+}
+
+function crearCandidato(e, puesto, variante, { origen, sueldo, probMalo = 0.5, rasgoVisible }) {
+  const v = PUESTOS[puesto].variantes[variante];
+  const c = {
+    nombre: nombreLibre(e), puesto, variante, origen,
+    sueldo: sueldo ?? mediaSueldo(e, puesto, variante),
+    exp: limitar(Math.round(v.exp + entre(e, -5, 5)), 0, 100),
+    rasgo: sortearRasgo(e, puesto, probMalo),
+    rasgoVisible,
+  };
+  if (puesto === 'vendedor') {
+    const ids = mezclar(e, [...productosPosibles(e)]);
+    c.fuerte = ids[0];
+    c.descuidado = ids[1];
+  }
+  return c;
+}
+
+function varianteAlAzar(e, puesto) {
+  const ids = Object.keys(PUESTOS[puesto].variantes);
+  const t = siguienteAzar(e);
+  return t < 0.5 ? ids[0] : t < 0.85 ? ids[1] : ids[2];
+}
+
+// Bolsa de trabajo del municipio: cuesta horas del domingo, ves todo y cobran más.
+export function irALaBolsa(e) {
+  if (e.semanaEnCurso) return { ok: false, motivo: 'A la bolsa se va el domingo, antes de arrancar la semana.' };
+  if (e.equipo.bolsa?.semana === e.semana) return { ok: true };
+  const candidatos = [];
+  const puestos = mezclar(e, ['operario', 'vendedor', siguienteAzar(e) < 0.6 ? 'operario' : 'vendedor']);
+  for (const puesto of puestos) {
+    const variante = varianteAlAzar(e, puesto);
+    const sueldo = Math.round((mediaSueldo(e, puesto, variante) * (1 + EQUIPO.bolsa.recargo)) / 1000) * 1000;
+    candidatos.push(crearCandidato(e, puesto, variante, { origen: 'bolsa', sueldo, rasgoVisible: true }));
+  }
+  e.equipo.bolsa = { semana: e.semana, candidatos };
+  return { ok: true };
+}
+
+export function fuisteALaBolsa(e) {
+  return e.equipo.bolsa?.semana === e.semana;
+}
+
+// Chuchu: te recomienda a alguien de confianza, más barato, sin decirte cómo es... y se va un mes.
+export function llamarAChuchu(e, puesto) {
+  const ch = e.equipo.chuchu;
+  if (e.semanaEnCurso) return { ok: false, motivo: 'A Chuchu lo llamás el domingo.' };
+  if (!chuchuDisponible(e)) return { ok: false, motivo: `Chuchu no está: ${ch.excusa}. Vuelve en ${ch.afueraHasta - e.semana} semana(s).` };
+  if (ch.llamadoSemana === e.semana) return { ok: false, motivo: 'Ya hablaste con Chuchu esta semana.' };
+  if (!PUESTOS[puesto]) return { ok: false, motivo: 'Ese puesto no existe.' };
+  const variante = varianteAlAzar(e, puesto);
+  const sueldo = Math.round((mediaSueldo(e, puesto, variante) * (1 - EQUIPO.chuchu.descuento)) / 1000) * 1000;
+  ch.candidato = crearCandidato(e, puesto, variante, { origen: 'chuchu', sueldo, rasgoVisible: false });
+  ch.candidato.frase = CHUCHU.recomienda[Math.floor(siguienteAzar(e) * CHUCHU.recomienda.length)];
+  ch.llamadoSemana = e.semana;
+  return { ok: true };
+}
+
+// Anuncio: elegís el puesto y el sueldo; el domingo siguiente aparece alguien que acepta ese sueldo.
+// Cuanto más ofrecés frente a la media, mejor viene (más experiencia y menos rasgos malos).
+export function publicarAnuncio(e, puesto, sueldo) {
+  if (e.semanaEnCurso) return { ok: false, motivo: 'El anuncio se publica el domingo.' };
+  if (e.equipo.anuncio) return { ok: false, motivo: 'Ya tenés un anuncio publicado.' };
+  if (!PUESTOS[puesto]) return { ok: false, motivo: 'Ese puesto no existe.' };
+  if (!(sueldo > 0)) return { ok: false, motivo: 'Poné un sueldo.' };
+  if (e.plata < EQUIPO.anuncio.costo) return { ok: false, motivo: `El anuncio cuesta $${fmt(EQUIPO.anuncio.costo)}.` };
+  e.plata -= EQUIPO.anuncio.costo;
+  e.finanzas.mesActual -= EQUIPO.anuncio.costo;
+  e.equipo.anuncio = { puesto, sueldo, semana: e.semana, candidato: null };
+  return { ok: true, mensaje: `Publicaste el anuncio ($${fmt(EQUIPO.anuncio.costo)}). El domingo que viene alguien se presenta.` };
+}
+
+function candidatoDelAnuncio(e, a) {
+  const vars = Object.keys(PUESTOS[a.puesto].variantes);
+  let variante = vars[0];
+  for (const v of vars) if (a.sueldo >= mediaSueldo(e, a.puesto, v)) variante = v;
+  const exceso = a.sueldo / mediaSueldo(e, a.puesto, variante) - 1;
+  const probMalo = limitar(0.5 - exceso * 1.5, 0.2, 0.8);
+  const c = crearCandidato(e, a.puesto, variante, { origen: 'anuncio', sueldo: a.sueldo, probMalo, rasgoVisible: false });
+  if (exceso < 0) c.exp = limitar(Math.round(c.exp * (1 + exceso)), 0, 100); // pagás menos que la media: viene más verde
+  return c;
+}
+
+export function rechazarChuchu(e) {
+  e.equipo.chuchu.candidato = null;
+}
+
+export function descartarAnuncio(e) {
+  e.equipo.anuncio = null;
+}
+
+function candidatoPorOrigen(e, origen, indice) {
+  if (origen === 'bolsa') return fuisteALaBolsa(e) ? e.equipo.bolsa.candidatos[indice] : null;
+  if (origen === 'chuchu') return e.equipo.chuchu.candidato;
+  if (origen === 'anuncio') return e.equipo.anuncio?.candidato;
+  return null;
+}
+
+export function contratar(e, origen, indice = 0) {
+  if (e.semanaEnCurso) return { ok: false, motivo: 'Se contrata el domingo.' };
+  const c = candidatoPorOrigen(e, origen, indice);
+  if (!c) return { ok: false, motivo: 'Ese candidato ya no está.' };
+  if (empleadosContratados(e) >= cupoEquipo(e)) return { ok: false, motivo: `En la ciudad podés tener hasta ${cupoEquipo(e)} empleados (además de Lelo).` };
+  const emp = {
+    ...c, id: `emp${e.equipo.siguienteId++}`, desde: e.semana, semanasMes: 0, capacitadoMes: false,
+    desganado: false, pideAumento: null, falta: false, semanasTrabajadas: 0,
+    proximaQueja: e.semana + EQUIPO.mesesQuejoso * 4 + 2, leal: origen === 'chuchu',
+  };
+  delete emp.frase;
+  e.equipo.empleados.push(emp);
+  let mensaje = `Contrataste a ${emp.nombre} (${PUESTOS[emp.puesto].variantes[emp.variante].nombre.toLowerCase()}, ${plata$(emp.sueldo)} por mes). Arranca esta semana.`;
+  if (origen === 'bolsa') e.equipo.bolsa.candidatos.splice(indice, 1);
+  if (origen === 'anuncio') e.equipo.anuncio = null;
+  if (origen === 'chuchu') {
+    const ch = e.equipo.chuchu;
+    ch.candidato = null;
+    ch.excusa = CHUCHU.excusas[Math.floor(siguienteAzar(e) * CHUCHU.excusas.length)].texto;
+    ch.afueraHasta = e.semana + EQUIPO.chuchu.semanasAfuera;
+    mensaje += ` Chuchu: "¡Menos mal que me agarrachte justo! Te cuento que ${ch.excusa}. ¡Nos vemos!"`;
+  }
+  return { ok: true, mensaje };
+}
+
+function plata$(n) {
+  return `$${fmt(n)}`;
+}
+
+function semanasDelMes(semana) {
+  return MESES[calendario(semana).mes].semanas;
+}
+
+export function costoDespido(e, emp) {
+  return Math.round(emp.sueldo * EQUIPO.despido + (emp.sueldo * emp.semanasMes) / semanasDelMes(e.semana));
+}
+
+export function despedir(e, id) {
+  const emp = e.equipo.empleados.find((x) => x.id === id);
+  if (!emp) return { ok: false, motivo: 'No está en tu equipo.' };
+  if (emp.esLelo) return { ok: false, motivo: 'Es tu primo: el tío no te lo perdonaría nunca.' };
+  if (e.semanaEnCurso) return { ok: false, motivo: 'Se despide el domingo.' };
+  const costo = costoDespido(e, emp);
+  e.plata -= costo;
+  e.finanzas.mesActual -= costo;
+  e.equipo.empleados = e.equipo.empleados.filter((x) => x !== emp);
+  return { ok: true, mensaje: `Despediste a ${emp.nombre}. Entre lo trabajado y la indemnización pagaste ${plata$(costo)}.` };
+}
+
+export function responderAumento(e, id, acepta) {
+  const emp = e.equipo.empleados.find((x) => x.id === id);
+  if (!emp?.pideAumento) return { ok: false, motivo: 'No pidió aumento.' };
+  if (acepta) {
+    emp.sueldo = emp.pideAumento;
+    emp.desganado = false;
+    emp.pideAumento = null;
+    return { ok: true, mensaje: `Le diste el aumento a ${emp.nombre}: ahora cobra ${plata$(emp.sueldo)}. Volvió con todo.` };
+  }
+  emp.pideAumento = null;
+  emp.desganado = true;
+  return { ok: true, mensaje: `Le dijiste que no a ${emp.nombre}. Va a trabajar con menos ganas hasta que le des un aumento.` };
+}
+
+export function darAumento(e, id) {
+  const emp = e.equipo.empleados.find((x) => x.id === id);
+  if (!emp) return { ok: false, motivo: 'No está en tu equipo.' };
+  emp.pideAumento = Math.round((emp.sueldo * (1 + EQUIPO.aumentoQuejoso)) / 1000) * 1000;
+  return responderAumento(e, id, true);
+}
+
+// Horas que pone cada empleado esta semana (0 si falta).
+export function horasEmpleado(e, emp, sem = e.semanaEnCurso) {
+  if (emp.falta) return 0;
+  let h = emp.esLelo ? LELO_EMPLEADO.horas : PUESTOS[emp.puesto].horas;
+  if (emp.rasgo === 'rapido') h *= 1.2;
+  if (emp.rasgo === 'creativo') h *= 0.9;
+  if (emp.desganado) h *= EQUIPO.desganoQuejoso;
+  if (sem?.capacitacion === 'curso') h -= CAPACITACION.curso.horas;
+  if (sem?.feriaVendedor === emp.id) h -= VENTAS.feria.horas;
+  return Math.max(0, redondear(h, 1));
+}
+
+export function presentes(e, puesto) {
+  return e.equipo.empleados.filter((x) => !x.falta && (!puesto || x.puesto === puesto));
+}
+
+function horasPorUnidadExp(exp, idProducto) {
+  return PRODUCTOS[idProducto].horas * Math.max(0.35, 1 - exp * 0.016);
+}
+
+function horasPorVentaExp(exp, cursoRedes = 0) {
+  return VENTAS.horasPorVentaRedes * (1 - exp / 200) * (1 - cursoRedes / 100);
+}
+
+// Reparte la producción: primero los operarios (con sus horas), lo que no les entra lo hacés vos.
+export function repartirProduccion(e, producir, sem = e.semanaEnCurso) {
+  const operarios = presentes(e, 'operario').map((emp) => ({ emp, libres: horasEmpleado(e, emp, sem), unidades: {}, horas: 0 }));
+  const vos = { unidades: {}, horas: 0 };
+  for (const [id, n] of Object.entries(producir || {})) {
+    for (let i = 0; i < (n || 0); i++) {
+      const o = operarios.find((x) => x.libres + 1e-9 >= horasPorUnidadExp(x.emp.exp, id));
+      if (o) {
+        const h = horasPorUnidadExp(o.emp.exp, id);
+        o.libres -= h; o.horas += h; o.unidades[id] = (o.unidades[id] || 0) + 1;
+      } else {
+        vos.horas += horasPorUnidad(e, id);
+        vos.unidades[id] = (vos.unidades[id] || 0) + 1;
+      }
+    }
+  }
+  return { operarios, vos };
+}
+
+export function capacidadEquipo(e, sem = e.semanaEnCurso) {
+  const produccion = presentes(e, 'operario').reduce((s, x) => s + horasEmpleado(e, x, sem), 0);
+  const redes = presentes(e, 'vendedor').reduce((s, x) => s + horasEmpleado(e, x, sem), 0);
+  return { produccion: redondear(produccion, 1), redes: redondear(redes, 1) };
+}
+
+// Tipos de producto que se usan para enseñar cuando capacitás vos (60-70% de los que tenés en stock).
+export function productosParaEnsenar(e) {
+  const tipos = Object.keys(e.stock).filter((id) => e.stock[id] > 0);
+  if (!tipos.length) return [];
+  return tipos.slice(0, Math.max(1, Math.round(tipos.length * CAPACITACION.vos.partePorTipos)));
+}
+
+export function costoCapacitacion(e, tipo) {
+  if (tipo === 'curso') return presentes(e).length * CAPACITACION.curso.costoPorEmpleado;
+  if (tipo === 'vos') return CAPACITACION.vos.buffet;
+  return 0;
+}
+
+function capacitar(e, tipo, enDia) {
+  const lista = presentes(e);
+  if (tipo === 'curso') {
+    for (const emp of lista) { emp.exp = limitar(emp.exp + CAPACITACION.curso.puntos, 0, 100); emp.capacitadoMes = true; }
+    enDia(1, `🎓 Mandaste al equipo a un curso: +${CAPACITACION.curso.puntos} de experiencia a cada uno (les sacó ${CAPACITACION.curso.horas} h esta semana).`, 'buena');
+  } else if (tipo === 'vos') {
+    const usados = productosParaEnsenar(e);
+    usados.forEach((id) => { e.stock[id]--; });
+    for (const emp of lista) {
+      if (emp.exp < e.exp) emp.exp = Math.min(e.exp, emp.exp + CAPACITACION.vos.puntos);
+      emp.capacitadoMes = true;
+    }
+    enDia(1, `🥐 Capacitaste vos al equipo con facturas y mate. Usaste ${usados.map((id) => `una ${PRODUCTOS[id].singular}`).join(' y ')} para enseñar (+${CAPACITACION.vos.puntos}, sin pasar tu nivel).`, 'buena');
+  }
+}
+
+// Al empezar cada semana: quién falta, si llegó el candidato del anuncio y si volvió Chuchu.
+function inicioDeSemana(e, evento) {
+  for (const emp of e.equipo.empleados) {
+    emp.falta = emp.rasgo === 'faltador' && siguienteAzar(e) < EQUIPO.probFalta;
+    if (emp.falta) emp.motivoFalta = FALTAS[Math.floor(siguienteAzar(e) * FALTAS.length)];
+  }
+  const a = e.equipo.anuncio;
+  if (a && !a.candidato && e.semana > a.semana) {
+    a.candidato = candidatoDelAnuncio(e, a);
+    evento?.(`📰 Alguien respondió tu anuncio de ${PUESTOS[a.puesto].nombre.toLowerCase()}: te espera el domingo.`, 'buena');
+  }
+  const ch = e.equipo.chuchu;
+  if (ch.excusa && e.semana === ch.afueraHasta) {
+    evento?.('🚂 Volvió Chuchu: "¡Chalú! ¿Me extrañachte? Chi necechitás a alguien, ya chabés."', 'info');
+    ch.excusa = null;
+  }
+  ch.candidato = ch.llamadoSemana === e.semana ? ch.candidato : null;
+}
+
+// Cierre de mes del equipo: sueldos, olvido, quejas y media del mercado.
+function cierreEquipo(e, r, evento) {
+  const emps = e.equipo.empleados;
+  if (emps.length) {
+    let total = 0;
+    const semanas = semanasDelMes(e.semana);
+    for (const emp of emps) total += Math.round((emp.sueldo * emp.semanasMes) / semanas);
+    if (total > 0) {
+      e.plata -= total;
+      r.gastos += total;
+      e.finanzas.mesActual -= total;
+      evento(`Pagaste ${plata$(total)} de sueldos.`);
+    }
+    // Media del mercado: un 5-10% por encima de lo que pagás vos
+    const proporcion = emps.filter((x) => !x.esLelo).map((x) => x.sueldo / PUESTOS[x.puesto].variantes[x.variante].sueldo);
+    if (proporcion.length) {
+      const nueva = promedioDe(proporcion) * entre(e, 1 + EQUIPO.mercado.subeMin, 1 + EQUIPO.mercado.subeMax);
+      e.equipo.mercado = redondear(Math.max(e.equipo.mercado, nueva), 3);
+    }
+  }
+  for (const emp of emps) {
+    emp.semanasMes = 0;
+    if (!emp.capacitadoMes) {
+      const baja = emp.esLelo ? EQUIPO.bajaExpPorMes / 2 : EQUIPO.bajaExpPorMes;
+      emp.exp = Math.max(0, redondear(emp.exp - baja, 1));
+    }
+    emp.capacitadoMes = false;
+    if (emp.rasgo === 'quejoso' && !emp.pideAumento && e.semana >= emp.proximaQueja) {
+      emp.pideAumento = Math.round((emp.sueldo * (1 + EQUIPO.aumentoQuejoso)) / 1000) * 1000;
+      emp.proximaQueja = e.semana + EQUIPO.mesesQuejoso * 4 + 2;
+      evento(`${emp.nombre} te pide un aumento a ${plata$(emp.pideAumento)}. Respondele el domingo.`, 'mala');
+    }
+  }
+}
+
+// "Prolijo" → "Prolija" si es mujer.
+export function nombreRasgo(rasgo, nombre) {
+  const r = RASGOS[rasgo].nombre;
+  if (!NOMBRES_FEMENINOS.includes(nombre)) return r;
+  return r.endsWith('o') ? `${r.slice(0, -1)}a` : r.endsWith('or') ? `${r}a` : r;
+}
+
+function promedioDe(xs) {
+  return xs.reduce((s, x) => s + x, 0) / xs.length;
+}
+
+function sumarLelo(e) {
+  if (e.equipo.empleados.some((x) => x.esLelo)) return;
+  e.equipo.empleados.push({
+    id: 'lelo', nombre: 'Lelo', esLelo: true, puesto: 'operario', variante: 'operario', origen: 'familia',
+    sueldo: LELO_EMPLEADO.sueldo, exp: LELO_EMPLEADO.exp, rasgo: null, rasgoVisible: true, leal: true,
+    desde: e.semana, semanasMes: 0, capacitadoMes: false, desganado: false, pideAumento: null, falta: false, semanasTrabajadas: 0,
+  });
+}
+
 // ---------- Partida nueva ----------
 export function nuevaPartida(opcionPrestamo, semilla = Date.now() >>> 0) {
   if (!['A', 'B'].includes(opcionPrestamo)) throw new Error('Opción de préstamo inválida');
@@ -177,9 +562,11 @@ export function nuevaPartida(opcionPrestamo, semilla = Date.now() >>> 0) {
     totales: { vendidas: 0, producidas: 0 },
     semanaEnCurso: null,
     mazoFeria: [],
+    equipo: equipoVacio(),
   };
   prepararMazo(e);
   planearPrimo(e);
+  inicioDeSemana(e);
   return e;
 }
 
@@ -274,16 +661,18 @@ export function puedeHacerPromo(e) {
 
 // ---------- Horas y costos ----------
 // Horas del domingo: publicidad, promo, feria y curso (el que está en marcha o el que arranca).
+// Son tus horas: lo que hace el equipo no cuenta acá.
 export function horasDomingo(e, pub) {
-  let horas = (pub.horasRedes || 0) + (pub.promo ? PROMO.horas : 0) + (pub.feria ? VENTAS.feria.horas : 0);
+  let horas = (pub.horasRedes || 0) + (pub.promo ? PROMO.horas : 0) + (pub.feria && !pub.feriaVendedor ? VENTAS.feria.horas : 0);
   const idCurso = e.curso.semanasRestantes > 0 ? e.curso.id : pub.curso;
   if (idCurso) horas += CURSOS[idCurso].horasPorSemana;
+  if (fuisteALaBolsa(e)) horas += EQUIPO.bolsa.horas;
+  if (pub.capacitar === 'vos') horas += CAPACITACION.vos.horas;
   return horas;
 }
 
 export function horasDelPlan(e, plan, sem = e.semanaEnCurso) {
-  let horas = sem ? sem.horasDomingo : 0;
-  for (const [id, n] of Object.entries(plan.producir || {})) horas += (n || 0) * horasPorUnidad(e, id);
+  const horas = (sem ? sem.horasDomingo : 0) + repartirProduccion(e, plan.producir, sem).vos.horas;
   return redondear(horas, 1);
 }
 
@@ -317,9 +706,19 @@ export function validarPublicidad(e, pub) {
   if (pub.feria && stockTotal(e) === 0) errores.push('No tenés stock para llevar a la feria.');
   if (pub.curso && !CURSOS[pub.curso]) errores.push('Ese curso no existe.');
   if (pub.curso && e.curso.semanasRestantes > 0) errores.push('Ya estás haciendo un curso.');
+  if (pub.feriaVendedor) {
+    const v = presentes(e, 'vendedor').find((x) => x.id === pub.feriaVendedor);
+    if (!pub.feria) errores.push('Para mandar a alguien a la feria, marcá "Ir a la feria".');
+    else if (!v || horasEmpleado(e, v, { capacitacion: pub.capacitar }) < VENTAS.feria.horas) errores.push('Ese vendedor no puede ir a la feria esta semana.');
+  }
+  if (pub.capacitar) {
+    if (!presentes(e).length) errores.push('No tenés a nadie para capacitar esta semana.');
+    if (pub.capacitar === 'vos' && !productosParaEnsenar(e).length) errores.push('Para capacitar vos necesitás algún producto en stock para enseñar.');
+    if (pub.capacitar === 'vos' && !presentes(e).some((x) => x.exp < e.exp)) errores.push('Tu equipo ya sabe tanto como vos: mejor un curso.');
+  }
   const total = horasDomingo(e, pub);
   if (total > HORAS_POR_SEMANA) errores.push(`Te pasaste de horas: ${total} de ${HORAS_POR_SEMANA}.`);
-  const costo = (pub.feria ? VENTAS.feria.costoMesa : 0) + (pub.curso ? CURSOS[pub.curso].costo : 0);
+  const costo = (pub.feria ? VENTAS.feria.costoMesa : 0) + (pub.curso ? CURSOS[pub.curso].costo : 0) + costoCapacitacion(e, pub.capacitar);
   if (costo > 0 && costo > e.plata) errores.push(`No te alcanza la plata: necesitás $${fmt(costo)} y tenés $${fmt(e.plata)}.`);
   return { ok: errores.length === 0, errores, horas: total, costo };
 }
@@ -367,13 +766,35 @@ export function publicar(e, pub) {
     }
   }
   const sacaLelo = compite && !pub.promo ? comp.saca : 0;
+
+  // El equipo: quién faltó, Chuchu dando vueltas y capacitación
+  const semEquipo = { capacitacion: pub.capacitar || null, feriaVendedor: pub.feriaVendedor || null };
+  for (const emp of e.equipo.empleados) if (emp.falta) enDia(1, `🤒 ${emp.nombre} no vino en toda la semana: ${emp.motivoFalta}.`, 'mala');
+  const ch = e.equipo.chuchu;
+  if (chuchuDisponible(e)) {
+    if (siguienteAzar(e) < CHUCHU.probAparece) enDia(1 + Math.floor(siguienteAzar(e) * 5), `🚂 ${CHUCHU.frases[Math.floor(siguienteAzar(e) * CHUCHU.frases.length)]}`, 'info');
+  } else {
+    const ex = CHUCHU.excusas.find((x) => x.texto === ch.excusa);
+    if (ex && siguienteAzar(e) < 0.5) enDia(1 + Math.floor(siguienteAzar(e) * 5), `🚂 ${ex.mensajes[Math.floor(siguienteAzar(e) * ex.mensajes.length)]}`, 'info');
+  }
+  let gastosEquipo = 0;
+  if (pub.capacitar) {
+    gastosEquipo = costoCapacitacion(e, pub.capacitar);
+    e.plata -= gastosEquipo;
+    capacitar(e, pub.capacitar, enDia);
+  }
+  // Vendedores: suman horas de redes y empujan su producto fuerte (y descuidan otro)
+  const vendedores = presentes(e, 'vendedor');
+  const hpvVos = horasPorVenta(e);
+  const horasVendedores = vendedores.reduce((sum, v) => sum + horasEmpleado(e, v, semEquipo), 0);
+  const horasEq = horas + vendedores.reduce((sum, v) => sum + (horasEmpleado(e, v, semEquipo) * hpvVos) / horasPorVentaExp(v.exp), 0);
   const extraPromo = pub.promo ? 1 + PROMO.extraDemanda : 1;
 
   const aviso = avisoFecha(e.semana);
   if (aviso) enDia(0, `📅 ${aviso}`, 'buena');
 
   // Curso que arranca esta semana
-  let gastosDomingo = 0;
+  let gastosDomingo = gastosEquipo;
   if (pub.curso) {
     const cu = CURSOS[pub.curso];
     e.plata -= cu.costo;
@@ -385,7 +806,9 @@ export function publicar(e, pub) {
   }
 
   // Feria del domingo: se vende el stock que sobró de semanas anteriores
-  const feria = pub.feria ? hacerFeria(e) : null;
+  const vendedorFeria = pub.feriaVendedor ? e.equipo.empleados.find((x) => x.id === pub.feriaVendedor) : null;
+  if (vendedorFeria) enDia(0, `🧑‍💼 ${vendedorFeria.nombre} fue a la feria por vos.`, 'info');
+  const feria = pub.feria ? hacerFeria(e, vendedorFeria) : null;
   if (feria) {
     gastosDomingo += feria.gastos;
     feria.textos.forEach((t) => enDia(0, t.texto, t.tipo));
@@ -395,12 +818,18 @@ export function publicar(e, pub) {
   const mercado = {};
   let totalMercado = 0;
   for (const id of Object.keys(PRODUCTOS)) {
-    mercado[id] = Math.max(0, Math.round(demandaEsperada(e, id) * extraPromo * entre(e, 0.8, 1.2)));
+    let empuje = 1;
+    for (const v of vendedores) {
+      const va = PUESTOS.vendedor.variantes[v.variante];
+      if (v.fuerte === id) empuje *= 1 + va.fuerte;
+      if (v.descuidado === id) empuje *= 1 - va.descuidado;
+    }
+    mercado[id] = Math.max(0, Math.round(demandaEsperada(e, id) * empuje * extraPromo * entre(e, 0.8, 1.2)));
     totalMercado += mercado[id];
   }
 
   // Cuánto alcanza tu publicidad
-  const alcance = Math.min(totalMercado, Math.floor(horas / horasPorVenta(e) + 1e-9));
+  const alcance = Math.min(totalMercado, Math.floor(horasEq / hpvVos + 1e-9));
   const captadas = {};
   let resto = alcance;
   const ids = Object.keys(mercado).filter((id) => mercado[id] > 0);
@@ -435,24 +864,24 @@ export function publicar(e, pub) {
   }
 
   // Me gusta: la publicidad se reparte en los días; si te pasaste, los últimos avisos no tienen respuesta
-  const horasUtiles = totalMercado * horasPorVenta(e);
-  const sobrante = horas - horasUtiles;
-  const diasConAvisos = Math.min(7, horas);
+  const horasUtiles = totalMercado * hpvVos;
+  const sobrante = horasEq - horasUtiles;
+  const diasConAvisos = Math.min(7, Math.ceil(horasEq));
   for (let d = 0; d < diasConAvisos; d++) {
-    const ultimo = d >= diasConAvisos - Math.min(2, Math.ceil(Math.max(0, sobrante) / Math.max(1, horas / diasConAvisos)));
+    const ultimo = d >= diasConAvisos - Math.min(2, Math.ceil(Math.max(0, sobrante) / Math.max(1, horasEq / diasConAvisos)));
     if (sobrante >= 1 && ultimo) enDia(d, '🦗 Tu aviso no tuvo ni un me gusta.', 'mala');
     else enDia(d, `❤️ ${Math.max(1, Math.round(entre(e, 3, 9) * (1 + e.rep / 25)))} me gusta en tu publicación.`, 'info');
   }
 
   // Balance del sábado (sin números exactos: siempre 2 pedidos menos de lo real)
   const sinCaptar = totalMercado - alcance;
-  if (horas === 0) {
+  if (horasEq === 0) {
     enDia(6, 'Sin publicidad, nadie se enteró de que vendés.', 'mala');
     evento('No hiciste publicidad: nadie se enteró de que vendés.', 'mala');
   } else if (sinCaptar > 0) {
     const pedidosPerdidos = Math.ceil(sinCaptar / 2);
     const texto = pedidosPerdidos - 2 >= 1
-      ? `En el mercado había más pedidos: al menos ${pedidosPerdidos - 2} quedaron sin atender.`
+      ? `En el mercado había más pedidos: al menos ${pedidosPerdidos - 2} ${pedidosPerdidos - 2 === 1 ? 'quedó' : 'quedaron'} sin atender.`
       : 'Puede que algún cliente no te haya encontrado.';
     enDia(6, `🔎 ${texto}`, 'mala');
     evento(texto, 'mala');
@@ -463,7 +892,7 @@ export function publicar(e, pub) {
 
   e.semanaEnCurso = {
     semana: e.semana, horasRedes: horas, promo: Boolean(pub.promo), horasDomingo: horasDomingo(e, { ...pub, curso: null }),
-    pedidos, pedidosLelo: deLelo.length, eventos, dias, feria, gastosDomingo,
+    pedidos, pedidosLelo: deLelo.length, eventos, dias, feria, gastosDomingo, horasVendedores: redondear(horasVendedores, 1), ...semEquipo,
   };
   return { ok: true, semana: e.semanaEnCurso };
 }
@@ -490,11 +919,13 @@ function describirUnidades(cuenta) {
   return Object.keys(cuenta).filter((id) => cuenta[id]).map((id) => `${cuenta[id]} ${nombreUnidades(id, cuenta[id])}`).join(' y ');
 }
 
-function hacerFeria(e) {
+function hacerFeria(e, vendedor = null) {
   const f = { ingresos: 0, gastos: VENTAS.feria.costoMesa, vendidas: 0, textos: [], linea: '' };
   e.plata -= VENTAS.feria.costoMesa;
   const stockInicial = stockTotal(e);
-  let cupo = Math.round(enteroEntre(e, VENTAS.feria.min, VENTAS.feria.max) * multiplicadorFeria(e));
+  // Si va un vendedor, vende con su experiencia en vez de tu curso de ventas
+  const mult = vendedor ? (1 + (multiplicadorReputacion(e.rep) - 1) * 0.5) * (1 + vendedor.exp / 120) : multiplicadorFeria(e);
+  let cupo = Math.round(enteroEntre(e, VENTAS.feria.min, VENTAS.feria.max) * mult);
   const carta = siguienteAzar(e) < PROB_CARTA_FERIA ? sacarCartaFeria(e) : null;
   const vender = (n, precio = 1) => {
     const cuenta = {};
@@ -591,25 +1022,41 @@ export function cerrarSemana(e, plan) {
   const precioRedes = sem.promo ? 1 - PROMO.descuento : 1;
   let deltaRep = 0;
 
-  // 1. Producción (con errores por producto)
-  const pError = probabilidadError(e);
+  // 1. Producción: cada uno hace su parte y cada uno tiene su probabilidad de error
+  const reparto = repartirProduccion(e, plan.producir, sem);
   let producidas = 0;
-  const arruinadas = {};
-  for (const [id, n] of Object.entries(plan.producir || {})) {
-    for (let i = 0; i < (n || 0); i++) {
-      e.plata -= PRODUCTOS[id].costo;
-      r.gastos += PRODUCTOS[id].costo;
-      if (siguienteAzar(e) < pError) { arruinadas[id] = (arruinadas[id] || 0) + 1; continue; }
-      e.stock[id] += 1;
-      producidas++;
+  const fabricar = (unidades, pError, quien) => {
+    let hechas = 0;
+    const arruinadas = {};
+    for (const [id, n] of Object.entries(unidades)) {
+      for (let i = 0; i < n; i++) {
+        e.plata -= PRODUCTOS[id].costo;
+        r.gastos += PRODUCTOS[id].costo;
+        if (siguienteAzar(e) < pError) { arruinadas[id] = (arruinadas[id] || 0) + 1; continue; }
+        e.stock[id] += 1;
+        hechas++;
+      }
     }
+    for (const [id, x] of Object.entries(arruinadas)) {
+      evento(`${quien} ${x} ${nombreUnidades(id, x)} en la prensa (perdiste $${fmt(x * PRODUCTOS[id].costo)} de insumo).`, 'mala');
+    }
+    producidas += hechas;
+    return { hechas, intentos: hechas + Object.values(arruinadas).reduce((t, x) => t + x, 0) };
+  };
+  const tuyas = fabricar(reparto.vos.unidades, probabilidadError(e), 'Se te arruinaron');
+  e.exp = limitar(e.exp + tuyas.intentos * 0.08, 0, 100);
+  let delEquipo = 0;
+  for (const o of reparto.operarios) {
+    const emp = o.emp;
+    const res = fabricar(o.unidades, probabilidadErrorEmpleado(emp), `${emp.nombre} arruinó`);
+    delEquipo += res.hechas;
+    const aprende = emp.esLelo ? 1 : PUESTOS.operario.variantes[emp.variante].aprende;
+    emp.exp = limitar(redondear(emp.exp + res.intentos * 0.08 * aprende, 1), 0, 100);
+    if (emp.rasgo === 'creativo') deltaRep += res.hechas * EQUIPO.repCreativo;
   }
-  const totalArruinadas = Object.values(arruinadas).reduce((s, x) => s + x, 0);
-  e.exp = limitar(e.exp + (producidas + totalArruinadas) * 0.08, 0, 100);
   e.totales.producidas += producidas;
-  if (producidas + totalArruinadas > 0) linea(`Produjiste ${producidas} unidades.`);
-  for (const [id, x] of Object.entries(arruinadas)) {
-    evento(`Se te arruinaron ${x} ${nombreUnidades(id, x)} en la prensa (perdiste $${fmt(x * PRODUCTOS[id].costo)} de insumo).`, 'mala');
+  if (producidas > 0 || Object.keys(plan.producir || {}).some((id) => plan.producir[id] > 0)) {
+    linea(delEquipo ? `Se produjeron ${producidas} unidades (${delEquipo} las hizo tu equipo).` : `Produjiste ${producidas} unidades.`);
   }
 
   // 2. Entrega de pedidos
@@ -635,6 +1082,17 @@ export function cerrarSemana(e, plan) {
       const d = p.cantidad * REPUTACION.porPedidoNoEntregado;
       deltaRep += d;
       evento(`No entregaste el pedido de ${p.cliente}: ${nombre} (${formatoRep(d)} de reputación).`, 'mala');
+    }
+  }
+  const vendedoresSem = presentes(e, 'vendedor');
+  for (const v of vendedoresSem) {
+    if (v.rasgo === 'creativo') deltaRep += entregados * EQUIPO.repCreativo / vendedoresSem.length;
+    const comision = PUESTOS.vendedor.variantes[v.variante].comision;
+    if (comision && r.ingresos > 0) {
+      const monto = Math.round((r.ingresos * comision) / vendedoresSem.length);
+      e.plata -= monto;
+      r.gastos += monto;
+      evento(`Comisión de ${v.nombre}: $${fmt(monto)}.`);
     }
   }
   const activos = sem.pedidos.filter((p) => !p.rechazado).length;
@@ -667,11 +1125,22 @@ export function cerrarSemana(e, plan) {
 
   // 5. Cansancio y curso
   const horas = v.horas;
-  e.cansancio = horas > 40
-    ? limitar(e.cansancio + (horas - 40) * 1.2, 0, 100)
-    : limitar(e.cansancio - (40 - horas) * 1.5, 0, 100);
+  e.cansancio = horas > CANSANCIO.umbral
+    ? limitar(e.cansancio + (horas - CANSANCIO.umbral) * CANSANCIO.sube, 0, 100)
+    : limitar(e.cansancio - (CANSANCIO.umbral - horas) * CANSANCIO.baja, 0, 100);
   e.cansancio = redondear(e.cansancio, 1);
-  if (e.cansancio >= 80) evento('Estás reventado. Si seguís así te vas a mandar macanas: descansá.', 'mala');
+  if (e.cansancio >= 80) evento('Estás reventado. Si seguís así te vas a mandar macanas: descansá o contratá a alguien.', 'mala');
+
+  // El equipo cumple otra semana: se le paga a fin de mes y se le conoce el rasgo
+  for (const emp of e.equipo.empleados) {
+    emp.semanasMes++;
+    emp.semanasTrabajadas++;
+    if (!emp.rasgoVisible && emp.semanasTrabajadas >= 1) {
+      emp.rasgoVisible = true;
+      const ra = RASGOS[emp.rasgo];
+      evento(`Ya conocés a ${emp.nombre}: es ${nombreRasgo(emp.rasgo, emp.nombre).toLowerCase()} (${ra.efecto}).`, ra.bueno ? 'buena' : 'mala');
+    }
+  }
   if (e.curso.semanasRestantes > 0) {
     e.curso.semanasRestantes--;
     if (e.curso.semanasRestantes === 0) {
@@ -705,7 +1174,8 @@ export function cerrarSemana(e, plan) {
   if (!e.mejorDeLaCiudad && e.rep >= REPUTACION.meta) {
     e.mejorDeLaCiudad = true;
     r.hito = 'mejorDeLaCiudad';
-    evento('¡Lograste ser el mejor de la ciudad! Lelo no pudo competir y cerró: ahora es empleado tuyo.', 'hito');
+    sumarLelo(e);
+    evento('¡Lograste ser el mejor de la ciudad! Lelo no pudo competir y cerró: ahora es empleado tuyo (operario con experiencia 60, $40.000 por mes).', 'hito');
   }
   if (repInicial < VENTAS.reputacionMercadoLibre && e.rep >= VENTAS.reputacionMercadoLibre) {
     evento('Con tu reputación, Mercado Libre empieza a traerte pedidos en serio.', 'buena');
@@ -717,8 +1187,9 @@ export function cerrarSemana(e, plan) {
   e.semana += 1;
   e.semanaEnCurso = null;
 
-  // 10. Lelo planea la semana que viene (puede correr un rumor)
+  // 10. Lelo planea la semana que viene (puede correr un rumor) y se prepara el equipo
   planearPrimo(e);
+  inicioDeSemana(e, evento);
   if (e.primo.rumor) evento(e.primo.rumor, 'rumor');
   e.ultimoResumen = r;
   return { ok: true, resumen: r };
@@ -727,7 +1198,10 @@ export function cerrarSemana(e, plan) {
 // Atajo para simulaciones: publicidad + producción en una sola llamada.
 // plan.producir puede ser un objeto o una función (semanaEnCurso) => objeto.
 export function jugarSemana(e, plan) {
-  const p = publicar(e, { horasRedes: plan.horasRedes || 0, promo: plan.promo, feria: plan.feria, curso: plan.curso });
+  const p = publicar(e, {
+    horasRedes: plan.horasRedes || 0, promo: plan.promo, feria: plan.feria, curso: plan.curso,
+    capacitar: plan.capacitar, feriaVendedor: plan.feriaVendedor,
+  });
   if (!p.ok) return p;
   const producir = typeof plan.producir === 'function' ? plan.producir(e.semanaEnCurso) : (plan.producir || {});
   const res = cerrarSemana(e, { producir });
@@ -751,6 +1225,7 @@ function cierreDeMes(e, c, r, evento) {
   r.gastos += gastos;
   e.finanzas.mesActual -= gastos;
   evento(`Cierre de ${c.nombreMes.toLowerCase()}: pagaste $${fmt(gastos)} de luz, internet y publicidad.`);
+  cierreEquipo(e, r, evento);
 
   const p = e.prestamo;
   if (p.opcion === 'B' && !p.pagado) {
@@ -841,4 +1316,6 @@ export function fmt(n) {
   return Math.round(n).toLocaleString('es-AR');
 }
 
-export { HORAS_POR_SEMANA, PRODUCTOS, MAQUINAS, CURSOS, VENTAS, PRESTAMO, TUTORIAL, PROMO };
+export {
+  HORAS_POR_SEMANA, PRODUCTOS, MAQUINAS, CURSOS, VENTAS, PRESTAMO, TUTORIAL, PROMO, CANSANCIO, PUESTOS, RASGOS, EQUIPO, CAPACITACION,
+};

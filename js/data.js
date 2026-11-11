@@ -1,7 +1,9 @@
 // Datos del juego "El Taller" — valores tomados del documento de reglas (v0.8).
 // Todo lo que se quiera balancear se cambia acá, sin tocar el motor.
 
-export const HORAS_POR_SEMANA = 60;
+export const HORAS_POR_SEMANA = 40;
+// El cansancio empieza a subir desde acá (por hora de más) y baja si trabajás menos.
+export const CANSANCIO = { umbral: 25, sube: 1.2, baja: 1.5 };
 export const SEMANAS_POR_ANIO = 52;
 
 // Meses con patrón 4-4-5 (52 semanas). Los pagos se hacen al cierre de cada mes.
@@ -189,14 +191,102 @@ export const MAZO = {
   ],
 };
 
+// ---------- Equipo ----------
+// Puestos de la etapa ciudad. Cada empleado trabaja 20 h por semana en su tarea.
+export const PUESTOS = {
+  operario: {
+    nombre: 'Operario', tarea: 'producción', horas: 20,
+    variantes: {
+      aprendiz: { nombre: 'Aprendiz', sueldo: 25000, exp: 10, errores: 1.5, aprende: 2 },
+      operario: { nombre: 'Operario', sueldo: 40000, exp: 30, errores: 1, aprende: 1 },
+      tecnico: { nombre: 'Técnico', sueldo: 70000, exp: 60, errores: 0.7, aprende: 1 },
+    },
+    rasgos: ['prolijo', 'rapido', 'creativo', 'distraido', 'faltador', 'quejoso'],
+  },
+  vendedor: {
+    nombre: 'Vendedor', tarea: 'redes y feria', horas: 15,
+    variantes: {
+      junior: { nombre: 'Junior', sueldo: 30000, exp: 10, fuerte: 0.2, descuidado: 0.1 },
+      senior: { nombre: 'Senior', sueldo: 50000, exp: 30, fuerte: 0.35, descuidado: 0.1 },
+      estrella: { nombre: 'Estrella', sueldo: 60000, exp: 60, fuerte: 0.5, descuidado: 0.15, comision: 0.05 },
+    },
+    rasgos: ['rapido', 'creativo', 'faltador', 'quejoso'],
+  },
+};
+
+export const RASGOS = {
+  prolijo: { nombre: 'Prolijo', efecto: 'se equivoca la mitad', bueno: true },
+  rapido: { nombre: 'Rápido', efecto: 'rinde un 20% más en las mismas horas', bueno: true },
+  creativo: { nombre: 'Creativo', efecto: 'suma reputación con lo que hace, pero es un 10% más lento', bueno: true },
+  distraido: { nombre: 'Distraído', efecto: 'se equivoca un 50% más', bueno: false },
+  faltador: { nombre: 'Faltador', efecto: 'falta más o menos una semana de cada diez', bueno: false },
+  quejoso: { nombre: 'Quejoso', efecto: 'pide aumento cada seis meses; si no se lo das, rinde menos', bueno: false },
+};
+
+export const NOMBRES_EMPLEADOS = [
+  'Brian', 'Yésica', 'Maxi', 'Romina', 'Kevin', 'Daiana', 'Lautaro', 'Micaela', 'Gonzalo', 'Ailén',
+  'Matías', 'Abril', 'Ezequiel', 'Luz', 'Franco', 'Milagros', 'Thiago', 'Belén', 'Rodrigo', 'Celeste',
+];
+export const NOMBRES_FEMENINOS = ['Yésica', 'Romina', 'Daiana', 'Micaela', 'Ailén', 'Abril', 'Luz', 'Milagros', 'Belén', 'Celeste'];
+
+export const EQUIPO = {
+  cupoCiudad: 2, // además de Lelo
+  bolsa: { horas: 3, candidatos: 3, recargo: 0.2 }, // ves todo, pero cobran un 20% más que la media
+  chuchu: { descuento: 0.2, semanasAfuera: 4 }, // cobran un 20% menos, no se ven los rasgos, nunca renuncian
+  anuncio: { costo: 5000, paso: 5000 }, // fijás el sueldo; el candidato llega el domingo siguiente
+  mercado: { subeMin: 0.05, subeMax: 0.1 }, // la media del mercado se recalcula cada mes
+  despido: 0.5, // indemnización: medio sueldo
+  bajaExpPorMes: 4, // si no se capacitan (Lelo, la mitad)
+  aumentoQuejoso: 0.15, desganoQuejoso: 0.8, mesesQuejoso: 6,
+  probFalta: 0.1,
+  repCreativo: 0.1, // por unidad o pedido que hace
+};
+
+export const CAPACITACION = {
+  curso: { costoPorEmpleado: 10000, horas: 5, puntos: 15 },
+  vos: { horas: 4, buffet: 3000, puntos: 5, partePorTipos: 0.65 },
+};
+
+export const LELO_EMPLEADO = { sueldo: 40000, exp: 60, horas: 20 };
+
+// ---------- Chuchu: el amigo que siempre tiene un conocido ----------
+export const CHUCHU = {
+  probAparece: 0.3,
+  frases: [
+    'Te fuiste a jugar un partido con Chuchu. Entre jugada y jugada te tiró: "¡Chalú, campeón! Tengo un amigo que trabaja como una locomotora, ¿cheguro que no lo necechitás?"',
+    'Chuchu pasó por el taller: "Echte negocio va a todo vapor. Ojo que che te va el último tren, eh."',
+    'Te cruzaste a Chuchu en la estación mirando trenes de carga: "Cuando necechités gente, avichá. Tengo un amigo para cada vagón."',
+    'Chuchu te mandó un audio de siete minutos: seis son de un tren pasando y uno es "chi necechitás a alguien, llamame".',
+    'Asado en lo de Chuchu: "La vida es como una vía, campeón: hay que cheguir derecho. Y chi te falta gente, yo te consigo."',
+    'Chuchu te vio pasar con las cajas: "¿Andás con mucho laburo? Echtás más cargado que un tren de carga. Llamame."',
+    'Chuchu te mostró la maqueta de trenes que está armando en el garaje. Tardó una hora. Al final: "¿Y? ¿Che vende o no che vende?"',
+  ],
+  // Excusa para irse justo después de recomendarte a alguien, y mensajitos mientras no está.
+  excusas: [
+    { texto: 'se va de viaje un mes', mensajes: ['Chuchu te mandó una foto desde la ventanilla de un tren: "¡Echto ech vida!"', 'Chuchu te escribió: "Ya cacho vuelvo, no me extrañech."'] },
+    { texto: 'se fracturó una pierna corriendo un tren y queda internado un mes', mensajes: ['Chuchu te mandó una foto del yeso: le dibujaron una locomotora.', 'Chuchu, desde el hospital: "La comida de acá ech peor que la del vagón comedor."'] },
+    { texto: 'se divorció y se va un mes a la casa de la madre', mensajes: ['Chuchu te escribió a las 3 de la mañana: "Ella nunca entendió lo de los trenech."', 'La mamá de Chuchu te mandó saludos. Dice que el nene está bien.'] },
+    { texto: 'se casa el sábado y se toma un mes', mensajes: ['Te llegó la invitación al casamiento de Chuchu: la torta tiene forma de locomotora.', 'Chuchu: "Me caché, campeón. Todavía no lo puedo creer."'] },
+    { texto: 'se va de luna de miel un mes', mensajes: ['Chuchu te mandó una postal: "La luna de miel ech en un tren. Ella no chabía."', 'Chuchu: "Mi echpocha dice que hablo mucho de trenech. No entiendo."'] },
+    { texto: 'se ganó un viaje en tren por la Patagonia', mensajes: ['Chuchu te mandó un video: 40 minutos de estepa desde La Trochita.', 'Chuchu: "¡Vi un guanaco! Bueno, creo. Iba muy rápido el tren."'] },
+    { texto: 'se va a un congreso de modelismo ferroviario', mensajes: ['Saliste en el diario del barrio: Chuchu ganó un premio por su maqueta en el congreso.', 'Chuchu: "Me hice amigo de un japonech. No le entiendo nada pero le encantan los trenech."'] },
+    { texto: 'se muda un mes a la casa de la suegra', mensajes: ['Chuchu te escribió bajito: "Echcapame de acá."', 'Chuchu: "Mi chuegra no me deja poner la maqueta en el living."'] },
+  ],
+  recomienda: [
+    'Chuchu: "¡Me agarrachte justo! Tengo un amigo que ech de fiar: no che baja del tren a mitad de camino."',
+    'Chuchu: "Echte pibe ech un fierro, campeón. Te lo mando mañana."',
+    'Chuchu: "Te paso a uno que conozco de la echtación. Trabaja como una locomotora."',
+  ],
+};
+
 // Mensajes del tutorial (semana -> texto del tío).
 export const TUTORIAL = {
-  1: 'Tío: "Bueno, campeón. Ya tenés la máquina de tazas. Así funciona: el domingo arrancás la semana haciendo publicidad en redes, durante la semana te llegan pedidos, el sábado producís y el domingo entregás. Cuando yo arranqué, con un par de horas de publicidad me alcanzaba. Y las horas que te sobren, aprovechalas para estudiar."',
+  1: 'Tío: "Bueno, campeón. Ya tenés la máquina de tazas. Así funciona: el domingo arrancás la semana haciendo publicidad en redes, durante la semana te llegan pedidos, el sábado producís y el domingo entregás. Tenés 40 horas por semana, pero no te mates: pasadas las 25 te empezás a cansar. Cuando yo arranqué, con un par de horas de publicidad me alcanzaba. Y las horas que te sobren, aprovechalas para estudiar."',
   2: 'Tío: "Cuantas más horas de publicidad, más pedidos te llegan... hasta que el mercado se agota. Fijate qué te dicen al final de la semana y ajustá: eso no te lo enseña nadie."',
   3: 'Tío: "Si aceptás un pedido y no lo entregás, quedás mal y perdés reputación. Si ves que no llegás, rechazalo a tiempo: perdés poquito. Y la reputación es lo que hace que te pidan más."',
   4: 'Tío: "Fin de mes: se pagan la luz, internet y la publicidad. Y me enteré de que tu primo Lelo también arrancó a vender tazas en el barrio... A ver quién la pega. Si escuchás algún rumor sobre él, prestale atención."',
   5: 'Tío: "¿Probaste la feria? Es el domingo: llevás lo que te sobró de stock, pagás la mesa y te lleva el día, pero vendés. Si el sábado producís unas de más, el domingo tenés qué llevar. Y no acumules mucho: lo que queda guardado siempre se termina rompiendo."',
   6: 'Tío: "En este negocio siempre pasa algo: a veces se rompe todo y a veces te cae un pedido del cielo. A la larga se compensa, pero hay que tener un colchón de plata."',
-  7: 'Tío: "Si trabajás siempre al máximo te cansás y empezás a mandarte macanas. Descansá. Y si te sobran horas, estudiá: un curso corto cuesta plata y tiempo, pero te hace mejor."',
+  7: 'Tío: "Si trabajás siempre al máximo te cansás y empezás a mandarte macanas. Descansá. Cuando no te den las horas, contratá a alguien: en la bolsa del municipio ves todo pero son caros; tu amigo Chuchu siempre tiene un conocido barato y de confianza, y si ponés un anuncio, el sueldo lo fijás vos."',
   8: 'Tío: "¡Feliz cumpleaños! Desde marzo arranca la época fuerte: en invierno las tazas vuelan, y para el Día del Padre ni te cuento. Prepará stock. Acá termina tu entrenamiento."',
 };

@@ -1,0 +1,1 @@
+Acá van las imágenes del juego. Ver docs/ARTE.md para la lista, los tamaños y cómo activarlas en js/arte.js.

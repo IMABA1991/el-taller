@@ -4,20 +4,44 @@
 import {
   nuevaPartida, jugarSemana, demandaEsperada, horasPorUnidad, horasPorVenta, validarPlan, validarPublicidad,
   comprarMaquina, pagarPrestamoA, costoPagoAnticipadoA, calendario, unidadesPedidas, horasDelPlan, stockTotal, PRODUCTOS, VENTAS,
+  capacidadEquipo, presentes, empleadosContratados, cupoEquipo, llamarAChuchu, chuchuDisponible, irALaBolsa, contratar,
+  publicarAnuncio, responderAumento, horasEmpleado, HORAS_POR_SEMANA, publicar,
 } from '../js/engine.js';
+
+// Contrata cuando no le dan las horas: primero un operario, después un vendedor.
+// Prueba con Chuchu, si no está pone un anuncio a la media, y si no, va a la bolsa.
+function contratarSiHaceFalta(e, horasNecesarias, conEquipo) {
+  if (!conEquipo || e.semana <= 8 || e.plata < 100000) return;
+  for (const emp of e.equipo.empleados) if (emp.pideAumento) responderAumento(e, emp.id, true);
+  if (empleadosContratados(e) >= cupoEquipo(e) || horasNecesarias <= 26) return;
+  const tiene = (p) => e.equipo.empleados.some((x) => x.puesto === p && !x.esLelo);
+  const puesto = !tiene('operario') ? 'operario' : !tiene('vendedor') ? 'vendedor' : null;
+  if (!puesto) return;
+  if (e.equipo.anuncio?.candidato?.puesto === puesto) { contratar(e, 'anuncio'); return; }
+  if (chuchuDisponible(e) && llamarAChuchu(e, puesto).ok && e.equipo.chuchu.candidato) { contratar(e, 'chuchu'); return; }
+  if (!e.equipo.anuncio) publicarAnuncio(e, puesto, puesto === 'operario' ? 40000 : 30000);
+}
 
 // Un jugador razonable: publicidad para cubrir lo que pide el mercado, después produce
 // lo que le pidieron (+1 por si se arruina alguna) y unas de más para la feria.
-function planRazonable(e) {
+function planRazonable(e, conEquipo = true) {
   const ids = Object.keys(PRODUCTOS).filter((id) => e.maquinas[PRODUCTOS[id].maquina]);
   const totalEsperado = ids.reduce((s, id) => s + demandaEsperada(e, id), 0);
-  const plan = { horasRedes: Math.ceil(totalEsperado * 1.2 * horasPorVenta(e)), feria: stockTotal(e) >= 2, curso: null };
+  const redesNecesarias = totalEsperado * 1.2 * horasPorVenta(e);
+  const prodNecesaria = ids.reduce((s, id) => s + demandaEsperada(e, id) * horasPorUnidad(e, id), 0);
+  contratarSiHaceFalta(e, redesNecesarias + prodNecesaria + (stockTotal(e) >= 2 ? 8 : 0), conEquipo);
+  const vendedor = presentes(e, 'vendedor')[0];
+  const plan = { horasRedes: 0, feria: stockTotal(e) >= 2, curso: null };
+  if (plan.feria && vendedor && horasEmpleado(e, vendedor, {}) >= 8) plan.feriaVendedor = vendedor.id;
+  const horasVend = vendedor ? horasEmpleado(e, vendedor, { feriaVendedor: plan.feriaVendedor }) : 0;
+  plan.horasRedes = Math.max(0, Math.ceil(redesNecesarias - horasVend));
+  if (calendario(e.semana).semanaDelMes === 1 && presentes(e).length && e.plata > 60000) plan.capacitar = 'curso';
   if (e.curso.semanasRestantes === 0 && e.plata > 80000) {
     const c = e.formacion.cursos;
     plan.curso = ['redes', 'sublimacion', 'ventas'].sort((a, b) => c[a] - c[b])[0];
   }
-  for (let i = 0; i < 3 && !validarPublicidad(e, plan).ok; i++) {
-    if (plan.curso) plan.curso = null; else if (plan.feria) plan.feria = false; else plan.horasRedes = Math.max(0, plan.horasRedes - 1);
+  for (let i = 0; i < 60 && !validarPublicidad(e, plan).ok; i++) {
+    if (plan.capacitar) plan.capacitar = null; else if (plan.curso) plan.curso = null; else if (plan.feria) { plan.feria = false; plan.feriaVendedor = null; } else plan.horasRedes = Math.max(0, plan.horasRedes - 1);
   }
   plan.producir = (sem) => {
     const pedidas = unidadesPedidas(sem);
@@ -36,7 +60,7 @@ function planRazonable(e) {
 
 function jugarPartida(opcion, semilla, semanas = 104) {
   const e = nuevaPartida(opcion, semilla);
-  const registro = { tutorial: 0, semanaGorras: null, semanaMejorCiudad: null, semanaPagoA: null, quiebra: false, meses: [] };
+  const registro = { cansancio: [], primerEmpleado: null, equipoAlGanar: 0, tutorial: 0, semanaGorras: null, semanaMejorCiudad: null, semanaPagoA: null, quiebra: false, meses: [] };
   for (let s = 1; s <= semanas && !e.fin; s++) {
     if (!e.maquinas.gorras && e.semana > 8 && e.plata > 150000 + 60000) {
       comprarMaquina(e, 'gorras');
@@ -51,7 +75,11 @@ function jugarPartida(opcion, semilla, semanas = 104) {
     if (res.resumen.semana <= 8) registro.tutorial += 0; // se mide por meses abajo
     if (res.resumen.gananciaMes !== undefined) registro.meses.push(res.resumen.gananciaMes);
     if (Number.isNaN(e.plata) || Number.isNaN(e.rep)) throw new Error('Apareció un NaN');
-    if (res.resumen.hito === 'mejorDeLaCiudad') registro.semanaMejorCiudad = res.resumen.semana;
+    if (res.resumen.hito === 'mejorDeLaCiudad') {
+      registro.semanaMejorCiudad = res.resumen.semana;
+      registro.equipoAlGanar = empleadosContratados(e);
+    }
+    if (!registro.semanaMejorCiudad) { registro.cansancio.push(e.cansancio); if (empleadosContratados(e) && !registro.primerEmpleado) registro.primerEmpleado = e.semana; }
     void plataAntes;
   }
   registro.quiebra = e.fin === 'quiebra';
@@ -82,6 +110,7 @@ for (const opcion of ['A', 'B']) {
   } else {
     console.log(`Préstamo B saldado: ${partidas.filter((p) => p.final.prestamo.pagado).length}/200`);
   }
+  console.log(`Primer empleado: semana ${fmt(promedio(partidas.map((p) => p.primerEmpleado).filter(Boolean)))}. Equipo al ganar la ciudad: ${promedio(partidas.map((p) => p.equipoAlGanar)).toFixed(1)}. Cansancio promedio en la ciudad: ${promedio(partidas.map((p) => promedio(p.cansancio))).toFixed(0)}`);
   console.log(`Quiebras: ${quiebras}/200. Plata final (2 años): $${fmt(promedio(partidas.map((p) => p.final.plata)))}. Primo: ${promedio(partidas.map((p) => p.final.primo)).toFixed(1)}`);
 
   chequear(quiebras === 0, `Opción ${opcion}: un jugador razonable no quiebra`);
@@ -148,6 +177,58 @@ const total = promedio([...difs.agresivo, ...difs.humo]);
 console.log(`\nPromo: si Lelo ataca, ${pa >= 0 ? '+' : ''}$${fmt(pa)}; si era humo, ${ph >= 0 ? '+' : ''}$${fmt(ph)}; promedio ${total >= 0 ? '+' : ''}$${fmt(total)} (${difs.agresivo.length + difs.humo.length} casos).`);
 chequear(pa > 0, 'La promo conviene cuando Lelo ataca');
 chequear(ph < pa, 'La promo rinde menos cuando el rumor era humo');
+
+// Equipo: contratación, sueldos al cierre de mes, rasgos ocultos, Chuchu y Lelo
+{
+  const e = nuevaPartida('A', 4242);
+  e.plata = 500000;
+  irALaBolsa(e);
+  chequear(e.equipo.bolsa.candidatos.length === 3 && e.equipo.bolsa.candidatos.every((c) => c.rasgoVisible), 'La bolsa muestra 3 candidatos con todo a la vista');
+  const horasBolsa = validarPublicidad(e, { horasRedes: 0 }).horas;
+  chequear(horasBolsa === 3, 'Ir a la bolsa cuesta 3 horas del domingo');
+  const c = e.equipo.bolsa.candidatos[0];
+  chequear(contratar(e, 'bolsa', 0).ok, 'Se puede contratar desde la bolsa');
+  chequear(c.sueldo > 0 && e.equipo.empleados.length === 1, 'El empleado entra al equipo');
+  llamarAChuchu(e, 'operario');
+  const deChuchu = e.equipo.chuchu.candidato;
+  chequear(deChuchu && !deChuchu.rasgoVisible, 'El recomendado de Chuchu no muestra el rasgo');
+  contratar(e, 'chuchu');
+  chequear(!chuchuDisponible(e), 'Después de recomendarte a alguien, Chuchu se va');
+  chequear(!contratar(e, 'bolsa', 0).ok, 'No se puede pasar el cupo de la ciudad (2)');
+  // Jugar hasta fin de enero: los sueldos se pagan prorrateados
+  const sueldos = e.equipo.empleados.reduce((t, x) => t + x.sueldo, 0);
+  let pagado = 0;
+  for (let i = 0; i < 4; i++) {
+    const r = jugarSemana(e, { horasRedes: 2, producir: {} });
+    if (!r.ok) throw new Error(r.errores.join(' '));
+    const ev = r.resumen.eventos.find((x) => x.texto.startsWith('Pagaste $') && x.texto.includes('sueldos'));
+    if (ev) pagado = Number(ev.texto.replace(/\D/g, ''));
+  }
+  chequear(pagado === sueldos, `A fin de mes se pagan los sueldos completos ($${fmt(sueldos)})`);
+  chequear(e.equipo.empleados.every((x) => x.rasgoVisible), 'Después de la primera semana ya se conoce el rasgo');
+  chequear(chuchuDisponible(e), 'Chuchu vuelve al mes');
+  // Lelo entra como empleado al ganar la ciudad
+  e.rep = 99.9;
+  e.stock.tazaCeramica = 20; e.stock.tazaPlastico = 20;
+  jugarSemana(e, { horasRedes: 6, producir: {} });
+  const lelo = e.equipo.empleados.find((x) => x.esLelo);
+  chequear(e.mejorDeLaCiudad && Boolean(lelo) && lelo.exp === 60 && lelo.sueldo === 40000, 'Al ganar la ciudad, Lelo entra con experiencia 60 y $40.000');
+  // El operario produce por vos: tus horas bajan
+  const f = nuevaPartida('A', 77);
+  f.plata = 500000;
+  irALaBolsa(f);
+  const iOp = f.equipo.bolsa.candidatos.findIndex((x) => x.puesto === 'operario');
+  if (iOp >= 0) {
+    contratar(f, 'bolsa', iOp);
+    jugarSemana(f, { horasRedes: 3, producir: {} });
+    const sinEquipo = nuevaPartida('A', 77);
+    const pub = { horasRedes: 3 };
+    f.equipo.bolsa = null;
+    publicar(f, pub); publicar(sinEquipo, pub);
+    const plan = { producir: { tazaCeramica: 10 } };
+    chequear(horasDelPlan(f, plan) < horasDelPlan(sinEquipo, plan), 'Con un operario, producir te lleva menos horas a vos');
+  }
+}
 
 console.log(fallas ? `\n${fallas} chequeo(s) fallaron.` : '\nTodos los chequeos pasaron.');
 process.exit(fallas ? 1 : 0);

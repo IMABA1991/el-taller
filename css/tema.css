@@ -1,0 +1,34 @@
+/* El Taller — tema visual.
+   Todos los colores, radios y tamaños de imagen están acá: para cambiar el estilo del juego
+   alcanza con tocar este archivo (o reemplazarlo por uno generado con otra herramienta). */
+:root {
+  /* Base */
+  --fondo: #f4f5f7;
+  --tarjeta: #ffffff;
+  --texto: #1d2433;
+  --suave: #5c6578;
+  --borde: #dde1e8;
+  --principal: #1f2a44; /* encabezado, botones oscuros */
+  --acento: #2f6fde; /* botón principal, barras */
+
+  /* Estados */
+  --bien: #1e8a4c;
+  --bien-fondo: #e7f5ec;
+  --mal: #c0392b;
+  --mal-fondo: #fbecea;
+  --cansancio: #e08a1e;
+  --barra-fondo: #e7e9ee;
+  --chip-fondo: #e9edf5;
+
+  /* Tarjetas especiales */
+  --aviso-fondo: #fff6df; /* el tío y avisos */
+  --aviso-borde: #f0dca4;
+  --rumor-fondo: #f3ecfb; /* rumores de Lelo */
+  --rumor-borde: #d9c8f0;
+  --chuchu-fondo: #eaf4f7; /* Chuchu */
+  --pedido-fondo: #e8f0fd;
+
+  /* Formas */
+  --radio: 12px;
+  --avatar: 44px;
+}
