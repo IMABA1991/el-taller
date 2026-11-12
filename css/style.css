@@ -48,8 +48,30 @@ p { margin: 0 0 10px; }
 .barra.horas > span { background: var(--bien); }
 .barra.horas.pasado > span { background: var(--mal); }
 
-.tio { background: var(--aviso-fondo); border-color: var(--aviso-borde); }
-.rumor { background: var(--rumor-fondo); border-color: var(--rumor-borde); }
+/* Mensajes de personajes: blancos, con borde grueso de color */
+.tarjeta.tio { background: var(--tarjeta); border: 2px solid var(--aviso-borde); }
+.tarjeta.rumor { background: var(--tarjeta); border: 2px solid var(--rumor-borde); }
+
+/* Secciones por color */
+.tarjeta.sec-publicidad { background: var(--publicidad-fondo); border-color: var(--publicidad-borde); }
+.tarjeta.sec-feria { background: var(--feria-fondo); border-color: var(--feria-borde); }
+.tarjeta.sec-estudio { background: var(--estudio-fondo); border-color: var(--estudio-borde); }
+.tarjeta.sec-trabajo { background: var(--trabajo-fondo); border-color: var(--trabajo-borde); }
+.tarjeta.sec-equipo { background: var(--equipo-fondo); border-color: var(--equipo-borde); }
+.tarjeta.sec-finanzas { background: var(--finanzas-fondo); border-color: var(--finanzas-borde); }
+.sec-publicidad h2 { color: var(--publicidad-titulo); }
+.sec-feria h2 { color: var(--feria-titulo); }
+.sec-estudio h2 { color: var(--estudio-titulo); }
+.sec-trabajo h2 { color: var(--trabajo-titulo); }
+.sec-equipo h2 { color: var(--equipo-titulo); }
+.sec-finanzas h2 { color: var(--finanzas-titulo); }
+/* Dentro de una sección de color, las líneas divisorias toman el tono de la sección */
+.sec-publicidad > * { --borde: var(--publicidad-borde); }
+.sec-feria > * { --borde: var(--feria-borde); }
+.sec-estudio > * { --borde: var(--estudio-borde); }
+.sec-trabajo > * { --borde: var(--trabajo-borde); }
+.sec-equipo > * { --borde: var(--equipo-borde); }
+.sec-finanzas > * { --borde: var(--finanzas-borde); }
 
 .producto { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 0; border-top: 1px solid var(--borde); }
 .producto:first-of-type { border-top: 0; }
@@ -161,7 +183,7 @@ button.chico { min-height: 40px; padding: 6px 12px; border-radius: 10px; border:
 .alterna { display: flex; gap: 6px; margin: 6px 0; }
 .alterna button { flex: 1; }
 .alterna button.activo { background: var(--principal); color: #fff; border-color: var(--principal); }
-.chuchu { background: var(--chuchu-fondo); border-radius: 8px; padding: 8px 10px; margin: 6px 0; font-size: 0.93rem; }
+.chuchu { background: var(--tarjeta); border: 2px solid var(--chuchu-borde); border-radius: 8px; padding: 8px 10px; margin: 6px 0; font-size: 0.93rem; }
 
 /* Imágenes (con emoji de respaldo mientras no haya arte) */
 .avatar { display: inline-flex; align-items: center; justify-content: center; width: var(--avatar); height: var(--avatar); flex: 0 0 var(--avatar); border-radius: 50%; background: var(--chip-fondo); font-size: calc(var(--avatar) * 0.55); overflow: hidden; vertical-align: middle; }

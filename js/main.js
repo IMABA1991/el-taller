@@ -96,7 +96,7 @@ function pantallaPrestamo() {
   app.innerHTML = `
     <h1>El préstamo del tío</h1>
     <p>Te presta <strong>${plata(PRESTAMO.monto)}</strong>: alcanza para la máquina de tazas (${plata(MAQUINAS.tazas.precio)}) y unos ${plata(PRESTAMO.monto - MAQUINAS.tazas.precio)} de insumos. ¿Cómo se lo devolvés?</p>
-    <div class="tarjeta opcion">
+    <div class="tarjeta opcion sec-finanzas">
       <h2>Opción A · Todo junto</h2>
       <ul>
         <li>${plata(PRESTAMO.A.total)} en la semana 52 (20% de interés).</li>
@@ -106,7 +106,7 @@ function pantallaPrestamo() {
       </ul>
       <button class="boton" data-opcion="A">Elegir opción A</button>
     </div>
-    <div class="tarjeta opcion">
+    <div class="tarjeta opcion sec-finanzas">
       <h2>Opción B · Cuotas</h2>
       <ul>
         <li>${PRESTAMO.B.cuotas} cuotas de ${plata(PRESTAMO.B.cuota)} al cierre de cada mes (32% de interés).</li>
@@ -260,7 +260,7 @@ function bloquePrestamoNuevo(e) {
 function bloqueComprasYReinicio(e) {
   const p = e.prestamo;
   const local = localActual(e);
-  return `<div class="tarjeta">
+  return `<div class="tarjeta sec-finanzas">
       <h2>Comprar y pagar</h2>
       ${Object.keys(MAQUINAS).filter((m) => !e.maquinas[m]).map((m) => `<button class="boton secundario" data-comprar="${m}">Comprar ${MAQUINAS[m].nombre.toLowerCase()} (${plata(MAQUINAS[m].precio)})</button>`).join('') || '<p class="suave">Ya tenés todas las máquinas.</p>'}
       <p class="suave">${Object.keys(MAQUINAS).filter((m) => !e.maquinas[m]).length ? 'Plancha 30x30: remeras, mangas largas y buzos. Plancha 1x1 m: los mismos en full color, al doble de precio. Calandra: combos para las licitaciones de clubes.' : ''}</p>
@@ -330,7 +330,7 @@ function bloqueProvincia(e) {
   if (a && a.semana === e.semana) {
     const L = LICITACION;
     if (ofertaLic === null) ofertaLic = a.oferta ?? L.precioRef;
-    html += `<div class="tarjeta">
+    html += `<div class="tarjeta sec-trabajo">
       <h2>🏟️ Licitación: ${a.club}</h2>
       <p class="suave">${L.combos} combos (camiseta + short) en ${L.plazo} semanas. Precio de referencia ${plata(L.precioRef)} por combo; cada uno te cuesta ${plata(L.costo)}. Gana el mejor puntaje: precio 40%, reputación 40% y calidad 20% (tu calidad hoy: ${calidadLicitacion(e)}). Compiten ${a.rivales.length} taller${a.rivales.length > 1 ? 'es' : ''} más. El club adelanta el 50%; lo que no entregues paga 3 veces su costo de multa.</p>
       ${!e.maquinas.calandra ? '<p><strong>Para participar necesitás la calandra.</strong></p>' : e.licitacion.contrato ? '<p class="suave">Todavía estás con otro contrato.</p>' : `
@@ -342,10 +342,10 @@ function bloqueProvincia(e) {
     </div>`;
   }
   const c = e.licitacion.contrato;
-  if (c) html += `<div class="tarjeta"><p>🏟️ Contrato con <strong>${c.club}</strong>: ${c.combos} combos a ${plata(c.precio)}. Tenés ${e.stock.combo}. Vence en ${Math.max(0, c.vence - e.semana)} semana${c.vence - e.semana === 1 ? '' : 's'}: producilos el sábado.</p></div>`;
+  if (c) html += `<div class="tarjeta sec-trabajo"><p>🏟️ Contrato con <strong>${c.club}</strong>: ${c.combos} combos a ${plata(c.precio)}. Tenés ${e.stock.combo}. Vence en ${Math.max(0, c.vence - e.semana)} semana${c.vence - e.semana === 1 ? '' : 's'}: producilos el sábado.</p></div>`;
   if (!e.mejorDeLaProvincia) {
     const seg = e.seguridad;
-    html += `<div class="tarjeta">
+    html += `<div class="tarjeta sec-finanzas">
       <h2>Defensas contra ${TRAICIO.nombre}</h2>
       ${Object.entries(DEFENSAS).map(([id, d]) => `<label class="interruptor">
         <span><strong>${d.nombre}</strong> · ${plata(d.costo)} por mes<br><span class="suave">${d.detalle}</span></span>
@@ -512,7 +512,7 @@ function bloqueContratar(e) {
 
 function bloqueEquipo(e) {
   const emps = e.equipo.empleados;
-  return `<div class="tarjeta">
+  return `<div class="tarjeta sec-equipo">
       <h2>Tu equipo</h2>
       ${emps.length ? emps.map((x) => htmlEmpleado(e, x)).join('') : '<p class="suave">Por ahora trabajás solo. Si no te dan las horas o estás muy cansado, contratá a alguien.</p>'}
       ${bloqueCapacitar(e)}
@@ -606,14 +606,14 @@ function pantallaPublicidad() {
       </label>
     </div>` : ''}
 
-    ${esSemanaCyber(e.semana) ? `<div class="tarjeta">
+    ${esSemanaCyber(e.semana) ? `<div class="tarjeta sec-publicidad">
       <label class="interruptor" style="border-top:0">
         <span><strong>Sumarte al CyberMonday</strong><br><span class="suave">Bajás todos los precios un ${Math.round(CYBER.descuento * 100)}% esta semana y la gente te pide mucho más de todo. Si no te sumás, no ganás nada extra.</span></span>
         <input type="checkbox" id="cyber" ${pub.cyber ? 'checked' : ''}>
       </label>
     </div>` : ''}
 
-    <div class="tarjeta">
+    <div class="tarjeta sec-publicidad">
       <h2>Publicidad en redes</h2>
       <p class="suave">Publicás en Instagram y Marketplace y respondés consultas: <strong>así te llegan los pedidos</strong>. Cuantas más horas, más pedidos, hasta que el mercado se agota. Al final de la semana te vas a enterar si te quedaste corto o si te pasaste.</p>
       <div class="producto">
@@ -632,7 +632,7 @@ function pantallaPublicidad() {
       ${opcionVolantesVendedor(e)}
     </div>
 
-    <div class="tarjeta">
+    <div class="tarjeta sec-feria">
       <h2>Feria del domingo</h2>
       <label class="interruptor" style="border-top:0">
         <span><strong>Ir a la feria</strong><br><span class="suave">Mesa ${plata(VENTAS.feria.costoMesa)} · ${VENTAS.feria.horas} h · vendés lo que te sobró de stock (${stockTotal(e) ? `tenés ${stockTotal(e)}` : 'hoy no tenés nada'}). En la feria siempre pasa algo.</span></span>
@@ -641,7 +641,7 @@ function pantallaPublicidad() {
       ${opcionFeriaVendedor(e)}
     </div>
 
-    <div class="tarjeta">
+    <div class="tarjeta sec-estudio">
       <h2>Estudiar</h2>
       ${e.curso.semanasRestantes > 0
         ? `<p>Estás haciendo el curso de <strong>${CURSOS[e.curso.id].nombre.toLowerCase()}</strong>: ${CURSOS[e.curso.id].horasPorSemana} h esta semana y termina ${e.curso.semanasRestantes === 1 ? 'esta semana' : `en ${e.curso.semanasRestantes} semanas`}.</p>`
@@ -780,7 +780,7 @@ function pantallaPedidos() {
     ${aviso ? `<div class="tarjeta tio"><p>${aviso}</p></div>` : ''}
     ${sem.eventos.length ? `<div class="tarjeta"><ul class="eventos">${sem.eventos.map((ev) => `<li class="${ev.tipo}">${ev.texto}</li>`).join('')}</ul></div>` : ''}
 
-    <div class="tarjeta">
+    <div class="tarjeta sec-trabajo">
       <h2>Pedidos de la semana (${sem.pedidos.filter((p) => !p.rechazado).length})</h2>
       ${sem.pedidos.length ? sem.pedidos.map((p) => `
         <div class="pedido ${p.rechazado ? 'rechazado' : ''}">
@@ -799,7 +799,7 @@ function pantallaPedidos() {
 
     ${bloqueEmpresas(e)}
 
-    <div class="tarjeta">
+    <div class="tarjeta sec-trabajo">
       <h2>Producir</h2>
       ${lineaOperarios(e)}
       ${productos.map((id) => {
@@ -864,7 +864,7 @@ function pantallaPedidos() {
 // Pedidos de empresas (provincia): tienen plazo de varias semanas y se cobran a 30 días.
 function bloqueEmpresas(e) {
   if (!e.pedidosEmpresa?.length) return '';
-  return `<div class="tarjeta">
+  return `<div class="tarjeta sec-trabajo">
       <h2>Pedidos de empresas</h2>
       ${e.pedidosEmpresa.map((p) => {
         const faltan = Math.max(0, p.vence - e.semana);
@@ -914,7 +914,7 @@ function pantallaResumen(r) {
     <div class="encabezado">
       <div class="fila"><span class="plata">${plata(r.plata)}</span><span class="fecha">Resumen · semana ${r.semana} · ${r.mes}</span></div>
     </div>
-    <div class="tarjeta">
+    <div class="tarjeta sec-finanzas">
       <div class="numeros">
         <span>Ingresos</span><span class="positivo">+${plata(r.ingresos)}</span>
         <span>Gastos</span><span class="negativo">−${plata(r.gastos)}</span>

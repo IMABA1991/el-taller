@@ -20,13 +20,20 @@
   --barra-fondo: #e7e9ee;
   --chip-fondo: #e9edf5;
 
-  /* Tarjetas especiales */
-  --aviso-fondo: #fff6df; /* el tío y avisos */
-  --aviso-borde: #f0dca4;
-  --rumor-fondo: #f3ecfb; /* rumores de Lelo */
-  --rumor-borde: #d9c8f0;
-  --chuchu-fondo: #eaf4f7; /* Chuchu */
+  /* Mensajes de personajes: fondo blanco con borde de color (no se confunden con las secciones) */
+  --aviso-borde: #ef9f27; /* el tío y avisos */
+  --rumor-fondo: #f3ecfb; /* rumores de Lelo (en las listas de eventos) */
+  --rumor-borde: #7f77dd;
+  --chuchu-borde: #1d9e75; /* Chuchu */
   --pedido-fondo: #e8f0fd;
+
+  /* Secciones: cada una con su fondo pastel, y borde y título en un tono fuerte del mismo color */
+  --publicidad-fondo: #fbeaf0; --publicidad-borde: #ed93b1; --publicidad-titulo: #72243e; /* rosa */
+  --feria-fondo: #faece7;      --feria-borde: #f0997b;      --feria-titulo: #712b13;      /* coral */
+  --estudio-fondo: #eeedfe;    --estudio-borde: #afa9ec;    --estudio-titulo: #3c3489;    /* violeta */
+  --trabajo-fondo: #e6f1fb;    --trabajo-borde: #85b7eb;    --trabajo-titulo: #0c447c;    /* celeste */
+  --equipo-fondo: #e1f5ee;     --equipo-borde: #5dcaa5;     --equipo-titulo: #085041;     /* verde agua */
+  --finanzas-fondo: #faeeda;   --finanzas-borde: #ef9f27;   --finanzas-titulo: #633806;   /* ámbar */
 
   /* Formas */
   --radio: 12px;
