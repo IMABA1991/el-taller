@@ -1,1 +1,1 @@
-{ "name": "el-taller", "private": true, "type": "module", "scripts": { "test": "node tests/simulacion.js" } }
+{"name": "el-taller", "private": true, "type": "module", "scripts": {"test": "node tests/simulacion.js && node tests/provincia.js"}}

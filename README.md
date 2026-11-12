@@ -18,6 +18,7 @@ Arrancás con un préstamo de tu tío y una máquina de tazas, competís con tu 
 - El tío vuelve a prestar para la próxima máquina, según su confianza (historial de pago y reputación).
 - Local chico para tener más de 2 empleados, volantes y servicios especiales (envío y diseño personalizado).
 - Experiencia por máquina: en una máquina nueva arrancás con la mitad.
+- **Provincia:** pelea contra Traicio Nero (Talleres Judas): sabotajes, robo de empleados, La Voz de Adentro, defensas y persona de seguridad. Plancha 30x30, plancha 1x1 m y calandra; diseñadores; local grande; tercerización; pedidos de empresas con cobro a 30 días; licitaciones de clubes del ascenso; Lelo gerente. Si Traicio te gana, volvés a la ciudad y hay revancha.
 - La partida se guarda en el navegador (las cuentas con Firebase llegan en el próximo paso).
 
 ## Estructura
@@ -29,6 +30,7 @@ Arrancás con un préstamo de tu tío y una máquina de tazas, competís con tu 
 - `js/engine.js`: reglas del juego, sin pantalla.
 - `js/main.js`: pantallas e interacción.
 - `js/storage.js`: guardado de la partida.
-- `tests/simulacion.js`: juega 400 partidas automáticas y controla el balance (`node tests/simulacion.js`).
+- `tests/simulacion.js`: juega 400 partidas automáticas y controla el balance de la ciudad.
+- `tests/provincia.js`: juega 240 partidas de hasta 3 años y controla el balance de la provincia (`npm test` corre las dos).
 
 Las reglas completas están en el documento de diseño del proyecto.

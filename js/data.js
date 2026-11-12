@@ -25,6 +25,9 @@ export const MESES = [
 export const MAQUINAS = {
   tazas: { nombre: 'Máquina de tazas', precio: 150000, luzExtra: 0 },
   gorras: { nombre: 'Máquina de gorras', precio: 150000, luzExtra: 5000 },
+  plancha30: { nombre: 'Plancha 30x30', precio: 900000, luzExtra: 10000 },
+  plancha1m: { nombre: 'Plancha 1x1 m', precio: 4000000, luzExtra: 20000 },
+  calandra: { nombre: 'Calandra', precio: 10000000, luzExtra: 40000 },
 };
 
 // sens = cuánto aprovecha el producto el multiplicador de reputación (1 alta, 0.7 media, 0.4 baja).
@@ -44,6 +47,43 @@ export const PRODUCTOS = {
     precio: 10000, costo: 2000, horas: 1.6, base: 3, sens: 0.7,
     temporada: { verano: 1.6, invierno: 0.5 },
   },
+  remera: {
+    nombre: 'Remera', corto: 'Remera', singular: 'remera', plural: 'remeras', maquina: 'plancha30',
+    precio: 15000, costo: 5000, horas: 1.6, base: 5, sens: 1,
+    temporada: { verano: 1.5, invierno: 0.6 },
+  },
+  mangaLarga: {
+    nombre: 'Manga larga', corto: 'Manga larga', singular: 'manga larga', plural: 'mangas largas', maquina: 'plancha30',
+    precio: 20000, costo: 6000, horas: 2.25, base: 2, sens: 0.7,
+    temporada: { otoño: 1.3, primavera: 1.3 },
+  },
+  buzo: {
+    nombre: 'Buzo', corto: 'Buzo', singular: 'buzo', plural: 'buzos', maquina: 'plancha30',
+    precio: 50000, costo: 10000, horas: 2, base: 1, sens: 1,
+    temporada: { invierno: 2, verano: 0.3 },
+  },
+  // Full color (plancha 1x1 m): el doble de precio, el mismo costo, 30 min más y el 30% de la demanda.
+  remeraFC: {
+    nombre: 'Remera full color', corto: 'Remera FC', singular: 'remera full color', plural: 'remeras full color', maquina: 'plancha1m',
+    precio: 30000, costo: 5000, horas: 2.1, base: 1.5, sens: 1,
+    temporada: { verano: 1.5, invierno: 0.6 },
+  },
+  mangaLargaFC: {
+    nombre: 'Manga larga full color', corto: 'Manga larga FC', singular: 'manga larga full color', plural: 'mangas largas full color', maquina: 'plancha1m',
+    precio: 40000, costo: 6000, horas: 2.75, base: 0.6, sens: 0.7,
+    temporada: { otoño: 1.3, primavera: 1.3 },
+  },
+  buzoFC: {
+    nombre: 'Buzo full color', corto: 'Buzo FC', singular: 'buzo full color', plural: 'buzos full color', maquina: 'plancha1m',
+    precio: 100000, costo: 10000, horas: 2.5, base: 0.3, sens: 1,
+    temporada: { invierno: 2, verano: 0.3 },
+  },
+  // Combo de club (camiseta + short): solo por licitación. 1 h de calandra + 30 min de costura.
+  combo: {
+    nombre: 'Combo de club', corto: 'Combo', singular: 'combo', plural: 'combos', maquina: 'calandra',
+    precio: 90000, costo: 30000, horas: 1.5, base: 0, sens: 0, soloPedido: true,
+    temporada: {},
+  },
 };
 
 // Fechas especiales. Los turnos van de domingo a domingo: el pico es el turno que termina el día
@@ -54,14 +94,16 @@ export const PRODUCTOS = {
 export const FECHAS_ESPECIALES = [
   { mes: 1, semana: 2, nombre: 'San Valentín', efecto: { tazaCeramica: 2 } },
   { mes: 2, semana: 2, nombre: 'el Día de la Mujer', efecto: { tazaCeramica: 1.5 } },
+  { mes: 2, semana: 4, nombre: 'el inicio de clases', efecto: { buzo: 2, buzoFC: 2 } },
   { mes: 3, semana: 2, nombre: 'Pascuas', efecto: { tazaCeramica: 1.5, tazaPlastico: 1.5 } },
   { mes: 4, semana: 4, nombre: 'el 25 de Mayo', efecto: { tazaCeramica: 1.5, tazaPlastico: 1.5, gorra: 1.5 } },
   { mes: 5, semana: 3, nombre: 'el Día del Padre', efecto: { tazaCeramica: 2, tazaPlastico: 2, gorra: 1.5 } },
   { mes: 6, semana: 3, nombre: 'el Día del Amigo', efecto: { tazaCeramica: 2, tazaPlastico: 2 } },
   { mes: 7, semana: 3, nombre: 'el Día del Niño', efecto: { tazaPlastico: 2 } },
+  { mes: 8, semana: 3, nombre: 'el Día del Estudiante', efecto: { remera: 1.5, buzo: 1.5, remeraFC: 1.5, buzoFC: 1.5 } },
   { mes: 9, semana: 3, nombre: 'el Día de la Madre', efecto: { tazaCeramica: 2, tazaPlastico: 2 } },
   { mes: 10, semana: 1, nombre: 'el CyberMonday', efecto: { todo: 1.5 }, cyber: true },
-  { mes: 11, semana: 4, nombre: 'Navidad', efecto: { tazaCeramica: 2, tazaPlastico: 2 } },
+  { mes: 11, semana: 4, nombre: 'Navidad', efecto: { tazaCeramica: 2, tazaPlastico: 2, remera: 2, remeraFC: 2 } },
 ];
 export const CYBER = { descuento: 0.15 };
 export const RAMPA_FECHA = { 3: 1 / 8, 2: 1 / 4, 1: 1 / 2, 0: 1 }; // semanas que faltan → parte del efecto
@@ -91,13 +133,14 @@ export const CONFIANZA = {
 };
 
 // Orden de las máquinas (las que todavía no están en el juego aparecen solo como aviso).
-export const ORDEN_MAQUINAS = ['tazas', 'gorras', 'plancha30'];
-export const MAQUINAS_FUTURAS = { plancha30: { nombre: 'Plancha 30x30', precio: 900000 } };
+export const ORDEN_MAQUINAS = ['tazas', 'gorras', 'plancha30', 'plancha1m', 'calandra'];
+export const MAQUINAS_FUTURAS = {};
 
 // Dónde trabajás: en tu casa entran 2 empleados; para más, alquilás un local.
 export const LOCALES = {
   casa: { nombre: 'Tu casa', alquiler: 0, luz: 0, cupo: 2 },
   chico: { nombre: 'Local chico', alquiler: 60000, luz: 8000, cupo: 5 },
+  grande: { nombre: 'Local grande', alquiler: 200000, luz: 20000, cupo: 12, desdeProvincia: true },
 };
 
 // Volantería: imprimís volantes y alguien los reparte por el barrio.
@@ -320,6 +363,28 @@ export const MAZO = {
         usa: { texto: 'Usarlo igual', detalle: 'No perdés horas, pero 1 de cada 2 veces algún cliente lo nota (−2 de reputación).' },
       },
     },
+    // Decisiones que vienen de Traicio
+    tintura: {
+      pregunta: '¿Qué hacés con las tazas guardadas?',
+      opciones: {
+        limpia: { texto: 'Pagar una limpieza', detalle: 'Cuesta plata, pero salvás la mayoría de las tazas.' },
+        tira: { texto: 'Tirar las que huelen', detalle: 'No gastás nada, pero perdés la mitad de las tazas guardadas.' },
+      },
+    },
+    propaganda: {
+      pregunta: '¿Lo desmentís?',
+      opciones: {
+        desmiente: { texto: 'Desmentirlo', detalle: 'Te lleva 3 h esta semana y recuperás la mitad (−1 de reputación).' },
+        ignora: { texto: 'Dejarlo pasar', detalle: '−2 de reputación.' },
+      },
+    },
+    roboEmpleado: {
+      pregunta: '¿Igualás la oferta?',
+      opciones: {
+        iguala: { texto: 'Igualar la oferta', detalle: 'Le subís el sueldo un 25% y se queda.' },
+        deja: { texto: 'No igualar', detalle: 'Decide él: si le pagás menos que la media del mercado, es más probable que se vaya.' },
+      },
+    },
     quejoso: {
       pregunta: '¿Le contestás?',
       opciones: {
@@ -351,7 +416,19 @@ export const PUESTOS = {
     },
     rasgos: ['rapido', 'creativo', 'faltador', 'quejoso'],
   },
+  // Diseñadores (desde la provincia): no producen, bajan los errores de las máquinas que manejan.
+  disenador: {
+    nombre: 'Diseñador', tarea: 'diseño', horas: 0, desdeProvincia: true,
+    variantes: {
+      basico: { nombre: 'Básico', sueldo: 35000, exp: 20, maquinas: ['tazas', 'gorras'], errores: 0.8 },
+      textil: { nombre: 'Textil', sueldo: 60000, exp: 30, maquinas: ['plancha30', 'plancha1m'], errores: 0.6 },
+      deportivo: { nombre: 'Deportivo', sueldo: 120000, exp: 40, maquinas: ['calandra'], errores: 0.4 },
+    },
+    rasgos: ['prolijo', 'creativo', 'distraido', 'faltador', 'quejoso'],
+  },
 };
+// Sin diseñador textil, los productos de plancha tienen más errores.
+export const SIN_TEXTIL_ERRORES = 1.5;
 
 export const RASGOS = {
   prolijo: { nombre: 'Prolijo', efecto: 'se equivoca la mitad', bueno: true },
@@ -401,8 +478,86 @@ export const LELO_VIAJE = {
   ],
 };
 
-// Rival de la provincia (todavía no se juega: solo se muestra en la barra).
-export const TRAICIO = { nombre: 'Traicio Nero', empresa: 'Talleres Judas' };
+// ---------- Provincia ----------
+export const PROVINCIA = {
+  factorRepVenta: 0.05, // cada venta suma la mitad que en la ciudad
+  mercadoInicial: 3.375, // arranca donde terminó la ciudad y llega al doble con 100
+  repAlPerder: 75, // si Traicio te gana, volvés a la ciudad con esta reputación
+  repLeloAlVolver: 50,
+  repTraicioRevancha: 30, // si volvés a la provincia después de perderla
+};
+
+export const LELO_GERENTE = { sueldo: 150000, errores: 0.8, umbralCansancio: 28 };
+
+// Rival de la provincia.
+export const TRAICIO = {
+  nombre: 'Traicio Nero', empresa: 'Talleres Judas',
+  ventanaRitmo: 12, // semanas para medir tu ritmo
+  factorMin: 0.95, factorMax: 0.97, // crece un 3-5% más lento que vos
+  ritmoMinimo: 1.4, // si te estancás, él sigue a este ritmo por semana
+  ruido: 0.15,
+  alerta: 85,
+  sabotajeCada: { min: 2, max: 4 },
+  probConRumor: 0.5,
+  roboEmpleado: { cadaSemanas: 8, prob: 0.2, aumento: 0.25, seVaDebajo: 0.5, seVaMedia: 0.25, seVaArriba: 0.1 },
+  sabotajes: {
+    resenas: { tamano: 'chica', rumor: 'dicen que Traicio Nero está juntando amigos para dejarte reseñas.', texto: 'Aparecieron reseñas falsas de tu taller: "horrible", "me llegó tarde", "el dueño es feo".' },
+    hablaMal: { tamano: 'chica', rumor: 'Traicio anda por los negocios hablando de vos.', texto: 'Traicio anda diciendo que tus productos son malos: por un par de semanas te van a pedir menos.' },
+    soborno: { tamano: 'chica', rumor: 'viste a Traicio tomando un café con tu proveedor.', texto: 'Traicio sobornó a tu proveedor: los insumos llegan tarde y perdés horas de producción la semana que viene.' },
+    tintura: { tamano: 'mediana', rumor: 'alguien vio a un empleado de Talleres Judas comprando tintura industrial.', texto: 'Amaneciste con tintura podrida derramada en la puerta: las tazas guardadas quedaron con un olor asqueroso.' },
+    propaganda: { tamano: 'mediana', rumor: 'Traicio está armando cuentas truchas en las redes.', texto: 'Aparecieron avisos falsos a tu nombre burlándose de la gente.' },
+    entregaTrucha: { tamano: 'mediana', rumor: 'dicen que en Talleres Judas están imprimiendo etiquetas con tu nombre.', texto: 'Traicio entregó productos truchos haciéndose pasar por vos. Los clientes están furiosos.' },
+    roboCliente: { tamano: 'grande', rumor: 'Traicio anda visitando a tus clientes grandes.', texto: 'Traicio te robó un cliente grande a último momento.' },
+  },
+};
+
+export const DEFENSAS = {
+  proteccion: { nombre: 'Protección', detalle: 'Cámaras y contratos firmados con proveedores. Los sabotajes sin aviso salen la mitad de las veces y hacen la mitad del daño.', costo: 15000 },
+  seguro: { nombre: 'Seguro', detalle: 'Te paga la mitad de lo que perdés en plata y stock por sabotajes.', costo: 15000 },
+};
+export const SEGURIDAD = { sueldo: 30000, frena: 1 / 3, probSoborno: 0.3 };
+
+// Clientes empresa de la provincia: pedidos con plazo, que se cobran a 30 días.
+export const EMPRESAS = {
+  catering: {
+    nombres: ['Catering Doña Rosa', 'Eventos El Quincho', 'Catering Las Delicias'],
+    cada: { min: 5, max: 7 }, plazo: 2, cobroSemanas: 4, descuento: 0,
+    items: [{ producto: 'remera', min: 20, max: 30 }],
+  },
+  colectivos: {
+    nombres: ['Colectivos La Golondrina', 'Micros El Rayo', 'Transporte Serrano'],
+    cada: { min: 12, max: 14 }, plazo: 3, cobroSemanas: 4, cobroLargo: 8, probCobroLargo: 0.25, descuento: 0.1,
+    items: [{ producto: 'remera', min: 20, max: 30 }, { producto: 'buzo', min: 8, max: 12 }, { producto: 'tazaCeramica', min: 12, max: 18 }],
+  },
+  repEntrega: 3, // pedido grande
+  repNoEntrega: -10,
+  entregasParaFijo: 3,
+  probTraicioSeLoLleva: 0.3, // si no es cliente fijo
+};
+
+export const TERCERIZAR = { min: 0.9, max: 0.95 }; // lo que pagás del precio
+
+export const LICITACION = {
+  cada: { min: 7, max: 9 },
+  combos: 60, precioRef: 90000, costo: 30000, plazo: 4, sena: 0.5, multa: 3,
+  pesos: { precio: 0.4, rep: 0.4, calidad: 0.2 },
+  rivales: { min: 1, max: 2, repMin: 40, repMax: 80, ofertaMin: 0.9, ofertaMax: 1.3 },
+  repGanada: 3, repIncompleta: -10,
+  talleres: ['Estampados Don Pepe', 'Sublimados La Tablada', 'Camisetas El Potrero', 'Textil Los Hornos'],
+  clubes: ['Club Atlético Villa Pancha', 'Sportivo Las Toscas', 'Deportivo El Cardo', 'Atlético Barrio Norte', 'Unión de Cañada Seca'],
+};
+
+// La Voz de Adentro: una nota por mes sobre Talleres Judas, mezclada con chismes inútiles.
+export const VOZ_DE_ADENTRO = [
+  'Chuchu fue visto persiguiendo un tren de carga en bicicleta.',
+  'Lelo se casó... aunque después la familia se dio cuenta de que ya estaba casado.',
+  'Un vecino asegura que su perro ladra el himno. Nadie lo pudo comprobar.',
+  'Inauguraron un semáforo en la ruta. Los vecinos llevaron facturas.',
+  'Récord provincial: un hombre comió 40 empanadas en una hora y pidió el postre.',
+  'Se perdió una vaca en el centro. La encontraron haciendo fila en el banco.',
+  'El intendente prometió arreglar el bache de la esquina. Es la promesa número 14.',
+  'Chuchu armó una maqueta de trenes de 12 metros. Su suegra se mudó.',
+];
 
 // ---------- Chuchu: el amigo que siempre tiene un conocido ----------
 export const CHUCHU = {
