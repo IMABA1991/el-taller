@@ -11,8 +11,13 @@ Arrancás con un préstamo de tu tío y una máquina de tazas, competís con tu 
 - Tutorial de enero y febrero, estacionalidad y fechas especiales.
 - Reputación, experiencia, cansancio (40 h por semana; cansa desde las 25) y cursos cortos.
 - Equipo desde la primera semana: operarios y vendedores, con rasgos y sueldos. Se contratan en la bolsa del municipio, por Chuchu o con un anuncio. Capacitaciones para el equipo.
-- Lelo se suma como empleado cuando sos el mejor de la ciudad.
-- El primo como rival y mazo de eventos balanceado.
+- Lelo se suma como empleado un mes después de que sos el mejor de la ciudad (antes se va de viaje).
+- El primo como rival: rumores, promo de contraataque (falla 1 de cada 10) y clientes que cancelan para irse con él.
+- Mazo de eventos por trimestre: cartas de plata, horas, stock y reputación, algunas con decisiones.
+- Fechas especiales casi todos los meses (San Valentín, Día de la Mujer, Pascuas, 25 de Mayo, Día del Amigo, CyberMonday y más).
+- El tío vuelve a prestar para la próxima máquina, según su confianza (historial de pago y reputación).
+- Local chico para tener más de 2 empleados, volantes y servicios especiales (envío y diseño personalizado).
+- Experiencia por máquina: en una máquina nueva arrancás con la mitad.
 - La partida se guarda en el navegador (las cuentas con Firebase llegan en el próximo paso).
 
 ## Estructura

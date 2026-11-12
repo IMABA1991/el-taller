@@ -36,12 +36,12 @@ export const PRODUCTOS = {
   },
   tazaPlastico: {
     nombre: 'Taza de plástico', corto: 'Taza plástico', singular: 'taza de plástico', plural: 'tazas de plástico', maquina: 'tazas',
-    precio: 5000, costo: 3000, horas: 1, base: 3, sens: 0.4,
+    precio: 5000, costo: 3000, horas: 0.5, base: 3, sens: 0.4,
     temporada: {},
   },
   gorra: {
     nombre: 'Gorra', corto: 'Gorra', singular: 'gorra', plural: 'gorras', maquina: 'gorras',
-    precio: 10000, costo: 2000, horas: 1.5, base: 3, sens: 0.7,
+    precio: 10000, costo: 2000, horas: 1.6, base: 3, sens: 0.7,
     temporada: { verano: 1.6, invierno: 0.5 },
   },
 };
@@ -49,18 +49,64 @@ export const PRODUCTOS = {
 // Fechas especiales. Los turnos van de domingo a domingo: el pico es el turno que termina el día
 // de la fecha (mes 0-11, semana del mes 1-based). Se anuncian 3 semanas antes y la demanda extra
 // sube de forma exponencial: 1/8, 1/4, 1/2 y todo el efecto en el pico. Después vuelve a lo normal.
+// "todo" afecta a todos los productos. El CyberMonday no tiene rampa: solo rinde en su semana
+// y solo si te sumás bajando los precios.
 export const FECHAS_ESPECIALES = [
+  { mes: 1, semana: 2, nombre: 'San Valentín', efecto: { tazaCeramica: 2 } },
+  { mes: 2, semana: 2, nombre: 'el Día de la Mujer', efecto: { tazaCeramica: 1.5 } },
+  { mes: 3, semana: 2, nombre: 'Pascuas', efecto: { tazaCeramica: 1.5, tazaPlastico: 1.5 } },
+  { mes: 4, semana: 4, nombre: 'el 25 de Mayo', efecto: { tazaCeramica: 1.5, tazaPlastico: 1.5, gorra: 1.5 } },
   { mes: 5, semana: 3, nombre: 'el Día del Padre', efecto: { tazaCeramica: 2, tazaPlastico: 2, gorra: 1.5 } },
+  { mes: 6, semana: 3, nombre: 'el Día del Amigo', efecto: { tazaCeramica: 2, tazaPlastico: 2 } },
   { mes: 7, semana: 3, nombre: 'el Día del Niño', efecto: { tazaPlastico: 2 } },
   { mes: 9, semana: 3, nombre: 'el Día de la Madre', efecto: { tazaCeramica: 2, tazaPlastico: 2 } },
+  { mes: 10, semana: 1, nombre: 'el CyberMonday', efecto: { todo: 1.5 }, cyber: true },
   { mes: 11, semana: 4, nombre: 'Navidad', efecto: { tazaCeramica: 2, tazaPlastico: 2 } },
 ];
+export const CYBER = { descuento: 0.15 };
 export const RAMPA_FECHA = { 3: 1 / 8, 2: 1 / 4, 1: 1 / 2, 0: 1 }; // semanas que faltan → parte del efecto
 
 export const PRESTAMO = {
   monto: 200000,
   A: { total: 240000, interes: 40000, semanaVence: 52 },
   B: { cuota: 22000, cuotas: 12, mesPerdonado: 1 }, // mes 1 = febrero (0-based)
+  // Préstamos siguientes (para la próxima máquina): mismos términos que el primero.
+  interesA: 0.2, interesB: 0.32,
+  tope: { min: 0.25, max: 0.75 }, // parte del precio de la próxima máquina, según la confianza
+};
+
+// Confianza del tío (0 a 100) = historial de pago (hasta 50) + reputación (hasta 50).
+export const CONFIANZA = {
+  historialInicial: 25,
+  pagoATiempo: 10, // opción A pagada al vencer
+  adelantoPorSemanas: 2, // +1 por cada 2 semanas de adelanto…
+  maxPagoAnticipado: 25, // …hasta +25 en total
+  cuotaATiempo: 1,
+  atraso: -10,
+  vencido: -25,
+  porMeta: 25, // por cada meta ganada
+  repDivisor: 4,
+  repMala: 20, // con reputación debajo de esto, resta…
+  restaRepMala: -10,
+};
+
+// Orden de las máquinas (las que todavía no están en el juego aparecen solo como aviso).
+export const ORDEN_MAQUINAS = ['tazas', 'gorras', 'plancha30'];
+export const MAQUINAS_FUTURAS = { plancha30: { nombre: 'Plancha 30x30', precio: 900000 } };
+
+// Dónde trabajás: en tu casa entran 2 empleados; para más, alquilás un local.
+export const LOCALES = {
+  casa: { nombre: 'Tu casa', alquiler: 0, luz: 0, cupo: 2 },
+  chico: { nombre: 'Local chico', alquiler: 60000, luz: 8000, cupo: 5 },
+};
+
+// Volantería: imprimís volantes y alguien los reparte por el barrio.
+export const VOLANTES = { costo: 5000, horas: 6, extra: 0.15, extraSiguiente: 0.07 };
+
+// Servicios especiales que piden algunos clientes.
+export const SERVICIOS = {
+  envio: { prob: 0.15, recargo: 0.1, rep: 0.5, horas: 1 }, // 1 h por envío, de un empleado si hay
+  diseno: { prob: 0.1, recargo: 0.2, tiempoExtra: 0.5 }, // +50% del tiempo de esas unidades (lo hacés vos)
 };
 
 export const GASTOS_FIJOS = { luz: 12000, internet: 10000, publicidad: 8000 };
@@ -87,25 +133,32 @@ export const PRIMO = {
     { id: 'ofertas', prob: 0.3, saca: 0.15 },
     { id: 'agresivo', prob: 0.2, saca: 0.25 },
   ],
-  // Ofertas chicas (sin rumor previo)
+  // Ofertas chicas (sin rumor previo). "pista" es lo que te cuenta el cliente cuando cancela.
   ofertas: [
-    'Lelo sacó un 2x1 en tazas. Algunos clientes se fueron con él.',
-    'Lelo publicó "envío gratis en el barrio" y te sacó algunos pedidos.',
-    'Lelo regaló un llavero con cada compra. Algunos clientes picaron.',
+    { texto: 'Lelo sacó un 2x1 en tazas. Algunos clientes se fueron con él.', pista: 'Lelo le hizo 2x1' },
+    { texto: 'Lelo publicó "envío gratis en el barrio" y te sacó algunos pedidos.', pista: 'Lelo se la lleva gratis a la casa' },
+    { texto: 'Lelo regaló un llavero con cada compra. Algunos clientes picaron.', pista: 'Lelo le regalaba un llavero' },
   ],
-  // Diez jugadas agresivas: cada una tiene su rumor (una semana antes) y su texto cuando pasa.
+  // Diez jugadas agresivas: cada una tiene su rumor (una semana antes), su texto cuando pasa
+  // y la pista que te da el cliente que cancela.
   jugadas: [
-    { rumor: 'dicen que Lelo está imprimiendo volantes con precios de remate.', ataque: 'Lelo repartió volantes con precios de remate por todo el barrio.' },
-    { rumor: 'Lelo anda anunciando "un sorteo bomba" en Instagram.', ataque: 'Lelo hizo un sorteo en Instagram: "seguime y compartí". Medio barrio lo compartió.' },
-    { rumor: 'te contaron que Lelo prepara un 2x1 relámpago.', ataque: 'Lelo lanzó un 2x1 relámpago de 48 horas.' },
-    { rumor: 'Lelo consiguió que lo entrevisten en la radio del barrio.', ataque: 'Lelo salió en la radio del barrio contando "su emprendimiento".' },
-    { rumor: 'Lelo está hablando con unos influencers amigos.', ataque: 'Tres influencers amigos de Lelo lo recomendaron en sus historias.' },
-    { rumor: 'Lelo está armando combos con regalo incluido.', ataque: 'Lelo sacó combos "taza + llavero + bombón" a precio de taza sola.' },
-    { rumor: 'tu tía dice que Lelo anda hablando mal de tus tazas.', ataque: 'Lelo le dijo a tus clientes que tus tazas se despintan en el lavavajillas.' },
-    { rumor: 'Lelo anda prometiendo entregas en 24 horas.', ataque: 'Lelo promete "pedido hoy, taza mañana" y la gente le cree.' },
-    { rumor: 'te parece que Lelo te está copiando los diseños...', ataque: 'Lelo copió tus diseños más vendidos y los ofrece más baratos.' },
-    { rumor: 'Lelo averiguó cuánto sale una mesa en la feria.', ataque: 'Lelo puso un puesto en la feria justo al lado del tuyo, con precios más bajos.' },
+    { rumor: 'dicen que Lelo está imprimiendo volantes con precios de remate.', ataque: 'Lelo repartió volantes con precios de remate por todo el barrio.', pista: 'vio un volante de Lelo con precios de remate', volantes: true },
+    { rumor: 'Lelo anda anunciando "un sorteo bomba" en Instagram.', ataque: 'Lelo hizo un sorteo en Instagram: "seguime y compartí". Medio barrio lo compartió.', pista: 'entró al sorteo de Lelo y ya que estaba le compró' },
+    { rumor: 'te contaron que Lelo prepara un 2x1 relámpago.', ataque: 'Lelo lanzó un 2x1 relámpago de 48 horas.', pista: 'agarró el 2x1 relámpago de Lelo' },
+    { rumor: 'Lelo consiguió que lo entrevisten en la radio del barrio.', ataque: 'Lelo salió en la radio del barrio contando "su emprendimiento".', pista: 'escuchó a Lelo en la radio' },
+    { rumor: 'Lelo está hablando con unos influencers amigos.', ataque: 'Tres influencers amigos de Lelo lo recomendaron en sus historias.', pista: 'lo vio recomendado por una influencer' },
+    { rumor: 'Lelo está armando combos con regalo incluido.', ataque: 'Lelo sacó combos "taza + llavero + bombón" a precio de taza sola.', pista: 'Lelo le daba taza, llavero y bombón al mismo precio' },
+    { rumor: 'tu tía dice que Lelo anda hablando mal de tus tazas.', ataque: 'Lelo le dijo a tus clientes que tus tazas se despintan en el lavavajillas.', pista: 'le dijeron que tus tazas se despintan' },
+    { rumor: 'Lelo anda prometiendo entregas en 24 horas.', ataque: 'Lelo promete "pedido hoy, taza mañana" y la gente le cree.', pista: 'Lelo se la entregaba al otro día' },
+    { rumor: 'te parece que Lelo te está copiando los diseños...', ataque: 'Lelo copió tus diseños más vendidos y los ofrece más baratos.', pista: 'Lelo tenía "el mismo diseño, pero más barato"' },
+    { rumor: 'Lelo averiguó cuánto sale una mesa en la feria.', ataque: 'Lelo puso un puesto en la feria justo al lado del tuyo, con precios más bajos.', pista: 'pasó por el puesto de Lelo en la feria' },
   ],
+  // Lelo tranquilo igual te saca algún cliente suelto.
+  pistasTranquilo: ['Lelo le hizo precio', 'es amigo de Lelo', 'Lelo se lo ofreció primero', 'la mamá de Lelo le insistió'],
+  // Si la promo falla, el cliente igual se va.
+  pistaPromoFallida: 'hiciste la promo, pero igual se fue a lo de Lelo',
+  // Con muchas cancelaciones en un día, se agrupan.
+  agruparDesde: 3,
   repMax: 70,
   // Rumor una semana antes: siempre aparece si Lelo prepara una jugada agresiva,
   // y a veces aparece aunque no la haga (falsa alarma). Así puede o no ejecutarse (~60%).
@@ -121,7 +174,7 @@ export const CLIENTES = [
   'Juanma', 'la panadería', 'Vicky', 'el gimnasio', 'Tobías', 'la escuelita de fútbol',
 ];
 
-export const PROMO = { descuento: 0.15, extraDemanda: 0.2, horas: 2 };
+export const PROMO = { descuento: 0.15, extraDemanda: 0.2, horas: 2, falla: 0.1 }; // 1 de cada 10 promos falla
 
 // Cursos cortos: 2 semanas, 5 horas por semana, $15.000. Suman puntos de actualización
 // (cada uno hasta 40) que bajan 5 por mes.
@@ -169,26 +222,112 @@ export const MERMA = [
   'Tu vieja le regaló {u} a la vecina sin avisarte.',
 ];
 
+// Mazo de eventos: uno por trimestre, de 6 cartas (3 pares de tipos distintos: uno chico, uno mediano
+// y uno grande), con al menos 2 cartas que te hacen elegir. Cada par suma cero.
+// Los montos son una parte de tu ganancia mensual (promedio de los últimos 3 meses).
 export const MAZO = {
-  // Valores de cada par (gasto y ganancia del mismo monto), como fracción de la base mensual.
-  pares: [0.1, 0.15, 0.2],
+  tamanos: { chica: 0.1, mediana: 0.2, grande: 0.35 },
   baseMinima: 80000,
-  malas: [
-    'Se quemó la resistencia de la máquina. Hubo que cambiarla.',
-    'Te labraron una multa en la feria por ocupar de más.',
-    'Corte de luz: perdiste insumos que estaban en la prensa.',
-    'El proveedor aumentó sin avisar y tuviste que pagar la diferencia.',
-    'Se te cayó una caja de tazas. Todas rotas.',
-    'Se te rompió el celular y tuviste que comprar otro para atender los mensajes.',
-  ],
-  buenas: [
-    'Un influencer local subió tu taza a sus historias. Llovieron pedidos.',
-    'La empresa de un vecino te encargó regalos para sus empleados.',
-    'Encontraste insumos en oferta y te ahorraste una buena plata.',
-    'Un cliente te pagó una deuda vieja que ya dabas por perdida.',
-    'Te encargaron los souvenirs para un cumpleaños de 15.',
-    'Ganaste un sorteo de la feria: te devolvieron las mesas del mes.',
-  ],
+  horas: { chica: 4, mediana: 8, grande: 16 },
+  rep: { chica: 1, mediana: 2, grande: 4 },
+  minDecisiones: 2,
+  // tipo → tamaño → { mala, buena }. {u} = unidades. "decision" = la carta te hace elegir.
+  cartas: {
+    plata: {
+      chica: {
+        mala: { texto: 'El proveedor aumentó sin avisar y tuviste que pagar la diferencia.' },
+        buena: { texto: 'Encontraste plata en una campera vieja. ¡Justo!' },
+      },
+      mediana: {
+        mala: { texto: 'Te cayó una multa del municipio por el cartel en la vereda.' },
+        buena: { texto: 'Te encargaron los souvenirs para un cumpleaños de 15.', decision: 'cumple15' },
+      },
+      grande: {
+        mala: { texto: 'Se quemó la resistencia de la máquina.', decision: 'resistencia' },
+        buena: { texto: 'Un cliente te pagó una deuda vieja que ya dabas por perdida.' },
+      },
+    },
+    horas: {
+      chica: {
+        mala: { texto: 'Tuviste que ir al banco a hacer un trámite: la fila daba dos vueltas a la manzana.' },
+        buena: { texto: 'Tu vieja te ordenó el taller: ahora encontrás todo al toque.' },
+      },
+      mediana: {
+        mala: { texto: 'Se viene un corte de luz programado en todo el barrio.' },
+        buena: { texto: 'Tu vieja se ofreció a darte una mano en el taller.' },
+      },
+      grande: {
+        mala: { texto: 'Te agarró una gripe de esas que te tiran en la cama.', decision: 'gripe' },
+        buena: { texto: 'Tu hermano viene de visita y se ofreció a ayudarte dos días.' },
+      },
+    },
+    stock: {
+      chica: {
+        mala: { texto: 'Se te cayó una caja: se rompió {u}.' },
+        buena: { texto: 'El proveedor te mandó de más y no lo quiere de vuelta: sumaste {u}.' },
+      },
+      mediana: {
+        mala: { texto: 'Te llegó un lote de insumos fallados.', decision: 'lote' },
+        buena: { texto: 'Un proveedor nuevo te regaló insumos para que lo pruebes: sumaste {u}.' },
+      },
+      grande: {
+        mala: { texto: 'Hubo una gotera justo arriba de las cajas: se arruinó {u}.' },
+        buena: { texto: 'Un taller que cerró te dejó lo que le quedaba: sumaste {u}.' },
+      },
+    },
+    reputacion: {
+      chica: {
+        mala: { texto: 'Te dejaron una reseña mala: "llegó bien, pero no me gustó la caja".' },
+        buena: { texto: 'Te dejaron una reseña de 5 estrellas, con foto y todo.' },
+      },
+      mediana: {
+        mala: { texto: 'Un cliente se quejó de vos en las redes.', decision: 'quejoso' },
+        buena: { texto: 'Un influencer local subió tu taza a sus historias.' },
+      },
+      grande: {
+        mala: { texto: 'Una taza tuya desteñida se hizo viral: "lo que pedí vs. lo que me llegó".' },
+        buena: { texto: 'Saliste en la radio del barrio: el locutor no paraba de hablar de tus tazas.' },
+      },
+    },
+  },
+  // Cartas que te hacen elegir (se resuelven el domingo siguiente).
+  decisiones: {
+    resistencia: {
+      pregunta: '¿Cómo la arreglás?',
+      opciones: {
+        tecnico: { texto: 'Llamar al técnico', detalle: 'Pagás el arreglo completo y listo.' },
+        vos: { texto: 'Arreglarla vos', detalle: 'Pagás el 40% en repuestos y te lleva 6 h esta semana. 1 de cada 3 veces no queda bien y hay que llamar al técnico igual.' },
+      },
+    },
+    cumple15: {
+      pregunta: 'Es para esta semana. ¿Lo agarrás?',
+      opciones: {
+        acepta: { texto: 'Aceptarlo', detalle: 'Cobrás el pedido, pero le metés 6 h extra y te cansás más.' },
+        rechaza: { texto: 'Decir que no', detalle: 'No pasa nada.' },
+      },
+    },
+    gripe: {
+      pregunta: '¿Qué hacés?',
+      opciones: {
+        trabaja: { texto: 'Trabajar igual', detalle: 'No perdés horas, pero el cansancio se te va por las nubes.' },
+        descansa: { texto: 'Hacer reposo', detalle: 'Perdés 16 h esta semana.' },
+      },
+    },
+    lote: {
+      pregunta: '¿Qué hacés con el lote?',
+      opciones: {
+        reclama: { texto: 'Reclamar al proveedor', detalle: 'Te lo cambian, pero el reclamo te lleva 4 h esta semana.' },
+        usa: { texto: 'Usarlo igual', detalle: 'No perdés horas, pero 1 de cada 2 veces algún cliente lo nota (−2 de reputación).' },
+      },
+    },
+    quejoso: {
+      pregunta: '¿Le contestás?',
+      opciones: {
+        contesta: { texto: 'Contestarle bien', detalle: 'Te lleva 2 h esta semana y recuperás la mitad (−1 de reputación).' },
+        ignora: { texto: 'Ignorarlo', detalle: '−2 de reputación.' },
+      },
+    },
+  },
 };
 
 // ---------- Equipo ----------
@@ -230,7 +369,6 @@ export const NOMBRES_EMPLEADOS = [
 export const NOMBRES_FEMENINOS = ['Yésica', 'Romina', 'Daiana', 'Micaela', 'Ailén', 'Abril', 'Luz', 'Milagros', 'Belén', 'Celeste'];
 
 export const EQUIPO = {
-  cupoCiudad: 2, // además de Lelo
   bolsa: { horas: 3, candidatos: 3, recargo: 0.2 }, // ves todo, pero cobran un 20% más que la media
   chuchu: { descuento: 0.2, semanasAfuera: 4 }, // cobran un 20% menos, no se ven los rasgos, nunca renuncian
   anuncio: { costo: 5000, paso: 5000 }, // fijás el sueldo; el candidato llega el domingo siguiente
@@ -248,6 +386,23 @@ export const CAPACITACION = {
 };
 
 export const LELO_EMPLEADO = { sueldo: 40000, exp: 60, horas: 20 };
+
+// Al ganar la ciudad, Lelo cierra y se va un mes de viaje antes de trabajar para vos.
+export const LELO_VIAJE = {
+  semanas: 4,
+  probFoto: 0.5,
+  fotos: [
+    'Lelo subió una foto con un choclo en la playa de Mar del Plata.',
+    'Lelo subió una historia: "Primer día sin pensar en tazas 🌊".',
+    'Lelo se insoló durmiendo en la playa. Subió una foto rojo como un camarón.',
+    'Lelo te mandó una foto con un lobo marino. El lobo marino parece más contento.',
+    'Lelo subió un video comiendo churros en la Rambla. Ya no le queda casi plata.',
+    'Lelo le escribió al grupo de la familia: "Acá todo bien, ¿y por allá qué onda el negocio?".',
+  ],
+};
+
+// Rival de la provincia (todavía no se juega: solo se muestra en la barra).
+export const TRAICIO = { nombre: 'Traicio Nero', empresa: 'Talleres Judas' };
 
 // ---------- Chuchu: el amigo que siempre tiene un conocido ----------
 export const CHUCHU = {
@@ -283,10 +438,10 @@ export const CHUCHU = {
 export const TUTORIAL = {
   1: 'Tío: "Bueno, campeón. Ya tenés la máquina de tazas. Así funciona: el domingo arrancás la semana haciendo publicidad en redes, durante la semana te llegan pedidos, el sábado producís y el domingo entregás. Tenés 40 horas por semana, pero no te mates: pasadas las 25 te empezás a cansar. Cuando yo arranqué, con un par de horas de publicidad me alcanzaba. Y las horas que te sobren, aprovechalas para estudiar."',
   2: 'Tío: "Cuantas más horas de publicidad, más pedidos te llegan... hasta que el mercado se agota. Fijate qué te dicen al final de la semana y ajustá: eso no te lo enseña nadie."',
-  3: 'Tío: "Si aceptás un pedido y no lo entregás, quedás mal y perdés reputación. Si ves que no llegás, rechazalo a tiempo: perdés poquito. Y la reputación es lo que hace que te pidan más."',
+  3: 'Tío: "Si aceptás un pedido y no lo entregás, quedás mal y perdés reputación. Si ves que no llegás, rechazalo a tiempo: perdés poquito. Y la reputación es lo que hace que te pidan más. Ah, y fijate en el calendario: se viene San Valentín. Las fechas especiales se avisan con tiempo y la gente pide cada vez más hasta el día. Prepará stock."',
   4: 'Tío: "Fin de mes: se pagan la luz, internet y la publicidad. Y me enteré de que tu primo Lelo también arrancó a vender tazas en el barrio... A ver quién la pega. Si escuchás algún rumor sobre él, prestale atención."',
   5: 'Tío: "¿Probaste la feria? Es el domingo: llevás lo que te sobró de stock, pagás la mesa y te lleva el día, pero vendés. Si el sábado producís unas de más, el domingo tenés qué llevar. Y no acumules mucho: lo que queda guardado siempre se termina rompiendo."',
   6: 'Tío: "En este negocio siempre pasa algo: a veces se rompe todo y a veces te cae un pedido del cielo. A la larga se compensa, pero hay que tener un colchón de plata."',
   7: 'Tío: "Si trabajás siempre al máximo te cansás y empezás a mandarte macanas. Descansá. Cuando no te den las horas, contratá a alguien: en la bolsa del municipio ves todo pero son caros; tu amigo Chuchu siempre tiene un conocido barato y de confianza, y si ponés un anuncio, el sueldo lo fijás vos."',
-  8: 'Tío: "¡Feliz cumpleaños! Desde marzo arranca la época fuerte: en invierno las tazas vuelan, y para el Día del Padre ni te cuento. Prepará stock. Acá termina tu entrenamiento."',
+  8: 'Tío: "¡Feliz cumpleaños! Desde marzo arranca la época fuerte: en invierno las tazas vuelan. Y casi todos los meses hay una fecha especial: el Día de la Mujer, Pascuas, el 25 de Mayo, el Día del Padre, el del Amigo... Prepará stock. Ah, y cuando termines de pagarme, si quedé contento, te puedo volver a prestar para la próxima máquina. Acá termina tu entrenamiento."',
 };

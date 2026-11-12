@@ -51,7 +51,12 @@ function planRazonable(e, conEquipo = true) {
     const p2 = { producir };
     for (let i = 0; i < 300 && !validarPlan(e, p2).ok; i++) {
       const id = ids.find((x) => p2.producir[x] > pedidas[x] - e.stock[x] && p2.producir[x] > 0) || ids.find((x) => p2.producir[x] > 0);
-      if (id) p2.producir[id]--; else break;
+      if (id) p2.producir[id]--;
+      else {
+        // Sin producción y sigue sin entrar: rechaza un pedido con servicio especial
+        const conServicio = sem.pedidos.find((x) => !x.rechazado && (x.envio || x.diseno));
+        if (conServicio) conServicio.rechazado = true; else break;
+      }
     }
     return p2.producir;
   };
@@ -211,8 +216,10 @@ chequear(ph < pa, 'La promo rinde menos cuando el rumor era humo');
   e.rep = 99.9;
   e.stock.tazaCeramica = 20; e.stock.tazaPlastico = 20;
   jugarSemana(e, { horasRedes: 6, producir: {} });
+  chequear(e.mejorDeLaCiudad && !e.equipo.empleados.some((x) => x.esLelo), 'Al ganar la ciudad, Lelo se va un mes de viaje');
+  for (let i = 0; i < 4; i++) jugarSemana(e, { horasRedes: 2, producir: {} });
   const lelo = e.equipo.empleados.find((x) => x.esLelo);
-  chequear(e.mejorDeLaCiudad && Boolean(lelo) && lelo.exp === 60 && lelo.sueldo === 40000, 'Al ganar la ciudad, Lelo entra con experiencia 60 y $40.000');
+  chequear(Boolean(lelo) && lelo.exp === 60 && lelo.sueldo === 40000, 'Cuatro semanas después, Lelo entra con experiencia 60 y $40.000');
   // El operario produce por vos: tus horas bajan
   const f = nuevaPartida('A', 77);
   f.plata = 500000;

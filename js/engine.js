@@ -3,10 +3,11 @@ import {
   HORAS_POR_SEMANA, SEMANAS_POR_ANIO, MESES, MAQUINAS, PRODUCTOS, FECHAS_ESPECIALES, RAMPA_FECHA,
   PRESTAMO, GASTOS_FIJOS, VENTAS, REPUTACION, PRIMO, CURSOS, CURSO_MAX_PUNTOS, CURSO_BAJA_POR_MES, MAZO, TUTORIAL, PROMO, CLIENTES,
   MAZO_FERIA, PROB_CARTA_FERIA, MERMA, CANSANCIO, PUESTOS, RASGOS, NOMBRES_EMPLEADOS, EQUIPO, CAPACITACION,
-  LELO_EMPLEADO, CHUCHU, NOMBRES_FEMENINOS,
+  LELO_EMPLEADO, CHUCHU, NOMBRES_FEMENINOS, CYBER, CONFIANZA, ORDEN_MAQUINAS, MAQUINAS_FUTURAS, LOCALES, VOLANTES,
+  SERVICIOS, LELO_VIAJE, TRAICIO,
 } from './data.js';
 
-export const VERSION_PARTIDA = 2;
+export const VERSION_PARTIDA = 3;
 
 // ---------- Azar con semilla (para poder guardar y reproducir partidas) ----------
 function siguienteAzar(estado) {
@@ -43,32 +44,52 @@ function semanaPico(f) {
   return MESES.slice(0, f.mes).reduce((s, m) => s + m.semanas, 0) + f.semana;
 }
 
-// Fecha especial que se viene (o es esta semana): { fecha, faltan } con faltan entre 0 y 3.
-export function fechaProxima(semana) {
+// Fechas especiales que se vienen (o son esta semana): [{ fecha, faltan }] con faltan entre 0 y 3.
+// Pueden coincidir dos: los efectos se multiplican.
+export function fechasProximas(semana) {
   const enAnio = calendario(semana).semanaEnAnio;
+  const lista = [];
   for (const f of FECHAS_ESPECIALES) {
     const faltan = semanaPico(f) - enAnio;
-    if (faltan >= 0 && faltan <= 3) return { fecha: f, faltan };
+    if (faltan >= 0 && faltan <= 3) lista.push({ fecha: f, faltan });
   }
-  return null;
+  return lista;
 }
 
-export function multiplicadorFecha(semana, idProducto) {
-  const p = fechaProxima(semana);
-  const efecto = p?.fecha.efecto[idProducto];
-  if (!efecto) return 1;
-  return 1 + (efecto - 1) * RAMPA_FECHA[p.faltan];
+export function fechaProxima(semana) {
+  return fechasProximas(semana)[0] || null;
+}
+
+// ¿Es la semana del CyberMonday? (se puede sumar bajando los precios)
+export function esSemanaCyber(semana) {
+  return fechasProximas(semana).some((p) => p.fecha.cyber && p.faltan === 0);
+}
+
+export function multiplicadorFecha(semana, idProducto, conCyber = false) {
+  let m = 1;
+  for (const p of fechasProximas(semana)) {
+    const efecto = p.fecha.efecto[idProducto] ?? p.fecha.efecto.todo;
+    if (!efecto) continue;
+    if (p.fecha.cyber) { if (p.faltan === 0 && conCyber) m *= efecto; continue; }
+    m *= 1 + (efecto - 1) * RAMPA_FECHA[p.faltan];
+  }
+  return m;
 }
 
 // Pista sin números para el jugador.
 export function avisoFecha(semana) {
-  const p = fechaProxima(semana);
-  if (!p) return null;
-  const n = p.fecha.nombre;
-  if (p.faltan === 3) return `Se viene ${n}: la gente empieza a pedir más, ya están buscando regalos.`;
-  if (p.faltan === 2) return `Faltan 2 semanas para ${n}: cada vez más gente busca regalos.`;
-  if (p.faltan === 1) return `Falta 1 semana para ${n}: hay mucha gente buscando regalos.`;
-  return `¡Esta semana termina con ${n}! Es la última para comprar regalos: hay muchísima gente buscando.`;
+  const textos = fechasProximas(semana).map(({ fecha, faltan }) => {
+    const n = fecha.nombre;
+    if (fecha.cyber) {
+      if (faltan > 0) return `Se viene ${n} (falta${faltan > 1 ? 'n' : ''} ${faltan} semana${faltan > 1 ? 's' : ''}): ese día la gente compra de todo, pero solo si hay descuento.`;
+      return `¡Es la semana del ${n.replace('el ', '')}! Si bajás los precios un ${Math.round(CYBER.descuento * 100)}%, te piden mucho más de todo.`;
+    }
+    if (faltan === 3) return `Se viene ${n}: la gente empieza a pedir más, ya están buscando regalos.`;
+    if (faltan === 2) return `Faltan 2 semanas para ${n}: cada vez más gente busca regalos.`;
+    if (faltan === 1) return `Falta 1 semana para ${n}: hay mucha gente buscando regalos.`;
+    return `¡Esta semana termina con ${n}! Es la última para comprar regalos: hay muchísima gente buscando.`;
+  });
+  return textos.length ? textos.join(' ') : null;
 }
 
 // ---------- Fórmulas ----------
@@ -101,12 +122,32 @@ export function migrarPartida(e) {
     e.equipo = equipoVacio();
     if (e.mejorDeLaCiudad) sumarLelo(e);
   }
+  // Versión 3: préstamos que se repiten, confianza nueva, experiencia por máquina, local y mazo nuevo
+  const p = e.prestamo;
+  if (p.monto === undefined) {
+    Object.assign(p, { numero: 1, monto: PRESTAMO.monto, inicio: 1 });
+    if (p.opcion === 'A') p.total = PRESTAMO.A.total;
+    else Object.assign(p, { cuota: PRESTAMO.B.cuota, cuotas: PRESTAMO.B.cuotas });
+  }
+  if (e.tio.historial === undefined) e.tio.historial = limitar(Math.round((e.tio.confianza ?? 50) / 2), 0, 50);
+  if (!e.retraso) e.retraso = {};
+  for (const emp of e.equipo.empleados) if (!emp.retraso) emp.retraso = {};
+  if (!e.local) e.local = 'casa';
+  if (e.horasAyuda === undefined) { e.horasAyuda = 0; e.horasPerdidas = 0; e.decision = null; }
+  if (e.mazo.cartas.some((c) => !c.clase)) e.mazo = { trimestre: -1, cartas: [] };
+  e.tio.confianza = confianzaTio(e);
   e.version = VERSION_PARTIDA;
   return e;
 }
 
+// Experiencia en una máquina: al comprar una nueva arrancás en ella con la mitad de tu experiencia.
+// Lo que te falta (retraso) se recupera produciendo en esa máquina.
+export function expEn(x, maquina) {
+  return Math.max(0, x.exp - (x.retraso?.[maquina] || 0));
+}
+
 export function horasPorUnidad(e, idProducto) {
-  return PRODUCTOS[idProducto].horas * Math.max(0.35, 1 - e.exp * 0.016);
+  return PRODUCTOS[idProducto].horas * Math.max(0.35, 1 - expEn(e, PRODUCTOS[idProducto].maquina) * 0.016);
 }
 
 // Curso de redes: cada punto hace que la publicidad rinda un 1% más.
@@ -115,15 +156,15 @@ export function horasPorVenta(e) {
 }
 
 // Curso de sublimación: 10 puntos bajan los errores un 12,5% (40 puntos, a la mitad).
-export function probabilidadError(e) {
+export function probabilidadError(e, maquina = 'tazas') {
   const f = e.formacion;
-  return limitar(0.04 * (1 - e.exp / 125) * (1 + e.cansancio / 40) * (1 - f.fija / 200) * (1 - f.cursos.sublimacion / 80), 0.005, 0.5);
+  return limitar(0.04 * (1 - expEn(e, maquina) / 125) * (1 + e.cansancio / 40) * (1 - f.fija / 200) * (1 - f.cursos.sublimacion / 80), 0.005, 0.5);
 }
 
-export function probabilidadErrorEmpleado(emp) {
+export function probabilidadErrorEmpleado(emp, maquina = 'tazas') {
   const variante = emp.esLelo ? 1 : PUESTOS[emp.puesto].variantes[emp.variante].errores ?? 1;
   const rasgo = emp.rasgo === 'prolijo' ? 0.5 : emp.rasgo === 'distraido' ? 1.5 : 1;
-  return limitar(0.04 * (1 - emp.exp / 125) * variante * rasgo, 0.005, 0.5);
+  return limitar(0.04 * (1 - expEn(emp, maquina) / 125) * variante * rasgo, 0.005, 0.5);
 }
 
 // Curso de ventas: 10 puntos venden un 25% más en la feria.
@@ -135,27 +176,96 @@ export function stockTotal(e) {
   return Object.values(e.stock).reduce((s, x) => s + x, 0);
 }
 
+export function localActual(e) {
+  return LOCALES[e.local || 'casa'];
+}
+
 export function luzDelMes(e) {
-  return GASTOS_FIJOS.luz + Object.keys(e.maquinas).filter((m) => e.maquinas[m])
+  return GASTOS_FIJOS.luz + localActual(e).luz + Object.keys(e.maquinas).filter((m) => e.maquinas[m])
     .reduce((s, m) => s + MAQUINAS[m].luzExtra, 0);
 }
 
 export function gastosFijosDelMes(e) {
-  return luzDelMes(e) + GASTOS_FIJOS.internet + GASTOS_FIJOS.publicidad;
+  return luzDelMes(e) + GASTOS_FIJOS.internet + GASTOS_FIJOS.publicidad + localActual(e).alquiler;
 }
 
-export function costoPagoAnticipadoA(semana) {
-  const s = Math.min(semana, PRESTAMO.A.semanaVence);
-  return Math.round(PRESTAMO.monto + PRESTAMO.A.interes * (s / PRESTAMO.A.semanaVence));
+// Pago anticipado de la opción A: el interés se cobra proporcional a las semanas que pasaron.
+// Sin préstamo, calcula el del primer préstamo (arranca en la semana 1).
+export function costoPagoAnticipadoA(semana, p = { monto: PRESTAMO.monto, total: PRESTAMO.A.total, inicio: 1 }) {
+  const transcurridas = limitar(semana - p.inicio + 1, 0, PRESTAMO.A.semanaVence);
+  return Math.round(p.monto + (p.total - p.monto) * (transcurridas / PRESTAMO.A.semanaVence));
+}
+
+export function semanaVencimientoA(p) {
+  return p.inicio + PRESTAMO.A.semanaVence - 1;
+}
+
+// ---------- Confianza del tío: historial de pago (hasta 50) + reputación (hasta 50) ----------
+export function metasGanadas(e) {
+  return e.mejorDeLaCiudad ? 1 : 0;
+}
+
+export function confianzaTio(e) {
+  const historial = limitar(e.tio.historial ?? CONFIANZA.historialInicial, 0, 50);
+  let porRep = CONFIANZA.porMeta * metasGanadas(e) + e.rep / CONFIANZA.repDivisor;
+  if (!metasGanadas(e) && e.rep < CONFIANZA.repMala && e.semana > 12) porRep += CONFIANZA.restaRepMala;
+  return Math.round(historial + limitar(porRep, 0, 50));
+}
+
+function sumarHistorial(e, d) {
+  e.tio.historial = limitar((e.tio.historial ?? CONFIANZA.historialInicial) + d, 0, 50);
+  e.tio.confianza = confianzaTio(e);
+}
+
+// Próxima máquina en el orden del juego (o una que todavía no está en esta versión).
+export function proximaMaquina(e) {
+  const id = ORDEN_MAQUINAS.find((m) => !e.maquinas[m]);
+  if (!id) return null;
+  if (MAQUINAS[id]) return { id, ...MAQUINAS[id], disponible: true };
+  return { id, ...MAQUINAS_FUTURAS[id], disponible: false };
+}
+
+// ¿Te presta el tío otra vez? Solo con el préstamo anterior pagado y sin estar enojado.
+// El tope va del 25% al 75% del precio de la próxima máquina, según la confianza.
+export function prestamoDisponible(e) {
+  const p = e.prestamo;
+  if (!p.pagado) return { ok: false, motivo: 'El tío te vuelve a prestar cuando termines de pagarle.' };
+  if (e.tio.enojado) return { ok: false, motivo: 'El tío está enojado: no te va a prestar más.' };
+  const m = proximaMaquina(e);
+  if (!m) return { ok: false, motivo: 'Ya tenés todas las máquinas.' };
+  if (!m.disponible) return { ok: false, motivo: `La próxima máquina es la ${m.nombre.toLowerCase()}: llega en la próxima versión del juego.` };
+  const conf = confianzaTio(e);
+  const parte = PRESTAMO.tope.min + (PRESTAMO.tope.max - PRESTAMO.tope.min) * (conf / 100);
+  const tope = Math.floor((m.precio * parte) / 1000) * 1000;
+  return { ok: true, maquina: m, tope, parte, confianza: conf };
+}
+
+export function pedirPrestamo(e, opcion, monto) {
+  const d = prestamoDisponible(e);
+  if (!d.ok) return d;
+  if (e.semanaEnCurso) return { ok: false, motivo: 'Con el tío se habla el domingo.' };
+  if (!['A', 'B'].includes(opcion)) return { ok: false, motivo: 'Elegí la opción A o la B.' };
+  monto = Math.round(monto / 1000) * 1000;
+  if (!(monto >= 10000)) return { ok: false, motivo: 'Pedile al menos $10.000.' };
+  if (monto > d.tope) return { ok: false, motivo: `El tío te presta hasta ${plata$(d.tope)}.` };
+  const numero = (e.prestamo.numero || 1) + 1;
+  e.prestamo = opcion === 'A'
+    ? { opcion: 'A', numero, monto, inicio: e.semana, total: Math.round(monto * (1 + PRESTAMO.interesA)), deuda: Math.round(monto * (1 + PRESTAMO.interesA)), pagado: false, vencido: false }
+    : { opcion: 'B', numero, monto, inicio: e.semana, cuota: Math.round((monto * (1 + PRESTAMO.interesB)) / PRESTAMO.B.cuotas / 100) * 100, cuotas: PRESTAMO.B.cuotas, cuotasPagadas: 0, cuotasPerdonadas: 0, atrasadas: 0, pagado: false };
+  e.plata += monto;
+  const detalle = opcion === 'A'
+    ? `me devolvés ${plata$(e.prestamo.total)} en un año, o menos si me pagás antes`
+    : `me pagás ${e.prestamo.cuotas} cuotas de ${plata$(e.prestamo.cuota)}`;
+  return { ok: true, mensaje: `Tío: "Te presto ${plata$(monto)} para la ${d.maquina.nombre.toLowerCase()}: ${detalle}. Confío en vos."` };
 }
 
 // Demanda esperada por producto (sin azar), para mostrar pistas al jugador.
-export function demandaEsperada(e, idProducto, semana = e.semana) {
+export function demandaEsperada(e, idProducto, semana = e.semana, conCyber = false) {
   const p = PRODUCTOS[idProducto];
   if (!e.maquinas[p.maquina]) return 0;
   const c = calendario(semana);
   const temporada = p.temporada[c.estacion] ?? 1;
-  const especial = multiplicadorFecha(semana, idProducto);
+  const especial = multiplicadorFecha(semana, idProducto, conCyber);
   const ml = e.rep >= VENTAS.reputacionMercadoLibre ? 1 + VENTAS.extraMercadoLibre : 1;
   return p.base * multiplicadorProducto(e.rep, p.sens) * temporada * especial * ml;
 }
@@ -182,8 +292,25 @@ export function mediaSueldo(e, puesto, variante) {
   return Math.round((PUESTOS[puesto].variantes[variante].sueldo * e.equipo.mercado) / 1000) * 1000;
 }
 
-export function cupoEquipo() {
-  return EQUIPO.cupoCiudad;
+export function cupoEquipo(e) {
+  return localActual(e).cupo;
+}
+
+// Local: en tu casa entran 2 empleados; para más, alquilás un local (alquiler y luz por mes).
+export function alquilarLocal(e) {
+  if (e.semanaEnCurso) return { ok: false, motivo: 'Eso se arregla el domingo.' };
+  if (e.local === 'chico') return { ok: false, motivo: 'Ya alquilás un local.' };
+  e.local = 'chico';
+  const l = LOCALES.chico;
+  return { ok: true, mensaje: `Alquilaste un local chico: entran hasta ${l.cupo} empleados. Pagás ${plata$(l.alquiler)} de alquiler y ${plata$(l.luz)} más de luz por mes.` };
+}
+
+export function dejarLocal(e) {
+  if (e.semanaEnCurso) return { ok: false, motivo: 'Eso se arregla el domingo.' };
+  if ((e.local || 'casa') === 'casa') return { ok: false, motivo: 'Ya trabajás en tu casa.' };
+  if (empleadosContratados(e) > LOCALES.casa.cupo) return { ok: false, motivo: `En tu casa entran ${LOCALES.casa.cupo} empleados: primero tenés que achicar el equipo.` };
+  e.local = 'casa';
+  return { ok: true, mensaje: 'Devolviste el local y volviste a trabajar en tu casa.' };
 }
 
 export function empleadosContratados(e) {
@@ -318,7 +445,7 @@ export function contratar(e, origen, indice = 0) {
   if (empleadosContratados(e) >= cupoEquipo(e)) return { ok: false, motivo: `En la ciudad podés tener hasta ${cupoEquipo(e)} empleados (además de Lelo).` };
   const emp = {
     ...c, id: `emp${e.equipo.siguienteId++}`, desde: e.semana, semanasMes: 0, capacitadoMes: false,
-    desganado: false, pideAumento: null, falta: false, semanasTrabajadas: 0,
+    desganado: false, pideAumento: null, falta: false, semanasTrabajadas: 0, retraso: {},
     proximaQueja: e.semana + EQUIPO.mesesQuejoso * 4 + 2, leal: origen === 'chuchu',
   };
   delete emp.frase;
@@ -390,6 +517,7 @@ export function horasEmpleado(e, emp, sem = e.semanaEnCurso) {
   if (emp.desganado) h *= EQUIPO.desganoQuejoso;
   if (sem?.capacitacion === 'curso') h -= CAPACITACION.curso.horas;
   if (sem?.feriaVendedor === emp.id) h -= VENTAS.feria.horas;
+  if (sem?.volantesVendedor === emp.id) h -= VOLANTES.horas;
   return Math.max(0, redondear(h, 1));
 }
 
@@ -397,23 +525,30 @@ export function presentes(e, puesto) {
   return e.equipo.empleados.filter((x) => !x.falta && (!puesto || x.puesto === puesto));
 }
 
-function horasPorUnidadExp(exp, idProducto) {
-  return PRODUCTOS[idProducto].horas * Math.max(0.35, 1 - exp * 0.016);
+function horasPorUnidadEmp(emp, idProducto) {
+  return PRODUCTOS[idProducto].horas * Math.max(0.35, 1 - expEn(emp, PRODUCTOS[idProducto].maquina) * 0.016);
 }
 
 function horasPorVentaExp(exp, cursoRedes = 0) {
   return VENTAS.horasPorVentaRedes * (1 - exp / 200) * (1 - cursoRedes / 100);
 }
 
+// Pedidos aceptados que piden envío a domicilio o diseño personalizado.
+export function serviciosDeLaSemana(sem) {
+  const activos = (sem?.pedidos || []).filter((p) => !p.rechazado);
+  return { envios: activos.filter((p) => p.envio).length, diseno: activos.filter((p) => p.diseno) };
+}
+
 // Reparte la producción: primero los operarios (con sus horas), lo que no les entra lo hacés vos.
+// Después, los envíos los hace un operario con horas libres (si no, vos), y el diseño personalizado lo hacés vos.
 export function repartirProduccion(e, producir, sem = e.semanaEnCurso) {
-  const operarios = presentes(e, 'operario').map((emp) => ({ emp, libres: horasEmpleado(e, emp, sem), unidades: {}, horas: 0 }));
-  const vos = { unidades: {}, horas: 0 };
+  const operarios = presentes(e, 'operario').map((emp) => ({ emp, libres: horasEmpleado(e, emp, sem), unidades: {}, horas: 0, envios: 0 }));
+  const vos = { unidades: {}, horas: 0, envios: 0, horasDiseno: 0 };
   for (const [id, n] of Object.entries(producir || {})) {
     for (let i = 0; i < (n || 0); i++) {
-      const o = operarios.find((x) => x.libres + 1e-9 >= horasPorUnidadExp(x.emp.exp, id));
+      const o = operarios.find((x) => x.libres + 1e-9 >= horasPorUnidadEmp(x.emp, id));
       if (o) {
-        const h = horasPorUnidadExp(o.emp.exp, id);
+        const h = horasPorUnidadEmp(o.emp, id);
         o.libres -= h; o.horas += h; o.unidades[id] = (o.unidades[id] || 0) + 1;
       } else {
         vos.horas += horasPorUnidad(e, id);
@@ -421,6 +556,13 @@ export function repartirProduccion(e, producir, sem = e.semanaEnCurso) {
       }
     }
   }
+  const serv = serviciosDeLaSemana(sem);
+  for (let i = 0; i < serv.envios; i++) {
+    const o = operarios.find((x) => x.libres + 1e-9 >= SERVICIOS.envio.horas);
+    if (o) { o.libres -= SERVICIOS.envio.horas; o.horas += SERVICIOS.envio.horas; o.envios++; } else { vos.horas += SERVICIOS.envio.horas; vos.envios++; }
+  }
+  for (const p of serv.diseno) vos.horasDiseno += p.cantidad * horasPorUnidad(e, p.producto) * SERVICIOS.diseno.tiempoExtra;
+  vos.horas += vos.horasDiseno;
   return { operarios, vos };
 }
 
@@ -476,6 +618,11 @@ function inicioDeSemana(e, evento) {
     ch.excusa = null;
   }
   ch.candidato = ch.llamadoSemana === e.semana ? ch.candidato : null;
+  if (e.leloVuelve && e.semana >= e.leloVuelve && leloDeViaje(e)) {
+    sumarLelo(e);
+    e.leloVuelve = null;
+    evento?.(`🏖️ Lelo volvió bronceado y sin un peso. Te golpeó la puerta: "Primo... ¿no necesitarás a alguien?" Desde ahora trabaja para vos: operario con experiencia ${LELO_EMPLEADO.exp}, ${plata$(LELO_EMPLEADO.sueldo)} por mes.`, 'hito');
+  }
 }
 
 // Cierre de mes del equipo: sueldos, olvido, quejas y media del mercado.
@@ -530,7 +677,12 @@ function sumarLelo(e) {
     id: 'lelo', nombre: 'Lelo', esLelo: true, puesto: 'operario', variante: 'operario', origen: 'familia',
     sueldo: LELO_EMPLEADO.sueldo, exp: LELO_EMPLEADO.exp, rasgo: null, rasgoVisible: true, leal: true,
     desde: e.semana, semanasMes: 0, capacitadoMes: false, desganado: false, pideAumento: null, falta: false, semanasTrabajadas: 0,
+    retraso: {},
   });
+}
+
+export function leloDeViaje(e) {
+  return e.mejorDeLaCiudad && !e.equipo.empleados.some((x) => x.esLelo);
 }
 
 // ---------- Partida nueva ----------
@@ -549,9 +701,9 @@ export function nuevaPartida(opcionPrestamo, semilla = Date.now() >>> 0) {
     formacion: { fija: 0, cursos: { sublimacion: 0, redes: 0, ventas: 0 } },
     curso: { id: null, semanasRestantes: 0 },
     prestamo: opcionPrestamo === 'A'
-      ? { opcion: 'A', pagado: false, deuda: PRESTAMO.A.total, vencido: false }
-      : { opcion: 'B', cuotasPagadas: 0, cuotasPerdonadas: 0, atrasadas: 0, pagado: false },
-    tio: { confianza: 50, enojado: false },
+      ? { opcion: 'A', numero: 1, monto: PRESTAMO.monto, inicio: 1, total: PRESTAMO.A.total, pagado: false, deuda: PRESTAMO.A.total, vencido: false }
+      : { opcion: 'B', numero: 1, monto: PRESTAMO.monto, inicio: 1, cuota: PRESTAMO.B.cuota, cuotas: PRESTAMO.B.cuotas, cuotasPagadas: 0, cuotasPerdonadas: 0, atrasadas: 0, pagado: false },
+    tio: { confianza: 0, historial: CONFIANZA.historialInicial, enojado: false },
     primo: { nombre: PRIMO.nombre, rep: 0, comportamiento: 'tranquilo', proximo: null, rumor: null },
     mazo: { trimestre: -1, cartas: [] },
     finanzas: { mesActual: 0, meses: [] },
@@ -563,7 +715,15 @@ export function nuevaPartida(opcionPrestamo, semilla = Date.now() >>> 0) {
     semanaEnCurso: null,
     mazoFeria: [],
     equipo: equipoVacio(),
+    retraso: {}, // experiencia que te falta en cada máquina nueva
+    local: 'casa',
+    horasAyuda: 0, // horas extra de esta semana (alguien te da una mano: no cansan)
+    horasPerdidas: 0, // horas que perdés esta semana (trámites, cortes, gripe...)
+    decision: null, // carta del mazo que espera que elijas
+    volantesSemana: null,
+    leloVuelve: null,
   };
+  e.tio.confianza = confianzaTio(e);
   prepararMazo(e);
   planearPrimo(e);
   inicioDeSemana(e);
@@ -588,6 +748,8 @@ function planearPrimo(e) {
 }
 
 // ---------- Mazo de eventos (balanceado por trimestre) ----------
+// 6 cartas: 3 pares de tipos distintos (plata, horas, stock, reputación), uno chico, uno mediano
+// y uno grande, con al menos 2 cartas que te hacen elegir. Cada par suma cero.
 function baseMazo(e) {
   const ultimos = e.finanzas.meses.slice(-3);
   const promedio = ultimos.length ? ultimos.reduce((s, v) => s + v, 0) / ultimos.length : 0;
@@ -602,29 +764,103 @@ function mezclar(e, lista) {
   return lista;
 }
 
+const TIPOS_CARTA = ['plata', 'horas', 'stock', 'reputacion'];
+const TAMANOS = ['chica', 'mediana', 'grande'];
+
+function decisionesDelPar(tipo, tamano) {
+  const par = MAZO.cartas[tipo][tamano];
+  return (par.mala.decision ? 1 : 0) + (par.buena.decision ? 1 : 0);
+}
+
+// Elige qué par va en cada tamaño. En el tutorial, el chico es de plata (la carta de la semana 6).
+function elegirPares(e, tutorial) {
+  let elegidos = null;
+  for (let intento = 0; intento < 200; intento++) {
+    const tipos = mezclar(e, [...TIPOS_CARTA]).slice(0, 3);
+    const tamanos = mezclar(e, [...TAMANOS]);
+    if (tutorial) {
+      if (!tipos.includes('plata')) continue;
+      const i = tipos.indexOf('plata');
+      const j = tamanos.indexOf('chica');
+      [tamanos[i], tamanos[j]] = [tamanos[j], tamanos[i]];
+    }
+    const pares = tipos.map((tipo, i) => ({ tipo, tamano: tamanos[i] }));
+    elegidos = pares;
+    if (pares.reduce((t, x) => t + decisionesDelPar(x.tipo, x.tamano), 0) >= MAZO.minDecisiones) break;
+  }
+  return elegidos;
+}
+
 function prepararMazo(e) {
   const trimestre = Math.floor((e.semana - 1) / 13);
   if (e.mazo.trimestre === trimestre) return;
   const base = baseMazo(e);
-  const malas = mezclar(e, [...MAZO.malas]);
-  const buenas = mezclar(e, [...MAZO.buenas]);
   let cartas = [];
-  MAZO.pares.forEach((v, i) => {
-    const monto = Math.round((base * v) / 1000) * 1000;
-    cartas.push({ tipo: 'mala', monto, texto: malas[i] });
-    cartas.push({ tipo: 'buena', monto, texto: buenas[i] });
-  });
+  for (const { tipo, tamano } of elegirPares(e, trimestre === 0)) {
+    const monto = Math.round((base * MAZO.tamanos[tamano]) / 1000) * 1000;
+    for (const lado of ['mala', 'buena']) {
+      const def = MAZO.cartas[tipo][tamano][lado];
+      cartas.push({ tipo: lado, clase: tipo, tamano, monto, texto: def.texto, decision: def.decision || null });
+    }
+  }
   cartas = mezclar(e, cartas);
   const inicio = trimestre * 13 + 1;
   let semanas = [1, 3, 5, 7, 9, 11].map((d) => inicio + d);
   if (trimestre === 0) {
-    // Tutorial: la primera carta sale en la semana 6 y es un gasto chico.
+    // Tutorial: la primera carta sale en la semana 6 y es un gasto chico de plata.
     semanas = [6, 7, 9, 10, 11, 13];
-    const idx = cartas.findIndex((c) => c.tipo === 'mala' && c.monto === Math.min(...cartas.map((x) => x.monto)));
+    const idx = cartas.findIndex((c) => c.tipo === 'mala' && c.clase === 'plata' && c.tamano === 'chica');
     const [chica] = cartas.splice(idx, 1);
     cartas.unshift(chica);
   }
   e.mazo = { trimestre, cartas: cartas.map((c, i) => ({ ...c, semana: semanas[i] })) };
+}
+
+// Precio de referencia para pasar un monto a unidades de stock.
+function precioReferencia(e) {
+  const ids = Object.keys(PRODUCTOS).filter((id) => e.maquinas[PRODUCTOS[id].maquina]);
+  return ids.reduce((t, id) => t + PRODUCTOS[id].precio, 0) / ids.length;
+}
+
+function aplicarCarta(e, carta, r, evento) {
+  const signo = carta.tipo === 'mala' ? -1 : 1;
+  const tipoEv = carta.tipo;
+  if (carta.decision) {
+    e.decision = { id: carta.decision, texto: carta.texto, monto: carta.monto };
+    evento(`📌 ${carta.texto} Lo decidís el domingo.`, tipoEv);
+    return;
+  }
+  if (carta.clase === 'plata') {
+    e.plata += signo * carta.monto;
+    if (signo < 0) r.gastos += carta.monto; else r.ingresos += carta.monto;
+    evento(`${carta.texto} (${signo < 0 ? '−' : '+'}$${fmt(carta.monto)})`, tipoEv);
+  } else if (carta.clase === 'horas') {
+    const h = MAZO.horas[carta.tamano];
+    if (signo < 0) e.horasPerdidas += h; else e.horasAyuda += h;
+    evento(`${carta.texto} (la semana que viene tenés ${h} h ${signo < 0 ? 'menos' : 'más, que no te cansan'})`, tipoEv);
+  } else if (carta.clase === 'stock') {
+    const unidades = Math.max(1, Math.round(carta.monto / precioReferencia(e)));
+    const cuenta = {};
+    if (signo < 0) {
+      let faltan = unidades;
+      for (; faltan > 0; faltan--) { const id = venderUnaDelStock(e); if (!id) break; cuenta[id] = (cuenta[id] || 0) + 1; }
+      const d = describirUnidades(cuenta);
+      // Si no había tanto stock, se arruinan insumos
+      const insumos = faltan > 0 ? Math.round((faltan * precioReferencia(e)) / 2 / 1000) * 1000 : 0;
+      if (insumos) { e.plata -= insumos; r.gastos += insumos; }
+      const texto = d ? carta.texto.replace('{u}', d) : carta.texto.replace(/: se (rompió|arruinó) \{u\}\./, '.');
+      evento(`${texto}${insumos ? ` Se arruinaron insumos por $${fmt(insumos)}.` : ''}`, tipoEv);
+    } else {
+      const ids = Object.keys(PRODUCTOS).filter((id) => e.maquinas[PRODUCTOS[id].maquina]);
+      for (let i = 0; i < unidades; i++) { const id = ids[Math.floor(siguienteAzar(e) * ids.length)]; e.stock[id]++; cuenta[id] = (cuenta[id] || 0) + 1; }
+      evento(carta.texto.replace('{u}', describirUnidades(cuenta)), tipoEv);
+    }
+  } else if (carta.clase === 'reputacion') {
+    const d = signo * MAZO.rep[carta.tamano];
+    e.rep = limitar(redondear(e.rep + d), 0, 100);
+    r.rep = e.rep;
+    evento(`${carta.texto} (${formatoRep(d)} de reputación)`, tipoEv);
+  }
 }
 
 // ---------- Acciones fuera del turno ----------
@@ -635,28 +871,76 @@ export function comprarMaquina(e, id) {
   if (e.plata < m.precio) return { ok: false, motivo: `Te faltan $${fmt(m.precio - e.plata)} para comprarla.` };
   e.plata -= m.precio;
   e.maquinas[id] = true;
-  return { ok: true, mensaje: `¡Compraste la ${m.nombre.toLowerCase()}! La luz sube $${fmt(m.luzExtra)} por mes.` };
+  // En la máquina nueva todos arrancan con la mitad de su experiencia
+  e.retraso[id] = redondear(e.exp / 2, 1);
+  for (const emp of e.equipo.empleados) { emp.retraso = emp.retraso || {}; emp.retraso[id] = redondear(emp.exp / 2, 1); }
+  return { ok: true, mensaje: `¡Compraste la ${m.nombre.toLowerCase()}! La luz sube $${fmt(m.luzExtra)} por mes. Es una máquina nueva: arrancás con la mitad de tu experiencia en ella y la vas recuperando produciendo.` };
 }
 
 export function pagarPrestamoA(e) {
   const p = e.prestamo;
   if (p.opcion !== 'A' || p.pagado) return { ok: false, motivo: 'No hay nada para pagar.' };
-  const monto = p.vencido ? p.deuda : costoPagoAnticipadoA(e.semana);
+  const monto = p.vencido ? p.deuda : costoPagoAnticipadoA(e.semana, p);
   if (e.plata < monto) return { ok: false, motivo: `Necesitás $${fmt(monto)} y tenés $${fmt(e.plata)}.` };
   e.plata -= monto;
+  e.finanzas.mesActual -= monto;
   p.pagado = true;
   p.deuda = 0;
   if (!p.vencido) {
-    e.tio.confianza = limitar(e.tio.confianza + 30, 0, 100);
+    const adelanto = Math.max(0, semanaVencimientoA(p) - e.semana);
+    sumarHistorial(e, Math.min(CONFIANZA.maxPagoAnticipado, CONFIANZA.pagoATiempo + Math.floor(adelanto / CONFIANZA.adelantoPorSemanas)));
     return { ok: true, mensaje: `Le pagaste $${fmt(monto)} al tío. Tío: "¡Así me gusta! Cuando quieras otra máquina, hablamos."` };
   }
-  e.tio.confianza = limitar(e.tio.confianza + 10, 0, 100);
   e.tio.enojado = false;
+  e.tio.confianza = confianzaTio(e);
   return { ok: true, mensaje: `Saldaste la deuda de $${fmt(monto)}. El tío se ablandó un poco.` };
 }
 
 export function puedeHacerPromo(e) {
   return Boolean(e.primo.rumor) && e.semana >= 4 && !e.mejorDeLaCiudad;
+}
+
+// Horas que tenés esta semana: 40, más las que te da alguien que te ayuda, menos las que perdiste.
+export function horasDisponibles(e) {
+  return Math.max(0, HORAS_POR_SEMANA + (e.horasAyuda || 0) - (e.horasPerdidas || 0));
+}
+
+// ---------- Cartas que te hacen elegir ----------
+export function resolverDecision(e, opcion) {
+  const d = e.decision;
+  if (!d) return { ok: false, motivo: 'No hay nada para decidir.' };
+  if (e.semanaEnCurso) return { ok: false, motivo: 'Se decide el domingo.' };
+  const def = MAZO.decisiones[d.id];
+  if (!def?.opciones[opcion]) return { ok: false, motivo: 'Esa opción no existe.' };
+  const gastar = (m) => { e.plata -= m; e.finanzas.mesActual -= m; };
+  let mensaje = '';
+  switch (`${d.id}.${opcion}`) {
+    case 'resistencia.tecnico': gastar(d.monto); mensaje = `Vino el técnico y la dejó como nueva (−${plata$(d.monto)}).`; break;
+    case 'resistencia.vos': {
+      const repuestos = Math.round((d.monto * 0.4) / 1000) * 1000;
+      gastar(repuestos);
+      e.horasPerdidas += 6;
+      if (siguienteAzar(e) < 1 / 3) { gastar(d.monto); mensaje = `La desarmaste entera (−${plata$(repuestos)} y 6 h)... y no quedó bien. Hubo que llamar al técnico igual (−${plata$(d.monto)}).`; }
+      else mensaje = `La arreglaste vos con un tutorial de YouTube: −${plata$(repuestos)} en repuestos y 6 h de esta semana.`;
+      break;
+    }
+    case 'cumple15.acepta':
+      e.plata += d.monto; e.finanzas.mesActual += d.monto; e.horasPerdidas += 6; e.cansancio = limitar(e.cansancio + 5, 0, 100);
+      mensaje = `Aceptaste los souvenirs del cumpleaños de 15: +${plata$(d.monto)}, pero te lleva 6 h de esta semana.`; break;
+    case 'cumple15.rechaza': mensaje = 'Le dijiste que no a la quinceañera. Lloró un poco, pero ya se le va a pasar.'; break;
+    case 'gripe.trabaja': e.cansancio = limitar(e.cansancio + 30, 0, 100); mensaje = 'Trabajás con gripe: no perdés horas, pero estás destruido (+30 de cansancio).'; break;
+    case 'gripe.descansa': e.horasPerdidas += 16; mensaje = 'Hacés reposo con té con miel: perdés 16 h esta semana.'; break;
+    case 'lote.reclama': e.horasPerdidas += 4; mensaje = 'Reclamaste y te cambiaron el lote. Entre llamadas y viajes se te fueron 4 h.'; break;
+    case 'lote.usa':
+      if (siguienteAzar(e) < 0.5) { e.rep = limitar(redondear(e.rep - 2), 0, 100); mensaje = 'Usaste el lote fallado y un cliente lo notó: −2 de reputación.'; }
+      else mensaje = 'Usaste el lote fallado y nadie se dio cuenta. Zafaste.';
+      break;
+    case 'quejoso.contesta': e.horasPerdidas += 2; e.rep = limitar(redondear(e.rep - 1), 0, 100); mensaje = 'Le contestaste con buena onda: −1 de reputación y 2 h de esta semana.'; break;
+    case 'quejoso.ignora': e.rep = limitar(redondear(e.rep - 2), 0, 100); mensaje = 'Lo ignoraste y la queja juntó comentarios: −2 de reputación.'; break;
+    default: return { ok: false, motivo: 'Esa opción no existe.' };
+  }
+  e.decision = null;
+  return { ok: true, mensaje };
 }
 
 // ---------- Horas y costos ----------
@@ -667,6 +951,7 @@ export function horasDomingo(e, pub) {
   const idCurso = e.curso.semanasRestantes > 0 ? e.curso.id : pub.curso;
   if (idCurso) horas += CURSOS[idCurso].horasPorSemana;
   if (fuisteALaBolsa(e)) horas += EQUIPO.bolsa.horas;
+  if (pub.volantes && !pub.volantesVendedor) horas += VOLANTES.horas;
   if (pub.capacitar === 'vos') horas += CAPACITACION.vos.horas;
   return horas;
 }
@@ -702,7 +987,14 @@ export function validarPublicidad(e, pub) {
   if (e.semanaEnCurso) errores.push('Ya hiciste la publicidad de esta semana.');
   const horas = pub.horasRedes || 0;
   if (horas < 0 || !Number.isInteger(horas)) errores.push('Horas de publicidad inválidas.');
+  if (e.decision) errores.push('Antes de arrancar, decidí qué hacer con lo que pasó.');
   if (pub.promo && !puedeHacerPromo(e)) errores.push('La promo de contraataque solo se puede lanzar cuando hay un rumor sobre Lelo.');
+  if (pub.cyber && !esSemanaCyber(e.semana)) errores.push('El CyberMonday no es esta semana.');
+  if (pub.volantesVendedor) {
+    const v = presentes(e, 'vendedor').find((x) => x.id === pub.volantesVendedor);
+    if (!pub.volantes) errores.push('Para mandar a alguien a repartir volantes, marcá "Repartir volantes".');
+    else if (!v || horasEmpleado(e, v, { capacitacion: pub.capacitar, feriaVendedor: pub.feriaVendedor }) < VOLANTES.horas) errores.push('Ese vendedor no tiene horas para repartir volantes esta semana.');
+  }
   if (pub.feria && stockTotal(e) === 0) errores.push('No tenés stock para llevar a la feria.');
   if (pub.curso && !CURSOS[pub.curso]) errores.push('Ese curso no existe.');
   if (pub.curso && e.curso.semanasRestantes > 0) errores.push('Ya estás haciendo un curso.');
@@ -717,8 +1009,9 @@ export function validarPublicidad(e, pub) {
     if (pub.capacitar === 'vos' && !presentes(e).some((x) => x.exp < e.exp)) errores.push('Tu equipo ya sabe tanto como vos: mejor un curso.');
   }
   const total = horasDomingo(e, pub);
-  if (total > HORAS_POR_SEMANA) errores.push(`Te pasaste de horas: ${total} de ${HORAS_POR_SEMANA}.`);
-  const costo = (pub.feria ? VENTAS.feria.costoMesa : 0) + (pub.curso ? CURSOS[pub.curso].costo : 0) + costoCapacitacion(e, pub.capacitar);
+  if (total > horasDisponibles(e)) errores.push(`Te pasaste de horas: ${total} de ${horasDisponibles(e)}.`);
+  const costo = (pub.feria ? VENTAS.feria.costoMesa : 0) + (pub.curso ? CURSOS[pub.curso].costo : 0) + costoCapacitacion(e, pub.capacitar)
+    + (pub.volantes ? VOLANTES.costo : 0);
   if (costo > 0 && costo > e.plata) errores.push(`No te alcanza la plata: necesitás $${fmt(costo)} y tenés $${fmt(e.plata)}.`);
   return { ok: errores.length === 0, errores, horas: total, costo };
 }
@@ -740,11 +1033,15 @@ export function publicar(e, pub) {
   const comp = PRIMO.comportamientos.find((x) => x.id === (e.primo.proximo || sortearComportamiento(e)));
   const habiaRumor = Boolean(e.primo.rumor);
   e.primo.comportamiento = comp.id;
-  const ataque = PRIMO.jugadas[e.primo.jugada ?? Math.floor(siguienteAzar(e) * PRIMO.jugadas.length)].ataque;
+  const jugada = PRIMO.jugadas[e.primo.jugada ?? Math.floor(siguienteAzar(e) * PRIMO.jugadas.length)];
+  const ataque = jugada.ataque;
   const oferta = PRIMO.ofertas[Math.floor(siguienteAzar(e) * PRIMO.ofertas.length)];
+  // La promo de contraataque falla 1 de cada 10 veces: pagás el descuento y Lelo te saca clientes igual.
+  const promoFalla = Boolean(pub.promo) && siguienteAzar(e) < PROMO.falla;
+  const promoFunciona = Boolean(pub.promo) && !promoFalla;
   if (compite) {
-    if (pub.promo) {
-      enDia(0, '📣 Lanzaste la promo de contraataque.', 'buena');
+    if (pub.promo) enDia(0, '📣 Lanzaste la promo de contraataque.', 'buena');
+    if (promoFunciona) {
       if (comp.id === 'agresivo') {
         enDia(1, `😤 ${ataque}.. pero tu promo ya estaba en todos lados.`, 'info');
         evento('¡Tu promo frenó a Lelo! Su campaña no te sacó ningún pedido y encima te llegaron clientes nuevos.', 'buena');
@@ -752,23 +1049,40 @@ export function publicar(e, pub) {
         evento('Lanzaste la promo, pero el rumor era humo: Lelo ni apareció. Igual te llegaron algunos clientes más.', 'info');
       }
     } else {
+      if (promoFalla) evento('Tu promo no prendió: casi nadie la vio. Pagaste el descuento y Lelo te sacó clientes igual.', 'mala');
       if (habiaRumor && comp.id !== 'agresivo') evento('El rumor era humo: Lelo no hizo ninguna jugada agresiva.', 'buena');
       else if (habiaRumor) evento('El rumor era cierto.', 'mala');
       if (comp.id === 'agresivo') {
         evento(`${ataque} Te sacó clientes.`, 'mala');
         enDia(1, `😤 ${ataque}`, 'mala');
       } else if (comp.id === 'ofertas') {
-        evento(oferta, 'mala');
-        enDia(2, `🏷️ ${oferta}`, 'mala');
+        evento(oferta.texto, 'mala');
+        enDia(2, `🏷️ ${oferta.texto}`, 'mala');
       } else {
         evento(comp.texto, 'info');
       }
     }
   }
-  const sacaLelo = compite && !pub.promo ? comp.saca : 0;
+  let sacaLelo = compite && !promoFunciona ? comp.saca : 0;
+  // Si repartís volantes la misma semana que Lelo reparte los suyos, los de él rinden la mitad.
+  if (sacaLelo && pub.volantes && comp.id === 'agresivo' && jugada.volantes) {
+    sacaLelo /= 2;
+    evento('Tus volantes taparon los de Lelo: su remate rindió la mitad.', 'buena');
+  }
+  const pistaLelo = () => {
+    if (promoFalla) return PRIMO.pistaPromoFallida;
+    if (comp.id === 'agresivo') return jugada.pista;
+    if (comp.id === 'ofertas') return oferta.pista;
+    return PRIMO.pistasTranquilo[Math.floor(siguienteAzar(e) * PRIMO.pistasTranquilo.length)];
+  };
+
+  // Lelo de viaje después de cerrar su taller
+  if (leloDeViaje(e) && siguienteAzar(e) < LELO_VIAJE.probFoto) {
+    enDia(1 + Math.floor(siguienteAzar(e) * 5), `🏖️ ${LELO_VIAJE.fotos[Math.floor(siguienteAzar(e) * LELO_VIAJE.fotos.length)]}`, 'info');
+  }
 
   // El equipo: quién faltó, Chuchu dando vueltas y capacitación
-  const semEquipo = { capacitacion: pub.capacitar || null, feriaVendedor: pub.feriaVendedor || null };
+  const semEquipo = { capacitacion: pub.capacitar || null, feriaVendedor: pub.feriaVendedor || null, volantesVendedor: pub.volantesVendedor || null };
   for (const emp of e.equipo.empleados) if (emp.falta) enDia(1, `🤒 ${emp.nombre} no vino en toda la semana: ${emp.motivoFalta}.`, 'mala');
   const ch = e.equipo.chuchu;
   if (chuchuDisponible(e)) {
@@ -788,7 +1102,13 @@ export function publicar(e, pub) {
   const hpvVos = horasPorVenta(e);
   const horasVendedores = vendedores.reduce((sum, v) => sum + horasEmpleado(e, v, semEquipo), 0);
   const horasEq = horas + vendedores.reduce((sum, v) => sum + (horasEmpleado(e, v, semEquipo) * hpvVos) / horasPorVentaExp(v.exp), 0);
-  const extraPromo = pub.promo ? 1 + PROMO.extraDemanda : 1;
+  const extraPromo = promoFunciona ? 1 + PROMO.extraDemanda : 1;
+  // Volantes: +15% esta semana y +7% la siguiente
+  let extraVolantes = e.volantesSemana === e.semana - 1 ? 1 + VOLANTES.extraSiguiente : 1;
+  if (pub.volantes) {
+    extraVolantes *= 1 + VOLANTES.extra;
+    e.volantesSemana = e.semana;
+  }
 
   const aviso = avisoFecha(e.semana);
   if (aviso) enDia(0, `📅 ${aviso}`, 'buena');
@@ -804,6 +1124,14 @@ export function publicar(e, pub) {
   } else if (e.curso.semanasRestantes > 0) {
     enDia(2, `📚 Seguís con el curso de ${CURSOS[e.curso.id].nombre.toLowerCase()}.`, 'info');
   }
+
+  if (pub.volantes) {
+    e.plata -= VOLANTES.costo;
+    gastosDomingo += VOLANTES.costo;
+    const quien = pub.volantesVendedor ? e.equipo.empleados.find((x) => x.id === pub.volantesVendedor)?.nombre : null;
+    enDia(0, `📄 ${quien ? `${quien} repartió` : 'Repartiste'} volantes por todo el barrio.`, 'buena');
+  }
+  if (pub.cyber) enDia(0, `💻 Te sumaste al CyberMonday: ${Math.round(CYBER.descuento * 100)}% de descuento en todo.`, 'buena');
 
   // Feria del domingo: se vende el stock que sobró de semanas anteriores
   const vendedorFeria = pub.feriaVendedor ? e.equipo.empleados.find((x) => x.id === pub.feriaVendedor) : null;
@@ -824,7 +1152,7 @@ export function publicar(e, pub) {
       if (v.fuerte === id) empuje *= 1 + va.fuerte;
       if (v.descuidado === id) empuje *= 1 - va.descuidado;
     }
-    mercado[id] = Math.max(0, Math.round(demandaEsperada(e, id) * empuje * extraPromo * entre(e, 0.8, 1.2)));
+    mercado[id] = Math.max(0, Math.round(demandaEsperada(e, id, e.semana, Boolean(pub.cyber)) * empuje * extraPromo * extraVolantes * entre(e, 0.8, 1.2)));
     totalMercado += mercado[id];
   }
 
@@ -839,7 +1167,8 @@ export function publicar(e, pub) {
     if (captadas[id] < mercado[id]) { captadas[id]++; resto--; }
   }
 
-  // Se arman los pedidos (1 a 3 unidades cada uno), llegan en distintos días y Lelo te pelea cada uno
+  // Se arman los pedidos (1 a 3 unidades cada uno) y llegan en distintos días. Lelo te pelea cada uno:
+  // algunos clientes te piden y después cancelan porque se lo pidieron a él.
   const pedidos = [];
   const deLelo = [];
   let n = 0;
@@ -850,17 +1179,37 @@ export function publicar(e, pub) {
       quedan -= cantidad;
       const cliente = CLIENTES[Math.floor(siguienteAzar(e) * CLIENTES.length)];
       const pedido = { id: `p${e.semana}-${++n}`, producto: id, cantidad, cliente, rechazado: false, dia: diaAlAzar() };
-      if (siguienteAzar(e) < sacaLelo) deLelo.push(pedido);
-      else pedidos.push(pedido);
+      if (siguienteAzar(e) < sacaLelo) {
+        pedido.dia = Math.min(pedido.dia, 5);
+        pedido.diaCancela = pedido.dia + 1 + Math.floor(siguienteAzar(e) * (6 - pedido.dia));
+        pedido.pista = pistaLelo();
+        deLelo.push(pedido);
+      } else {
+        pedido.envio = siguienteAzar(e) < SERVICIOS.envio.prob;
+        pedido.diseno = siguienteAzar(e) < SERVICIOS.diseno.prob;
+        pedidos.push(pedido);
+      }
     }
   }
   pedidos.sort((a, b) => a.dia - b.dia);
-  for (const p of pedidos) enDia(p.dia, `📩 ${capitalizar(p.cliente)} te pidió ${p.cantidad} ${nombreUnidades(p.producto, p.cantidad)}.`, 'pedido');
-  for (const p of deLelo) enDia(p.dia, `😤 Lelo le ganó el pedido a ${p.cliente} (${p.cantidad} ${nombreUnidades(p.producto, p.cantidad)}).`, 'mala');
+  const extras = (p) => `${p.envio ? ' Quiere que se lo lleves a la casa 🚚.' : ''}${p.diseno ? ' Trae su propio diseño 🎨.' : ''}`;
+  for (const p of [...pedidos, ...deLelo].sort((a, b) => a.dia - b.dia)) {
+    enDia(p.dia, `📩 ${capitalizar(p.cliente)} te pidió ${p.cantidad} ${nombreUnidades(p.producto, p.cantidad)}.${p.diaCancela === undefined ? extras(p) : ''}`, 'pedido');
+  }
+  // Cancelaciones: con muchas el mismo día, se agrupan
+  for (let d = 0; d < 7; d++) {
+    const del = deLelo.filter((p) => p.diaCancela === d);
+    if (!del.length) continue;
+    if (del.length >= PRIMO.agruparDesde) {
+      enDia(d, `❌ ${del.length} clientes cancelaron y se fueron con Lelo (${del[0].pista}).`, 'mala');
+    } else {
+      for (const p of del) enDia(d, `❌ ${capitalizar(p.cliente)} canceló: ${p.pista}. Se lo pidió a Lelo.`, 'mala');
+    }
+  }
   if (deLelo.length) {
     const u = unidadesPedidas({ pedidos: deLelo });
     const detalle = Object.keys(u).filter((id) => u[id]).map((id) => `${u[id]} ${nombreUnidades(id, u[id])}`).join(', ');
-    evento(`Lelo se quedó con ${deLelo.length} pedido${deLelo.length > 1 ? 's' : ''} (${detalle}).`, 'mala');
+    evento(`${deLelo.length} cliente${deLelo.length > 1 ? 's cancelaron' : ' canceló'} y se fue${deLelo.length > 1 ? 'ron' : ''} con Lelo (${detalle}).`, 'mala');
   }
 
   // Me gusta: la publicidad se reparte en los días; si te pasaste, los últimos avisos no tienen respuesta
@@ -891,7 +1240,7 @@ export function publicar(e, pub) {
   enDia(6, pedidos.length ? `📦 Cierra la semana con ${pedidos.length} pedido${pedidos.length > 1 ? 's' : ''} para entregar el domingo.` : '📦 Cierra la semana sin pedidos.', 'cierre');
 
   e.semanaEnCurso = {
-    semana: e.semana, horasRedes: horas, promo: Boolean(pub.promo), horasDomingo: horasDomingo(e, { ...pub, curso: null }),
+    semana: e.semana, horasRedes: horas, promo: Boolean(pub.promo), cyber: Boolean(pub.cyber), volantes: Boolean(pub.volantes), horasDomingo: horasDomingo(e, { ...pub, curso: null }),
     pedidos, pedidosLelo: deLelo.length, eventos, dias, feria, gastosDomingo, horasVendedores: redondear(horasVendedores, 1), ...semEquipo,
   };
   return { ok: true, semana: e.semanaEnCurso };
@@ -1002,10 +1351,21 @@ export function validarPlan(e, plan) {
     if (n > 0 && !e.maquinas[PRODUCTOS[id].maquina]) errores.push(`No tenés máquina para ${PRODUCTOS[id].nombre.toLowerCase()}.`);
   }
   const horas = horasDelPlan(e, plan);
-  if (horas > HORAS_POR_SEMANA) errores.push(`Te pasaste de horas: ${horas} de ${HORAS_POR_SEMANA}.`);
+  if (horas > horasDisponibles(e)) errores.push(`Te pasaste de horas: ${horas} de ${horasDisponibles(e)}.`);
   const costo = costoDelPlan(plan);
   if (costo > 0 && costo > e.plata) errores.push(`No te alcanza la plata: necesitás $${fmt(costo)} y tenés $${fmt(e.plata)}.`);
   return { ok: errores.length === 0, errores, horas, costo };
+}
+
+// Descuento de la semana en los pedidos de redes (promo o CyberMonday; no se suman).
+export function precioRedesSemana(sem) {
+  return 1 - Math.max(sem?.promo ? PROMO.descuento : 0, sem?.cyber ? CYBER.descuento : 0);
+}
+
+// Precio de un pedido, con descuento y servicios especiales.
+export function precioPedido(p, sem) {
+  const recargo = (p.envio ? SERVICIOS.envio.recargo : 0) + (p.diseno ? SERVICIOS.diseno.recargo : 0);
+  return Math.round(p.cantidad * PRODUCTOS[p.producto].precio * precioRedesSemana(sem) * (1 + recargo));
 }
 
 export function cerrarSemana(e, plan) {
@@ -1019,38 +1379,44 @@ export function cerrarSemana(e, plan) {
   const repInicial = e.rep;
   const linea = (t) => r.lineas.push(t);
   const evento = (t, tipo = 'info') => r.eventos.push({ texto: t, tipo });
-  const precioRedes = sem.promo ? 1 - PROMO.descuento : 1;
+  const precioRedes = precioRedesSemana(sem);
   let deltaRep = 0;
 
   // 1. Producción: cada uno hace su parte y cada uno tiene su probabilidad de error
   const reparto = repartirProduccion(e, plan.producir, sem);
   let producidas = 0;
-  const fabricar = (unidades, pError, quien) => {
+  // Cada máquina tiene su experiencia: producir en una máquina nueva te pone al día el doble de rápido
+  const fabricar = (x, unidades, pErrorEn, quien, aprende = 1) => {
     let hechas = 0;
+    let intentos = 0;
     const arruinadas = {};
     for (const [id, n] of Object.entries(unidades)) {
+      const maq = PRODUCTOS[id].maquina;
+      const pError = pErrorEn(maq);
       for (let i = 0; i < n; i++) {
         e.plata -= PRODUCTOS[id].costo;
         r.gastos += PRODUCTOS[id].costo;
+        intentos++;
+        if (x.retraso?.[maq]) x.retraso[maq] = Math.max(0, redondear(x.retraso[maq] - 0.08 * aprende, 2));
         if (siguienteAzar(e) < pError) { arruinadas[id] = (arruinadas[id] || 0) + 1; continue; }
         e.stock[id] += 1;
         hechas++;
       }
     }
-    for (const [id, x] of Object.entries(arruinadas)) {
-      evento(`${quien} ${x} ${nombreUnidades(id, x)} en la prensa (perdiste $${fmt(x * PRODUCTOS[id].costo)} de insumo).`, 'mala');
+    for (const [id, cant] of Object.entries(arruinadas)) {
+      evento(`${quien} ${cant} ${nombreUnidades(id, cant)} en la prensa (perdiste $${fmt(cant * PRODUCTOS[id].costo)} de insumo).`, 'mala');
     }
     producidas += hechas;
-    return { hechas, intentos: hechas + Object.values(arruinadas).reduce((t, x) => t + x, 0) };
+    return { hechas, intentos };
   };
-  const tuyas = fabricar(reparto.vos.unidades, probabilidadError(e), 'Se te arruinaron');
+  const tuyas = fabricar(e, reparto.vos.unidades, (m) => probabilidadError(e, m), 'Se te arruinaron');
   e.exp = limitar(e.exp + tuyas.intentos * 0.08, 0, 100);
   let delEquipo = 0;
   for (const o of reparto.operarios) {
     const emp = o.emp;
-    const res = fabricar(o.unidades, probabilidadErrorEmpleado(emp), `${emp.nombre} arruinó`);
-    delEquipo += res.hechas;
     const aprende = emp.esLelo ? 1 : PUESTOS.operario.variantes[emp.variante].aprende;
+    const res = fabricar(emp, o.unidades, (m) => probabilidadErrorEmpleado(emp, m), `${emp.nombre} arruinó`, aprende);
+    delEquipo += res.hechas;
     emp.exp = limitar(redondear(emp.exp + res.intentos * 0.08 * aprende, 1), 0, 100);
     if (emp.rasgo === 'creativo') deltaRep += res.hechas * EQUIPO.repCreativo;
   }
@@ -1072,10 +1438,10 @@ export function cerrarSemana(e, plan) {
     }
     if (e.stock[p.producto] >= p.cantidad) {
       e.stock[p.producto] -= p.cantidad;
-      const ingreso = Math.round(p.cantidad * PRODUCTOS[p.producto].precio * precioRedes);
+      const ingreso = precioPedido(p, sem);
       e.plata += ingreso;
       r.ingresos += ingreso;
-      deltaRep += p.cantidad * REPUTACION.porVenta;
+      deltaRep += p.cantidad * REPUTACION.porVenta + (p.envio ? SERVICIOS.envio.rep : 0);
       entregados++;
       unidadesEntregadas += p.cantidad;
     } else {
@@ -1095,8 +1461,16 @@ export function cerrarSemana(e, plan) {
       evento(`Comisión de ${v.nombre}: $${fmt(monto)}.`);
     }
   }
+  void precioRedes;
   const activos = sem.pedidos.filter((p) => !p.rechazado).length;
   if (activos) linea(`Entregaste ${entregados} de ${activos} pedidos (${unidadesEntregadas} productos).`);
+  const serv = serviciosDeLaSemana(sem);
+  if (serv.envios || serv.diseno.length) {
+    const partes = [];
+    if (reparto.vos.envios || serv.envios) partes.push(`${serv.envios} envío${serv.envios === 1 ? '' : 's'} a domicilio${reparto.vos.envios ? ` (${reparto.vos.envios} los hiciste vos)` : ' (los hizo tu equipo)'}`);
+    if (serv.diseno.length) partes.push(`${serv.diseno.length} diseño${serv.diseno.length === 1 ? '' : 's'} personalizado${serv.diseno.length === 1 ? '' : 's'}`);
+    linea(`Servicios especiales: ${partes.join(' y ')}.`);
+  }
   else if (!sem.pedidos.length) linea('No llegaron pedidos esta semana.');
 
   // 3. Lo del domingo: feria y curso
@@ -1124,12 +1498,15 @@ export function cerrarSemana(e, plan) {
   e.exp = limitar(e.exp + vendidas * 0.02, 0, 100);
 
   // 5. Cansancio y curso
-  const horas = v.horas;
+  // Las horas en que alguien te dio una mano no te cansan
+  const horas = Math.max(0, v.horas - (e.horasAyuda || 0));
   e.cansancio = horas > CANSANCIO.umbral
     ? limitar(e.cansancio + (horas - CANSANCIO.umbral) * CANSANCIO.sube, 0, 100)
     : limitar(e.cansancio - (CANSANCIO.umbral - horas) * CANSANCIO.baja, 0, 100);
   e.cansancio = redondear(e.cansancio, 1);
   if (e.cansancio >= 80) evento('Estás reventado. Si seguís así te vas a mandar macanas: descansá o contratá a alguien.', 'mala');
+  e.horasAyuda = 0;
+  e.horasPerdidas = 0;
 
   // El equipo cumple otra semana: se le paga a fin de mes y se le conoce el rasgo
   for (const emp of e.equipo.empleados) {
@@ -1160,13 +1537,14 @@ export function cerrarSemana(e, plan) {
   const carta = e.mazo.cartas.find((x) => x.semana === e.semana && !x.usada);
   if (carta) {
     carta.usada = true;
-    if (carta.tipo === 'mala') { e.plata -= carta.monto; r.gastos += carta.monto; evento(`${carta.texto} (−$${fmt(carta.monto)})`, 'mala'); }
-    else { e.plata += carta.monto; r.ingresos += carta.monto; evento(`${carta.texto} (+$${fmt(carta.monto)})`, 'buena'); }
+    aplicarCarta(e, carta, r, evento);
   }
 
   e.finanzas.mesActual += r.ingresos - r.gastos;
 
-  // 8. Cierre de mes y fin de año
+  // 8. Vencimiento de la opción A, cierre de mes y fin de año
+  const pr = e.prestamo;
+  if (pr.opcion === 'A' && !pr.pagado && !pr.vencido && e.semana >= semanaVencimientoA(pr)) vencePrestamoA(e, r, evento);
   if (c.finDeMes) cierreDeMes(e, c, r, evento);
   if (c.semanaEnAnio === SEMANAS_POR_ANIO) finDeAnio(e, r, evento);
 
@@ -1174,13 +1552,14 @@ export function cerrarSemana(e, plan) {
   if (!e.mejorDeLaCiudad && e.rep >= REPUTACION.meta) {
     e.mejorDeLaCiudad = true;
     r.hito = 'mejorDeLaCiudad';
-    sumarLelo(e);
-    evento('¡Lograste ser el mejor de la ciudad! Lelo no pudo competir y cerró: ahora es empleado tuyo (operario con experiencia 60, $40.000 por mes).', 'hito');
+    e.leloVuelve = e.semana + 1 + LELO_VIAJE.semanas;
+    evento('¡Lograste ser el mejor de la ciudad! Lelo se dio cuenta de que no tenía nada que hacer contra tu majestuosidad: cerró el taller, vendió la máquina de tazas y con la plata se fue un mes a Mar del Plata.', 'hito');
   }
   if (repInicial < VENTAS.reputacionMercadoLibre && e.rep >= VENTAS.reputacionMercadoLibre) {
     evento('Con tu reputación, Mercado Libre empieza a traerte pedidos en serio.', 'buena');
   }
 
+  e.tio.confianza = confianzaTio(e);
   r.plata = e.plata;
   r.rep = e.rep;
   r.repDelta = redondear(e.rep - repInicial);
@@ -1198,9 +1577,10 @@ export function cerrarSemana(e, plan) {
 // Atajo para simulaciones: publicidad + producción en una sola llamada.
 // plan.producir puede ser un objeto o una función (semanaEnCurso) => objeto.
 export function jugarSemana(e, plan) {
+  if (e.decision) resolverDecision(e, plan.decision?.[e.decision.id] || Object.keys(MAZO.decisiones[e.decision.id].opciones)[0]);
   const p = publicar(e, {
     horasRedes: plan.horasRedes || 0, promo: plan.promo, feria: plan.feria, curso: plan.curso,
-    capacitar: plan.capacitar, feriaVendedor: plan.feriaVendedor,
+    capacitar: plan.capacitar, feriaVendedor: plan.feriaVendedor, volantes: plan.volantes, volantesVendedor: plan.volantesVendedor, cyber: plan.cyber,
   });
   if (!p.ok) return p;
   const producir = typeof plan.producir === 'function' ? plan.producir(e.semanaEnCurso) : (plan.producir || {});
@@ -1228,29 +1608,33 @@ function cierreDeMes(e, c, r, evento) {
   cierreEquipo(e, r, evento);
 
   const p = e.prestamo;
-  if (p.opcion === 'B' && !p.pagado) {
+  if (p.opcion === 'B' && !p.pagado && e.semana > p.inicio - 1) {
     const numeroCuota = p.cuotasPagadas + p.cuotasPerdonadas + p.atrasadas + 1;
-    if (c.mes === PRESTAMO.B.mesPerdonado && c.anio === 1) {
+    const atrasadasAntes = p.atrasadas;
+    if (p.numero === 1 && c.mes === PRESTAMO.B.mesPerdonado && c.anio === 1) {
       p.cuotasPerdonadas++;
       evento('Tío: "Esta cuota no me la pagues: es mi regalo de cumpleaños."', 'buena');
-    } else if (numeroCuota <= PRESTAMO.B.cuotas) {
+    } else if (numeroCuota <= p.cuotas) {
       p.atrasadas++;
     }
     // Pagar lo que se pueda (cuotas del mes + atrasadas)
-    while (p.atrasadas > 0 && e.plata >= PRESTAMO.B.cuota) {
-      e.plata -= PRESTAMO.B.cuota;
-      r.gastos += PRESTAMO.B.cuota;
-      e.finanzas.mesActual -= PRESTAMO.B.cuota;
+    let pagadas = 0;
+    while (p.atrasadas > 0 && e.plata >= p.cuota) {
+      e.plata -= p.cuota;
+      r.gastos += p.cuota;
+      e.finanzas.mesActual -= p.cuota;
       p.atrasadas--;
       p.cuotasPagadas++;
-      e.tio.confianza = limitar(e.tio.confianza + 3, 0, 100);
-      evento(`Pagaste la cuota ${p.cuotasPagadas + p.cuotasPerdonadas} de ${PRESTAMO.B.cuotas} al tío ($${fmt(PRESTAMO.B.cuota)}).`);
+      pagadas++;
+      evento(`Pagaste la cuota ${p.cuotasPagadas + p.cuotasPerdonadas} de ${p.cuotas} al tío ($${fmt(p.cuota)}).`);
     }
+    // Cuota del mes a tiempo: +1 de confianza. Si quedó alguna sin pagar, −10.
+    if (pagadas > atrasadasAntes) sumarHistorial(e, CONFIANZA.cuotaATiempo);
     if (p.atrasadas > 0) {
-      e.tio.confianza = limitar(e.tio.confianza - 15, 0, 100);
+      sumarHistorial(e, CONFIANZA.atraso);
       evento(`No te alcanzó para la cuota. Le debés ${p.atrasadas} al tío y no está contento.`, 'mala');
     }
-    if (p.cuotasPagadas + p.cuotasPerdonadas >= PRESTAMO.B.cuotas) {
+    if (p.cuotasPagadas + p.cuotasPerdonadas >= p.cuotas) {
       p.pagado = true;
       evento('¡Terminaste de pagarle al tío!', 'buena');
     }
@@ -1287,27 +1671,29 @@ function cierreDeMes(e, c, r, evento) {
   }
 }
 
-function finDeAnio(e, r, evento) {
+function vencePrestamoA(e, r, evento) {
   const p = e.prestamo;
-  if (p.opcion === 'A' && !p.pagado && !p.vencido) {
-    if (e.plata >= PRESTAMO.A.total) {
-      e.plata -= PRESTAMO.A.total;
-      r.gastos += PRESTAMO.A.total;
-      p.pagado = true;
-      p.deuda = 0;
-      e.tio.confianza = limitar(e.tio.confianza + 20, 0, 100);
-      evento(`Venció el préstamo y le pagaste los $${fmt(PRESTAMO.A.total)} al tío. Cumplidor.`, 'buena');
-    } else {
-      p.vencido = true;
-      e.tio.enojado = true;
-      e.tio.confianza = limitar(e.tio.confianza - 50, 0, 100);
-      evento('Venció el préstamo y no llegaste. El tío está furioso: la deuda ahora crece un 10% por mes.', 'mala');
-    }
+  if (e.plata >= p.total) {
+    e.plata -= p.total;
+    r.gastos += p.total;
+    p.pagado = true;
+    p.deuda = 0;
+    sumarHistorial(e, CONFIANZA.pagoATiempo);
+    evento(`Venció el préstamo y le pagaste los $${fmt(p.total)} al tío. Cumplidor.`, 'buena');
+  } else {
+    p.vencido = true;
+    e.tio.enojado = true;
+    sumarHistorial(e, CONFIANZA.vencido);
+    evento('Venció el préstamo y no llegaste. El tío está furioso: la deuda ahora crece un 10% por mes.', 'mala');
   }
+}
+
+function finDeAnio(e, r, evento) {
   const tuyo = e.rep;
   const delPrimo = e.primo.rep;
   r.fiestas = { tuyo, delPrimo };
-  if (e.mejorDeLaCiudad) evento('Fiestas: Lelo brinda por su jefe. Todos te miran con respeto.', 'buena');
+  if (e.mejorDeLaCiudad && leloDeViaje(e)) evento('Fiestas: Lelo mandó un audio desde la playa para brindar. Todos te miran con respeto.', 'buena');
+  else if (e.mejorDeLaCiudad) evento('Fiestas: Lelo brinda por su jefe. Todos te miran con respeto.', 'buena');
   else if (tuyo >= delPrimo) evento(`Fiestas: el tío los compara delante de toda la familia. Tu reputación ${Math.round(tuyo)} contra ${Math.round(delPrimo)} de Lelo. "¡Este pibe va a llegar lejos!"`, 'buena');
   else evento(`Fiestas: el tío los compara delante de toda la familia. Tu reputación ${Math.round(tuyo)} contra ${Math.round(delPrimo)} de Lelo. "Che, ¿y vos qué estuviste haciendo todo el año?"`, 'mala');
 }
@@ -1318,4 +1704,5 @@ export function fmt(n) {
 
 export {
   HORAS_POR_SEMANA, PRODUCTOS, MAQUINAS, CURSOS, VENTAS, PRESTAMO, TUTORIAL, PROMO, CANSANCIO, PUESTOS, RASGOS, EQUIPO, CAPACITACION,
+  MAZO, LOCALES, VOLANTES, SERVICIOS, CYBER, TRAICIO, LELO_VIAJE,
 };

@@ -8,6 +8,9 @@ import {
   irALaBolsa, fuisteALaBolsa, llamarAChuchu, rechazarChuchu, publicarAnuncio, descartarAnuncio, contratar, despedir,
   costoDespido, responderAumento, darAumento, horasEmpleado, presentes, capacidadEquipo, repartirProduccion,
   productosParaEnsenar, costoCapacitacion, nombreRasgo,
+  confianzaTio, prestamoDisponible, pedirPrestamo, proximaMaquina, horasDisponibles, resolverDecision, esSemanaCyber,
+  alquilarLocal, dejarLocal, localActual, precioPedido, leloDeViaje,
+  MAZO, LOCALES, VOLANTES, SERVICIOS, CYBER, TRAICIO,
 } from './engine.js';
 import { guardar, cargar, borrar } from './storage.js';
 import { imagen } from './arte.js';
@@ -21,6 +24,7 @@ let confirmarReinicio = false;
 let menuAbierto = false;
 let anuncioForm = { puesto: 'operario', sueldo: null };
 let confirmarDespido = null;
+let montoPrestamo = null; // monto que le pedís al tío (préstamo para la próxima máquina)
 let temporizadores = [];
 const DIAS_LARGOS = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
 
@@ -29,7 +33,7 @@ const plata = (n) => `${n < 0 ? '−' : ''}$${fmt(Math.abs(n))}`;
 const pct = (v) => `${Math.max(0, Math.min(100, v))}%`;
 
 function planPublicidad() {
-  return { horasRedes: partida?.ultimaPublicidad ?? 0, promo: false, feria: false, curso: null, capacitar: null, feriaVendedor: null };
+  return { horasRedes: partida?.ultimaPublicidad ?? 0, promo: false, feria: false, curso: null, capacitar: null, feriaVendedor: null, volantes: false, volantesVendedor: null, cyber: false };
 }
 
 // La producción siempre arranca en cero: lo que falta se muestra resaltado y lo carga el jugador.
@@ -159,47 +163,107 @@ function bloqueEstado(e) {
   const p = e.prestamo;
   let estadoPrestamo;
   if (p.pagado) estadoPrestamo = 'Pagado ✔';
-  else if (p.opcion === 'A') estadoPrestamo = p.vencido ? `Vencido: debés ${plata(p.deuda)}` : `Opción A · hoy saldás con ${plata(costoPagoAnticipadoA(e.semana))}`;
-  else estadoPrestamo = `Opción B · ${p.cuotasPagadas + p.cuotasPerdonadas}/${PRESTAMO.B.cuotas} cuotas${p.atrasadas ? ` · ${p.atrasadas} atrasada(s)` : ''}`;
+  else if (p.opcion === 'A') estadoPrestamo = p.vencido ? `Vencido: debés ${plata(p.deuda)}` : `Opción A · hoy saldás con ${plata(costoPagoAnticipadoA(e.semana, p))}`;
+  else estadoPrestamo = `Opción B · ${p.cuotasPagadas + p.cuotasPerdonadas}/${p.cuotas} cuotas de ${plata(p.cuota)}${p.atrasadas ? ` · ${p.atrasadas} atrasada(s)` : ''}`;
+  // Rival: Lelo en la ciudad; después de ganarla, Traicio Nero (la provincia llega en la próxima versión)
+  const rival = e.mejorDeLaCiudad
+    ? `<div class="stat"><div class="etiqueta">${TRAICIO.nombre} (${TRAICIO.empresa})</div><div class="valor" style="font-size:.85rem">Sin noticias todavía</div><div class="barra"><span style="width:0%"></span></div></div>`
+    : `<div class="stat"><div class="etiqueta">Lelo (tu primo)</div><div class="valor">${Math.floor(e.primo.rep)}/100</div><div class="barra"><span style="width:${pct(e.primo.rep)}"></span></div></div>`;
   return `<div class="tarjeta">
       <div class="stats">
         <div class="stat"><div class="etiqueta">Reputación (ciudad)</div><div class="valor">${Math.floor(e.rep)}/100</div><div class="barra"><span style="width:${pct(e.rep)}"></span></div></div>
-        <div class="stat"><div class="etiqueta">Lelo (tu primo)</div><div class="valor">${e.mejorDeLaCiudad ? 'Tu empleado' : `${Math.floor(e.primo.rep)}/100`}</div><div class="barra"><span style="width:${pct(e.mejorDeLaCiudad ? 0 : e.primo.rep)}"></span></div></div>
+        ${rival}
         <div class="stat"><div class="etiqueta">Experiencia</div><div class="valor">${Math.floor(e.exp)}/100</div><div class="barra"><span style="width:${pct(e.exp)}"></span></div></div>
         <div class="stat"><div class="etiqueta">Cansancio</div><div class="valor">${Math.round(e.cansancio)}/100</div><div class="barra cansancio"><span style="width:${pct(e.cansancio)}"></span></div></div>
         <div class="stat"><div class="etiqueta">Préstamo</div><div class="valor" style="font-size:.85rem">${estadoPrestamo}</div></div>
-        <div class="stat"><div class="etiqueta">Confianza del tío</div><div class="valor">${e.tio.confianza}/100</div></div>
-        <div class="stat"><div class="etiqueta">Equipo</div><div class="valor">${empleadosContratados(e)}/${cupoEquipo(e)}${e.equipo.empleados.some((x) => x.esLelo) ? ' + Lelo' : ''}</div></div>
+        <div class="stat"><div class="etiqueta">Confianza del tío</div><div class="valor">${confianzaTio(e)}/100</div></div>
+        <div class="stat"><div class="etiqueta">Equipo · ${localActual(e).nombre.toLowerCase()}</div><div class="valor">${empleadosContratados(e)}/${cupoEquipo(e)}${e.equipo.empleados.some((x) => x.esLelo) ? ' + Lelo' : ''}</div></div>
         <div class="stat"><div class="etiqueta">Sueldos por mes</div><div class="valor">${plata(e.equipo.empleados.reduce((t, x) => t + x.sueldo, 0))}</div></div>
       </div>
       <p class="suave" style="margin-top:8px">Stock: ${Object.keys(PRODUCTOS).filter((id) => e.maquinas[PRODUCTOS[id].maquina]).map((id) => `${e.stock[id]} ${nombreUnidades(id, e.stock[id])}`).join(' · ')}</p>
-      <p class="suave">Gastos fijos del mes: ${plata(gastosFijosDelMes(e))}${e.equipo.empleados.length ? ' más sueldos' : ''} (se pagan en la última semana de ${c.nombreMes.toLowerCase()}${c.finDeMes ? ': ¡es esta!' : ''}).</p>
+      ${e.retraso && Object.keys(e.retraso).some((m) => e.retraso[m] >= 1 && e.maquinas[m]) ? `<p class="suave">Todavía te estás acostumbrando a ${Object.keys(e.retraso).filter((m) => e.retraso[m] >= 1 && e.maquinas[m]).map((m) => `la ${MAQUINAS[m].nombre.toLowerCase()}`).join(' y ')}: ahí rendís menos hasta que le agarres la mano.</p>` : ''}
+      <p class="suave">Gastos fijos del mes: ${plata(gastosFijosDelMes(e))}${localActual(e).alquiler ? ` (incluye ${plata(localActual(e).alquiler)} de alquiler)` : ''}${e.equipo.empleados.length ? ' más sueldos' : ''} (se pagan en la última semana de ${c.nombreMes.toLowerCase()}${c.finDeMes ? ': ¡es esta!' : ''}).</p>
     </div>`;
 }
 
 function barraInferior(horas, costo, errores, textoBoton, idBoton) {
-  const horasPct = (horas / HORAS_POR_SEMANA) * 100;
+  const total = horasDisponibles(partida);
+  const horasPct = (horas / total) * 100;
+  const ayuda = partida.horasAyuda || 0;
   return `<div class="barra-inferior"><div class="contenido">
-      <div class="resumen-plan"><span>Tus horas: <strong>${String(horas).replace('.', ',')}</strong> / ${HORAS_POR_SEMANA}${horas > CANSANCIO.umbral ? ' <span class="faltan">te cansa</span>' : ''}</span>${costo !== null ? `<span>Gastás: <strong>${plata(costo)}</strong></span>` : ''}</div>
-      <div class="barra horas ${horas > HORAS_POR_SEMANA ? 'pasado' : ''}" style="margin-bottom:8px"><span style="width:${pct(horasPct)}"></span></div>
+      <div class="resumen-plan"><span>Tus horas: <strong>${String(horas).replace('.', ',')}</strong> / ${total}${total !== HORAS_POR_SEMANA ? ` <span class="suave">(esta semana)</span>` : ''}${horas - ayuda > CANSANCIO.umbral ? ' <span class="faltan">te cansa</span>' : ''}</span>${costo !== null ? `<span>Gastás: <strong>${plata(costo)}</strong></span>` : ''}</div>
+      <div class="barra horas ${horas > total ? 'pasado' : ''}" style="margin-bottom:8px"><span style="width:${pct(horasPct)}"></span></div>
       ${errores.length ? `<ul class="errores">${errores.map((x) => `<li>${x}</li>`).join('')}</ul>` : ''}
       <button class="boton" id="${idBoton}" ${errores.length ? 'disabled' : ''}>${textoBoton}</button>
     </div></div>`;
 }
 
+function accionCompra(r) {
+  aviso = r.ok ? r.mensaje : r.motivo;
+  if (r.ok) guardarPartida();
+  refrescar(true);
+}
+
 function conectarComprasYReinicio() {
   const gorras = document.getElementById('comprarGorras');
-  if (gorras) gorras.onclick = () => { const r = comprarMaquina(partida, 'gorras'); aviso = r.ok ? r.mensaje : r.motivo; if (r.ok) guardarPartida(); refrescar(true); };
+  if (gorras) gorras.onclick = () => accionCompra(comprarMaquina(partida, 'gorras'));
   const pagar = document.getElementById('pagarTio');
-  if (pagar) pagar.onclick = () => { const r = pagarPrestamoA(partida); aviso = r.ok ? r.mensaje : r.motivo; if (r.ok) guardarPartida(); refrescar(true); };
+  if (pagar) pagar.onclick = () => accionCompra(pagarPrestamoA(partida));
+  app.querySelectorAll('[data-monto-prestamo]').forEach((b) => {
+    b.onclick = () => {
+      const d = prestamoDisponible(partida);
+      montoPrestamo = Math.max(10000, Math.min(d.tope, (montoPrestamo ?? d.tope) + Number(b.dataset.montoPrestamo) * 10000));
+      refrescar();
+    };
+  });
+  app.querySelectorAll('[data-pedir-prestamo]').forEach((b) => {
+    b.onclick = () => {
+      const d = prestamoDisponible(partida);
+      const r = pedirPrestamo(partida, b.dataset.pedirPrestamo, montoPrestamo ?? d.tope);
+      montoPrestamo = null;
+      accionCompra(r);
+    };
+  });
+  const alquilar = document.getElementById('alquilarLocal');
+  if (alquilar) alquilar.onclick = () => accionCompra(alquilarLocal(partida));
+  const dejar = document.getElementById('dejarLocal');
+  if (dejar) dejar.onclick = () => accionCompra(dejarLocal(partida));
+}
+
+function bloquePrestamoNuevo(e) {
+  const d = prestamoDisponible(e);
+  if (!e.prestamo.pagado) return '';
+  if (!d.ok) return `<p class="suave">${d.motivo}</p>`;
+  const monto = Math.min(montoPrestamo ?? d.tope, d.tope);
+  const totalA = Math.round(monto * (1 + PRESTAMO.interesA));
+  const cuotaB = Math.round((monto * (1 + PRESTAMO.interesB)) / PRESTAMO.B.cuotas / 100) * 100;
+  return `<div class="subtitulo">Pedirle otro préstamo al tío</div>
+    <p class="suave">Para la ${d.maquina.nombre.toLowerCase()} (${plata(d.maquina.precio)}). Con tu confianza (${d.confianza}/100) te presta hasta <strong>${plata(d.tope)}</strong>, el ${Math.round(d.parte * 100)}% de la máquina. Cuanto más cumplidor seas y mejor reputación tengas, más te presta.</p>
+    <div class="producto">
+      <div class="info"><div class="nombre">Le pedís</div><div class="detalle">hasta ${plata(d.tope)}</div></div>
+      <div class="paso"><button data-monto-prestamo="-1" aria-label="Menos">−</button><span class="numero" style="min-width:86px">${plata(monto)}</span><button data-monto-prestamo="1" aria-label="Más">+</button></div>
+    </div>
+    <div class="alterna">
+      <button class="chico" data-pedir-prestamo="A">Opción A: ${plata(totalA)} en un año</button>
+      <button class="chico" data-pedir-prestamo="B">Opción B: ${PRESTAMO.B.cuotas} cuotas de ${plata(cuotaB)}</button>
+    </div>`;
 }
 
 function bloqueComprasYReinicio(e) {
   const p = e.prestamo;
+  const prox = proximaMaquina(e);
+  const local = localActual(e);
   return `<div class="tarjeta">
       <h2>Comprar y pagar</h2>
-      ${!e.maquinas.gorras ? `<button class="boton secundario" id="comprarGorras">Comprar máquina de gorras (${plata(MAQUINAS.gorras.precio)})</button>` : '<p class="suave">Ya tenés la máquina de gorras.</p>'}
-      ${p.opcion === 'A' && !p.pagado ? `<button class="boton secundario" id="pagarTio">Pagarle al tío ahora (${plata(p.vencido ? p.deuda : costoPagoAnticipadoA(e.semana))})</button>` : ''}
+      ${!e.maquinas.gorras ? `<button class="boton secundario" id="comprarGorras">Comprar máquina de gorras (${plata(MAQUINAS.gorras.precio)})</button>` : `<p class="suave">Ya tenés la máquina de gorras.${prox && !prox.disponible ? ` La próxima es la ${prox.nombre.toLowerCase()} (${plata(prox.precio)}): llega en la próxima versión.` : ''}</p>`}
+      ${p.opcion === 'A' && !p.pagado ? `<button class="boton secundario" id="pagarTio">Pagarle al tío ahora (${plata(p.vencido ? p.deuda : costoPagoAnticipadoA(e.semana, p))})</button>` : ''}
+      ${bloquePrestamoNuevo(e)}
+      <div class="subtitulo">Dónde trabajás: ${local.nombre.toLowerCase()}</div>
+      ${(e.local || 'casa') === 'casa'
+        ? `<p class="suave">En tu casa entran ${LOCALES.casa.cupo} empleados. Para tener más, alquilás un local chico: hasta ${LOCALES.chico.cupo} empleados, ${plata(LOCALES.chico.alquiler)} de alquiler y ${plata(LOCALES.chico.luz)} más de luz por mes.</p>
+          <button class="boton secundario" id="alquilarLocal">Alquilar un local chico</button>`
+        : `<p class="suave">Entran hasta ${local.cupo} empleados. Pagás ${plata(local.alquiler)} de alquiler y ${plata(local.luz)} más de luz por mes.</p>
+          <button class="chico" id="dejarLocal">Devolver el local y volver a tu casa</button>`}
     </div>`;
 }
 
@@ -219,6 +283,29 @@ function lineaVendedores(e) {
   if (!vs.length) return '';
   const h = vs.reduce((t, v) => t + horasEmpleado(e, v, semEquipoPub()), 0);
   return `<p class="suave" style="margin-top:8px">Además, ${listaNombres(vs)} ${vs.length > 1 ? 'suman' : 'suma'} <strong>${String(h).replace('.', ',')} h</strong> de redes esta semana.</p>`;
+}
+
+function opcionVolantesVendedor(e) {
+  if (!pub.volantes) return '';
+  const v = presentes(e, 'vendedor').find((x) => horasEmpleado(e, x, { capacitacion: pub.capacitar, feriaVendedor: pub.feriaVendedor }) >= VOLANTES.horas);
+  if (!v) return '';
+  return `<label class="interruptor">
+      <span><strong>Que los reparta ${v.nombre}</strong><br><span class="suave">Te ahorrás las ${VOLANTES.horas} h; se las saca a sus horas de redes.</span></span>
+      <input type="checkbox" id="volantesVendedor" data-id="${v.id}" ${pub.volantesVendedor === v.id ? 'checked' : ''}>
+    </label>`;
+}
+
+function bloqueDecision(e) {
+  const d = e.decision;
+  if (!d) return '';
+  const def = MAZO.decisiones[d.id];
+  return `<div class="tarjeta rumor">
+      <p><strong>${d.texto}</strong> ${def.pregunta}</p>
+      ${Object.entries(def.opciones).map(([id, o]) => `<div class="producto">
+        <div class="info"><div class="nombre">${o.texto}</div><div class="detalle">${o.detalle}${d.monto && ['tecnico', 'acepta'].includes(id) ? ` (${plata(d.monto)})` : ''}</div></div>
+        <button class="chico" data-decision="${id}">Elegir</button>
+      </div>`).join('')}
+    </div>`;
 }
 
 function opcionFeriaVendedor(e) {
@@ -302,7 +389,7 @@ function bloqueCapacitar(e) {
 function bloqueContratar(e) {
   const lleno = empleadosContratados(e) >= cupoEquipo(e);
   const ch = e.equipo.chuchu;
-  if (lleno) return `<div class="subtitulo">Contratar</div><p class="suave">Tenés el cupo completo de la ciudad (${cupoEquipo(e)} empleados${e.equipo.empleados.some((x) => x.esLelo) ? ', más Lelo' : ''}).</p>`;
+  if (lleno) return `<div class="subtitulo">Contratar</div><p class="suave">No entra nadie más en ${localActual(e).nombre.toLowerCase()} (${cupoEquipo(e)} empleados${e.equipo.empleados.some((x) => x.esLelo) ? ', más Lelo' : ''}).${(e.local || 'casa') === 'casa' ? ' Para tener más, alquilá un local (abajo, en "Comprar y pagar").' : ''}</p>`;
 
   // Bolsa del municipio
   let bolsa;
@@ -438,12 +525,20 @@ function pantallaPublicidad() {
     ${aviso ? `<div class="tarjeta tio"><p>${aviso}</p></div>` : ''}
     ${tutorial ? `<div class="tarjeta tio con-avatar">${imagen('tio')}<p>${tutorial}</p></div>` : ''}
     ${fecha ? `<div class="tarjeta tio con-avatar">${imagen('calendario')}<p>${fecha}</p></div>` : ''}
-    ${e.mejorDeLaCiudad ? '<div class="tarjeta"><p><strong>Sos el mejor de la ciudad.</strong> Lelo trabaja para vos como operario. La pelea por la provincia llega en la próxima versión.</p></div>' : ''}
+    ${bloqueDecision(e)}
+    ${e.mejorDeLaCiudad ? `<div class="tarjeta"><p><strong>Sos el mejor de la ciudad.</strong> ${leloDeViaje(e) ? 'Lelo cerró su taller y anda de viaje por Mar del Plata: cuando vuelva, viene a trabajar con vos.' : 'Lelo trabaja para vos como operario.'} La pelea por la provincia contra ${TRAICIO.nombre} llega en la próxima versión.</p></div>` : ''}
     ${puedeHacerPromo(e) ? `<div class="tarjeta rumor">
       <div class="con-avatar">${imagen('lelo')}<p>${e.primo.rumor}</p></div>
       <label class="interruptor">
-        <span><strong>Lanzar promo de contraataque</strong><br><span class="suave">${Math.round(PROMO.descuento * 100)}% de descuento en los pedidos de esta semana · ${PROMO.horas} h. Si Lelo ataca, no te saca ningún pedido y te llegan un ${Math.round(PROMO.extraDemanda * 100)}% más. Si era humo, regalaste el descuento.</span></span>
+        <span><strong>Lanzar promo de contraataque</strong><br><span class="suave">${Math.round(PROMO.descuento * 100)}% de descuento en los pedidos de esta semana · ${PROMO.horas} h. Si Lelo ataca, casi siempre lo frenás: no te saca pedidos y te llegan un ${Math.round(PROMO.extraDemanda * 100)}% más. Si era humo, regalaste el descuento. Y alguna vez la promo no prende.</span></span>
         <input type="checkbox" id="promo" ${pub.promo ? 'checked' : ''}>
+      </label>
+    </div>` : ''}
+
+    ${esSemanaCyber(e.semana) ? `<div class="tarjeta">
+      <label class="interruptor" style="border-top:0">
+        <span><strong>Sumarte al CyberMonday</strong><br><span class="suave">Bajás todos los precios un ${Math.round(CYBER.descuento * 100)}% esta semana y la gente te pide mucho más de todo. Si no te sumás, no ganás nada extra.</span></span>
+        <input type="checkbox" id="cyber" ${pub.cyber ? 'checked' : ''}>
       </label>
     </div>` : ''}
 
@@ -459,6 +554,11 @@ function pantallaPublicidad() {
         </div>
       </div>
       ${lineaVendedores(e)}
+      <label class="interruptor">
+        <span><strong>Repartir volantes</strong><br><span class="suave">${plata(VOLANTES.costo)} de imprenta · ${VOLANTES.horas} h recorriendo el barrio. Te piden más esta semana y un poco más la que viene.</span></span>
+        <input type="checkbox" id="volantes" ${pub.volantes ? 'checked' : ''}>
+      </label>
+      ${opcionVolantesVendedor(e)}
     </div>
 
     <div class="tarjeta">
@@ -493,6 +593,12 @@ function pantallaPublicidad() {
   app.querySelectorAll('[data-redes]').forEach((b) => { b.onclick = () => { pub.horasRedes = Math.max(0, pub.horasRedes + Number(b.dataset.redes)); refrescar(); }; });
   const promo = document.getElementById('promo');
   if (promo) promo.onchange = (ev) => { pub.promo = ev.target.checked; refrescar(); };
+  const cyber = document.getElementById('cyber');
+  if (cyber) cyber.onchange = (ev) => { pub.cyber = ev.target.checked; refrescar(); };
+  document.getElementById('volantes').onchange = (ev) => { pub.volantes = ev.target.checked; if (!pub.volantes) pub.volantesVendedor = null; refrescar(); };
+  const vv = document.getElementById('volantesVendedor');
+  if (vv) vv.onchange = (ev) => { pub.volantesVendedor = ev.target.checked ? vv.dataset.id : null; refrescar(); };
+  app.querySelectorAll('[data-decision]').forEach((b) => { b.onclick = () => accionCompra(resolverDecision(partida, b.dataset.decision)); });
   document.getElementById('feria').onchange = (ev) => { pub.feria = ev.target.checked; if (!pub.feria) pub.feriaVendedor = null; refrescar(); };
   conectarEquipo();
   app.querySelectorAll('input[name="curso"]').forEach((r) => { r.onchange = () => { pub.curso = r.value; refrescar(); }; });
@@ -590,7 +696,8 @@ function pantallaPedidos() {
   const pedidas = unidadesPedidas(sem);
   const productos = Object.keys(PRODUCTOS).filter((id) => e.maquinas[PRODUCTOS[id].maquina]);
   const v = validarPlan(e, plan);
-  const precio = (p) => Math.round(p.cantidad * PRODUCTOS[p.producto].precio * (sem.promo ? 1 - PROMO.descuento : 1));
+  const precio = (p) => precioPedido(p, sem);
+  const servicios = (p) => `${p.envio ? ` · 🚚 envío (+${Math.round(SERVICIOS.envio.recargo * 100)}%, ${SERVICIOS.envio.horas} h)` : ''}${p.diseno ? ` · 🎨 diseño propio (+${Math.round(SERVICIOS.diseno.recargo * 100)}%, lleva más tiempo)` : ''}`;
 
   app.innerHTML = `
     ${bloqueEncabezado(e, '<div class="paso-semana">Sábado · Pedidos y producción</div>')}
@@ -603,11 +710,11 @@ function pantallaPedidos() {
         <div class="pedido ${p.rechazado ? 'rechazado' : ''}">
           <div class="info">
             <div class="nombre">${p.cantidad} ${nombreUnidades(p.producto, p.cantidad)}</div>
-            <div class="detalle">${p.cliente} · ${plata(precio(p))}${p.rechazado ? ' · rechazado' : ''}</div>
+            <div class="detalle">${p.cliente} · ${plata(precio(p))}${servicios(p)}${p.rechazado ? ' · rechazado' : ''}</div>
           </div>
           <button class="chico" data-rechazar="${p.id}">${p.rechazado ? 'Aceptar' : 'Rechazar'}</button>
         </div>`).join('') : '<p class="suave">No llegaron pedidos. Probá con más horas de publicidad la semana que viene.</p>'}
-      <p class="suave" style="margin-top:8px">Si no entregás un pedido aceptado perdés reputación. Si sabés que no llegás, rechazalo: perdés mucho menos.</p>
+      <p class="suave" style="margin-top:8px">Si no entregás un pedido aceptado perdés reputación. Si sabés que no llegás, rechazalo: perdés mucho menos.${sem.pedidos.some((p) => p.envio || p.diseno) ? ' Los envíos los hace un operario con horas libres (si no, vos) y suman reputación; el diseño propio lo hacés vos.' : ''}</p>
     </div>
 
     <div class="tarjeta">
@@ -711,7 +818,8 @@ function pantallaLogro() {
   app.innerHTML = `
     <h1>¡Sos el mejor de la ciudad! 🏆</h1>
     <div class="tarjeta">
-      <p>Lelo no pudo competir y cerró el taller. En el almuerzo del domingo, el tío anunció que <strong>ahora trabaja para vos</strong>: entra como operario con experiencia 60 y cobra ${plata(40000)} por mes. Ya lo ves en tu equipo.</p>
+      <p>Lelo se dio cuenta de que no tenía nada que hacer contra tu majestuosidad. Cerró el taller, vendió la máquina de tazas y con la plata <strong>se fue un mes a Mar del Plata</strong>.</p>
+      <p class="suave">Cuando vuelva, seguro te golpea la puerta. Mientras tanto, pensá si querés sumar más gente al equipo.</p>
       <p>Lo lograste en la semana ${e.semana - 1}, con ${plata(e.plata)} en la caja y ${e.totales.vendidas} productos vendidos.</p>
     </div>
     <div class="tarjeta tio">
