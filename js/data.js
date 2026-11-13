@@ -496,6 +496,7 @@ export const PROVINCIA = {
   repAlPerder: 75, // si Traicio te gana, volvés a la ciudad con esta reputación
   repLeloAlVolver: 50,
   repTraicioRevancha: 30, // si volvés a la provincia después de perderla
+  repTraicioInicial: 8, // Traicio ya es el mejor de otra ciudad: arranca con ventaja
 };
 
 export const LELO_GERENTE = { sueldo: 150000, errores: 0.8, umbralCansancio: 28 };

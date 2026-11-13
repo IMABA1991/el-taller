@@ -86,8 +86,8 @@ function planRazonable(e) {
     }
     const p2 = { producir };
     for (let i = 0; i < 400 && !validarPlan(e, p2).ok; i++) {
-      // Primero terceriza pedidos de redes (si puede), después baja la producción
-      const terc = e.mejorDeLaCiudad && sem.pedidos.find((x) => !x.rechazado && !x.tercerizado && p2.producir[x.producto] > 0);
+      // Primero terceriza pedidos de redes (si puede y no está en rojo), después baja la producción
+      const terc = e.mejorDeLaCiudad && e.plata > 0 && sem.pedidos.find((x) => !x.rechazado && !x.tercerizado && p2.producir[x.producto] > 0);
       if (terc) { tercerizarPedido(e, terc.id, true); p2.producir[terc.producto] = Math.max(0, p2.producir[terc.producto] - terc.cantidad); continue; }
       const id = ids.find((x) => p2.producir[x] > 0 && !PRODUCTOS[x].soloPedido && p2.producir[x] > pedidas[x] + empresa[x] - e.stock[x]) || ids.find((x) => p2.producir[x] > 0);
       if (id) p2.producir[id]--;

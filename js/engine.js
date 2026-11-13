@@ -1601,13 +1601,16 @@ export function cerrarSemana(e, plan) {
     }
     if (p.tercerizado || e.stock[p.producto] >= p.cantidad) {
       if (p.tercerizado) {
-        const costo = Math.round(PRODUCTOS[p.producto].precio * p.cantidad * (p.factorTerc || TERCERIZAR.max));
-        e.plata -= costo; r.gastos += costo;
+        // Si la tercerizadora le erra, perdés el pedido y el insumo que pusiste (no le pagás el trabajo).
         if (siguienteAzar(e) < TERCERIZAR.falla) {
+          const insumo = PRODUCTOS[p.producto].costo * p.cantidad;
+          e.plata -= insumo; r.gastos += insumo;
           deltaRep += TERCERIZAR.repFalla;
-          evento(`🏭 La tercerizadora le erró a la calidad del pedido de ${p.cliente} (${nombre}): perdiste el pedido y lo que pagaste (−0,02 de reputación).`, 'desastre');
+          evento(`🏭 La tercerizadora le erró a la calidad del pedido de ${p.cliente} (${nombre}): perdiste el pedido y el insumo (−${plata$(insumo)}, −0,02 de reputación).`, 'desastre');
           continue;
         }
+        const costo = Math.round(PRODUCTOS[p.producto].precio * p.cantidad * (p.factorTerc || TERCERIZAR.max));
+        e.plata -= costo; r.gastos += costo;
       } else e.stock[p.producto] -= p.cantidad;
       const ingreso = precioPedido(p, sem);
       e.plata += ingreso;
@@ -1907,7 +1910,7 @@ export function iniciarProvincia(e, revancha = false) {
   e.reconquista = false;
   e.rep = 0;
   e.traicio = {
-    rep: revancha ? PROVINCIA.repTraicioRevancha : 0,
+    rep: revancha ? PROVINCIA.repTraicioRevancha : PROVINCIA.repTraicioInicial,
     visible: null, mesVisible: null, alertaDada: false,
     factor: redondear(entre(e, TRAICIO.factorMin, TRAICIO.factorMax), 3),
     ganancias: [],
@@ -2220,13 +2223,15 @@ function cerrarEmpresas(e, r, evento, sumarRep) {
     const hayStock = Object.entries(p.items).every(([id, n]) => e.stock[id] >= n);
     if (p.tercerizar || hayStock) {
       if (p.tercerizar) {
-        const costo = Math.round(p.precio * p.factorTerc);
-        e.plata -= costo; r.gastos += costo;
         if (siguienteAzar(e) < TERCERIZAR.falla) {
+          const insumo = Object.entries(p.items).reduce((t, [id, n]) => t + PRODUCTOS[id].costo * n, 0);
+          e.plata -= insumo; r.gastos += insumo;
           e.rep = limitar(redondear(e.rep + TERCERIZAR.repFalla), 0, 100);
-          evento(`🏭 La tercerizadora le erró a la calidad del pedido de ${p.cliente}: perdiste el pedido y lo que pagaste (−0,02 de reputación).`, 'desastre');
+          evento(`🏭 La tercerizadora le erró a la calidad del pedido de ${p.cliente}: perdiste el pedido y el insumo (−${plata$(insumo)}, −0,02 de reputación).`, 'desastre');
           continue;
         }
+        const costo = Math.round(p.precio * p.factorTerc);
+        e.plata -= costo; r.gastos += costo;
       } else {
         for (const [id, n] of Object.entries(p.items)) e.stock[id] -= n;
       }
