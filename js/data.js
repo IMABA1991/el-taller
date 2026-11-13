@@ -149,7 +149,8 @@ export const VOLANTES = { costo: 5000, horas: 6, extra: 0.15, extraSiguiente: 0.
 // Servicios especiales que piden algunos clientes.
 export const SERVICIOS = {
   envio: { prob: 0.15, recargo: 0.1, rep: 0.5, horas: 1 }, // 1 h por envío, de un empleado si hay
-  diseno: { prob: 0.1, recargo: 0.2, tiempoExtra: 0.5 }, // +50% del tiempo de esas unidades (lo hacés vos)
+  // +50% del tiempo de esas unidades: lo hace el diseñador de esa máquina (con sus horas) o, si no hay, vos.
+  diseno: { prob: 0.1, recargo: 0.2, tiempoExtra: 0.5 },
 };
 
 export const GASTOS_FIJOS = { luz: 12000, internet: 10000, publicidad: 8000 };
@@ -416,13 +417,14 @@ export const PUESTOS = {
     },
     rasgos: ['rapido', 'creativo', 'faltador', 'quejoso'],
   },
-  // Diseñadores (desde la provincia): no producen, bajan los errores de las máquinas que manejan.
+  // Diseñadores (desde la provincia): no producen, bajan los errores de las máquinas que manejan y hacen
+  // los diseños personalizados de sus productos (con más pedidos personalizados: probDiseno).
   disenador: {
-    nombre: 'Diseñador', tarea: 'diseño', horas: 0, desdeProvincia: true,
+    nombre: 'Diseñador', tarea: 'diseño', horas: 0, horasDiseno: 20, desdeProvincia: true,
     variantes: {
-      basico: { nombre: 'Básico', sueldo: 35000, exp: 20, maquinas: ['tazas', 'gorras'], errores: 0.8 },
-      textil: { nombre: 'Textil', sueldo: 60000, exp: 30, maquinas: ['plancha30', 'plancha1m'], errores: 0.6 },
-      deportivo: { nombre: 'Deportivo', sueldo: 120000, exp: 40, maquinas: ['calandra'], errores: 0.4 },
+      basico: { nombre: 'Básico', sueldo: 35000, exp: 20, maquinas: ['tazas', 'gorras'], errores: 0.8, probDiseno: 0.2 },
+      textil: { nombre: 'Textil', sueldo: 60000, exp: 30, maquinas: ['plancha30', 'plancha1m'], errores: 0.6, probDiseno: 0.25 },
+      deportivo: { nombre: 'Deportivo', sueldo: 120000, exp: 40, maquinas: ['calandra'], errores: 0.4, probDiseno: 0.3 },
     },
     rasgos: ['prolijo', 'creativo', 'distraido', 'faltador', 'quejoso'],
   },
@@ -462,20 +464,29 @@ export const CAPACITACION = {
   vos: { horas: 4, buffet: 3000, puntos: 5, partePorTipos: 0.65 },
 };
 
-export const LELO_EMPLEADO = { sueldo: 40000, exp: 60, horas: 20 };
+export const LELO_EMPLEADO = { sueldo: 40000, exp: 60, horas: 40 };
 
-// Al ganar la ciudad, Lelo cierra y se va un mes de viaje antes de trabajar para vos.
+// Al ganar la ciudad, Lelo cierra y se va un mes de viaje a Santa Clara del Mar.
 export const LELO_VIAJE = {
   semanas: 4,
   probFoto: 0.5,
   fotos: [
-    'Lelo subió una foto con un choclo en la playa de Mar del Plata.',
+    'Lelo subió una foto con un choclo en la playa de Santa Clara del Mar.',
     'Lelo subió una historia: "Primer día sin pensar en tazas 🌊".',
     'Lelo se insoló durmiendo en la playa. Subió una foto rojo como un camarón.',
     'Lelo te mandó una foto con un lobo marino. El lobo marino parece más contento.',
-    'Lelo subió un video comiendo churros en la Rambla. Ya no le queda casi plata.',
+    'Lelo subió un video comiendo churros en la costanera. Ya no le queda casi plata.',
     'Lelo le escribió al grupo de la familia: "Acá todo bien, ¿y por allá qué onda el negocio?".',
   ],
+};
+
+// Cuando Lelo vuelve del viaje, la abuela te pide que le des trabajo: cada 4 semanas, hasta 4 veces.
+// Aceptar suma reputación, experiencia y confianza del tío; cada rechazo resta el doble que el anterior.
+export const ABUELA = {
+  cadaSemanas: 4,
+  veces: 4,
+  bonus: 7.5,
+  castigos: [2.5, 5, 10, 20],
 };
 
 // ---------- Provincia ----------
@@ -535,7 +546,7 @@ export const EMPRESAS = {
   probTraicioSeLoLleva: 0.3, // si no es cliente fijo
 };
 
-export const TERCERIZAR = { min: 0.9, max: 0.95 }; // lo que pagás del precio
+export const TERCERIZAR = { min: 0.9, max: 0.95, falla: 0.15, repFalla: -0.02 }; // lo que pagás del precio; 15% de los pedidos salen mal
 
 export const LICITACION = {
   cada: { min: 7, max: 9 },

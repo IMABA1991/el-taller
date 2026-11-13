@@ -195,3 +195,30 @@ button.chico { min-height: 40px; padding: 6px 12px; border-radius: 10px; border:
 button.chico.peligro { color: var(--mal); border-color: #efc2bc; }
 .pedido .acciones-pedido { display: flex; flex-direction: column; gap: 4px; align-items: flex-end; }
 .chico.activo { background: var(--principal); color: #fff; border-color: var(--principal); }
+
+/* Eventos destacados: oportunidades en amarillo fuerte, desastres en rojo fuerte */
+.feed li.oportunidad, .eventos li.oportunidad { background: var(--oportunidad); color: var(--oportunidad-texto); font-weight: 600; }
+.feed li.desastre, .eventos li.desastre { background: var(--desastre); color: #fff; font-weight: 600; }
+.tarjeta.oportunidad { background: var(--tarjeta); border: 3px solid var(--oportunidad); }
+
+/* Secciones contraíbles (+/− arriba a la derecha) */
+.tarjeta.contraible { position: relative; }
+.tarjeta.contraible > h2 { padding-right: 40px; }
+.contraer {
+  position: absolute; top: 8px; right: 8px; width: 30px; height: 30px; border-radius: 8px;
+  border: 1px solid var(--borde); background: var(--tarjeta); font-size: 1.1rem; font-weight: 700; line-height: 1; cursor: pointer; color: var(--texto);
+}
+.tarjeta.contraida > :not(h2):not(.contraer) { display: none; }
+.tarjeta.contraida > h2 { margin-bottom: 0; }
+
+/* Cantidad a producir: se puede escribir */
+.paso input.numero {
+  width: 52px; min-width: 0; border: 1px solid var(--borde); border-radius: 8px; padding: 4px 2px; background: var(--tarjeta);
+  color: var(--texto); font: inherit; font-weight: 700; font-size: 1.1rem; text-align: center; -moz-appearance: textfield;
+}
+.paso input.numero::-webkit-outer-spin-button, .paso input.numero::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.paso button { touch-action: manipulation; user-select: none; -webkit-user-select: none; }
+
+/* Elegir qué pedidos tercerizar */
+.marcar { display: flex; align-items: center; gap: 6px; font-size: 0.85rem; white-space: nowrap; }
+.marcar input { width: 22px; height: 22px; }

@@ -5,7 +5,7 @@ import {
   MAZO_FERIA, PROB_CARTA_FERIA, MERMA, CANSANCIO, PUESTOS, RASGOS, NOMBRES_EMPLEADOS, EQUIPO, CAPACITACION,
   LELO_EMPLEADO, CHUCHU, NOMBRES_FEMENINOS, CYBER, CONFIANZA, ORDEN_MAQUINAS, MAQUINAS_FUTURAS, LOCALES, VOLANTES,
   SERVICIOS, LELO_VIAJE, TRAICIO, SIN_TEXTIL_ERRORES, PROVINCIA, LELO_GERENTE, DEFENSAS, SEGURIDAD, EMPRESAS,
-  TERCERIZAR, LICITACION, VOZ_DE_ADENTRO,
+  TERCERIZAR, LICITACION, VOZ_DE_ADENTRO, ABUELA,
 } from './data.js';
 
 export const VERSION_PARTIDA = 4;
@@ -600,8 +600,30 @@ export function serviciosDeLaSemana(sem) {
   return { envios: activos.filter((p) => p.envio).length, diseno: activos.filter((p) => p.diseno) };
 }
 
+// Diseñadores presentes que manejan la máquina de un producto.
+function disenadoresDe(e, idProducto) {
+  const maq = PRODUCTOS[idProducto].maquina;
+  return presentes(e, 'disenador').filter((x) => PUESTOS.disenador.variantes[x.variante].maquinas.includes(maq));
+}
+
+// Chance de que un pedido traiga diseño personalizado: sube si tenés el diseñador de esa máquina.
+export function probDiseno(e, idProducto) {
+  const probs = disenadoresDe(e, idProducto).map((x) => PUESTOS.disenador.variantes[x.variante].probDiseno);
+  return Math.max(SERVICIOS.diseno.prob, ...probs);
+}
+
+// Horas por semana que un diseñador dedica a los diseños personalizados.
+export function horasDisenador(e, emp) {
+  if (emp.falta) return 0;
+  let h = PUESTOS.disenador.horasDiseno;
+  if (emp.rasgo === 'creativo') h *= 0.9;
+  if (emp.desganado) h *= EQUIPO.desganoQuejoso;
+  return redondear(h, 1);
+}
+
 // Reparte la producción: primero los operarios (con sus horas), lo que no les entra lo hacés vos.
-// Después, los envíos los hace un operario con horas libres (si no, vos), y el diseño personalizado lo hacés vos.
+// Después, los envíos los hace un operario con horas libres (si no, vos), y el diseño personalizado lo hace
+// el diseñador de esa máquina con sus horas (lo que no le entra, vos).
 export function repartirProduccion(e, producir, sem = e.semanaEnCurso) {
   const operarios = presentes(e, 'operario').map((emp) => ({ emp, libres: horasEmpleado(e, emp, sem), unidades: {}, horas: 0, envios: 0 }));
   const vos = { unidades: {}, horas: 0, envios: 0, horasDiseno: 0 };
@@ -622,9 +644,17 @@ export function repartirProduccion(e, producir, sem = e.semanaEnCurso) {
     const o = operarios.find((x) => x.libres + 1e-9 >= SERVICIOS.envio.horas);
     if (o) { o.libres -= SERVICIOS.envio.horas; o.horas += SERVICIOS.envio.horas; o.envios++; } else { vos.horas += SERVICIOS.envio.horas; vos.envios++; }
   }
-  for (const p of serv.diseno) vos.horasDiseno += p.cantidad * horasPorUnidad(e, p.producto) * SERVICIOS.diseno.tiempoExtra;
+  const disenadores = presentes(e, 'disenador').map((emp) => ({ emp, libres: horasDisenador(e, emp), horas: 0 }));
+  for (const p of serv.diseno) {
+    let falta = p.cantidad * horasPorUnidad(e, p.producto) * SERVICIOS.diseno.tiempoExtra;
+    for (const d of disenadores.filter((x) => disenadoresDe(e, p.producto).includes(x.emp))) {
+      const usa = Math.min(d.libres, falta);
+      d.libres -= usa; d.horas += usa; falta -= usa;
+    }
+    vos.horasDiseno += falta;
+  }
   vos.horas += vos.horasDiseno;
-  return { operarios, vos };
+  return { operarios, vos, disenadores };
 }
 
 export function capacidadEquipo(e, sem = e.semanaEnCurso) {
@@ -681,10 +711,55 @@ function inicioDeSemana(e, evento) {
   ch.candidato = ch.llamadoSemana === e.semana ? ch.candidato : null;
   if (enProvincia(e) && e.licitacion?.proxima && e.semana >= e.licitacion.proxima && !e.licitacion.abierta) abrirLicitacion(e, evento);
   if (e.leloVuelve && e.semana >= e.leloVuelve && leloDeViaje(e)) {
-    sumarLelo(e);
     e.leloVuelve = null;
-    evento?.(`🏖️ Lelo volvió bronceado y sin un peso. Te golpeó la puerta: "Primo... ¿no necesitarás a alguien?" Desde ahora trabaja para vos: operario con experiencia ${LELO_EMPLEADO.exp}, ${plata$(LELO_EMPLEADO.sueldo)} por mes.`, 'hito');
+    e.abuela = { pidiendo: false, veces: 0, rechazos: 0, proxima: e.semana, fin: false, acepto: false };
   }
+  const ab = e.abuela;
+  if (ab && !ab.fin && !ab.pidiendo && e.semana >= ab.proxima && ab.veces < ABUELA.veces) {
+    ab.pidiendo = true;
+    ab.veces++;
+    evento?.(ab.veces === 1
+      ? '👵 Te llamó la abuela: Lelo volvió de Santa Clara del Mar, no consigue trabajo y se le puso a llorar. Te pregunta si le podés dar trabajo en tu taller. Contestale el domingo.'
+      : '👵 La abuela volvió a llamar: Lelo sigue sin conseguir trabajo. Te pregunta otra vez si le podés hacer un lugar en tu taller. Contestale el domingo.', 'oportunidad');
+  }
+}
+
+// ---------- La abuela te pide trabajo para Lelo ----------
+export function abuelaPide(e) {
+  return Boolean(e.abuela?.pidiendo);
+}
+
+export function responderAbuela(e, acepta) {
+  const ab = e.abuela;
+  if (!ab?.pidiendo) return { ok: false, motivo: 'La abuela no te está pidiendo nada.' };
+  if (e.semanaEnCurso) return { ok: false, motivo: 'Se decide el domingo.' };
+  ab.pidiendo = false;
+  const mover = (d) => {
+    e.rep = limitar(redondear(e.rep + d), 0, 100);
+    e.exp = limitar(redondear(e.exp + d), 0, 100);
+    sumarHistorial(e, d);
+  };
+  const numero = (x) => String(x).replace('.', ',');
+  if (acepta) {
+    ab.fin = true;
+    ab.acepto = true;
+    sumarLelo(e);
+    if (e.mejorDeLaProvincia) {
+      e.leloGerente = true;
+      e.equipo.empleados.find((x) => x.esLelo).sueldo = LELO_GERENTE.sueldo;
+    }
+    mover(ABUELA.bonus);
+    return { ok: true, mensaje: `Le dijiste que sí. La abuela está chocha y Lelo arranca el lunes: no te ocupa un lugar en el equipo, trabaja ${LELO_EMPLEADO.horas} h por semana y cobra ${plata$(e.leloGerente ? LELO_GERENTE.sueldo : LELO_EMPLEADO.sueldo)} por mes. +${numero(ABUELA.bonus)} de reputación, de experiencia y de confianza del tío.` };
+  }
+  ab.rechazos++;
+  const castigo = ABUELA.castigos[Math.min(ab.rechazos, ABUELA.castigos.length) - 1];
+  mover(-castigo);
+  let mensaje = `Lelo entiende. Lelo se va deprimido. Lelo va a seguir buscando un trabajo... La abuela se enojó con vos: −${numero(castigo)} de reputación, de experiencia y de confianza del tío.`;
+  if (ab.veces >= ABUELA.veces) {
+    ab.fin = true;
+    mensaje += ' La abuela no te va a pedir más: Lelo, al no conseguir trabajo, canceló su suscripción a la vida.';
+  } else ab.proxima = e.semana + ABUELA.cadaSemanas;
+  return { ok: true, mensaje };
 }
 
 // Cierre de mes del equipo: sueldos, olvido, quejas y media del mercado.
@@ -895,7 +970,7 @@ function precioReferencia(e) {
 
 function aplicarCarta(e, carta, r, evento) {
   const signo = carta.tipo === 'mala' ? -1 : 1;
-  const tipoEv = carta.tipo;
+  const tipoEv = carta.tipo === 'mala' && carta.tamano === 'grande' ? 'desastre' : carta.tipo;
   if (carta.decision) {
     e.decisiones.push({ id: carta.decision, texto: carta.texto, monto: carta.monto });
     evento(`📌 ${carta.texto} Lo decidís el domingo.`, tipoEv);
@@ -1063,6 +1138,7 @@ export function validarPublicidad(e, pub) {
   const horas = pub.horasRedes || 0;
   if (horas < 0 || !Number.isInteger(horas)) errores.push('Horas de publicidad inválidas.');
   if (e.decisiones.length) errores.push('Antes de arrancar, decidí qué hacer con lo que pasó.');
+  if (abuelaPide(e)) errores.push('Antes de arrancar, contestale a la abuela.');
   if (pub.promo && !puedeHacerPromo(e)) errores.push('La promo de contraataque solo se puede lanzar cuando hay un rumor sobre Lelo.');
   if (pub.cyber && !esSemanaCyber(e.semana)) errores.push('El CyberMonday no es esta semana.');
   if (pub.volantesVendedor) {
@@ -1262,7 +1338,7 @@ export function publicar(e, pub) {
         deLelo.push(pedido);
       } else {
         pedido.envio = siguienteAzar(e) < SERVICIOS.envio.prob;
-        pedido.diseno = siguienteAzar(e) < SERVICIOS.diseno.prob;
+        pedido.diseno = siguienteAzar(e) < probDiseno(e, id);
         if (e.mejorDeLaCiudad) pedido.factorTerc = redondear(entre(e, TERCERIZAR.min, TERCERIZAR.max), 3);
         pedidos.push(pedido);
       }
@@ -1527,6 +1603,11 @@ export function cerrarSemana(e, plan) {
       if (p.tercerizado) {
         const costo = Math.round(PRODUCTOS[p.producto].precio * p.cantidad * (p.factorTerc || TERCERIZAR.max));
         e.plata -= costo; r.gastos += costo;
+        if (siguienteAzar(e) < TERCERIZAR.falla) {
+          deltaRep += TERCERIZAR.repFalla;
+          evento(`🏭 La tercerizadora le erró a la calidad del pedido de ${p.cliente} (${nombre}): perdiste el pedido y lo que pagaste (−0,02 de reputación).`, 'desastre');
+          continue;
+        }
       } else e.stock[p.producto] -= p.cantidad;
       const ingreso = precioPedido(p, sem);
       e.plata += ingreso;
@@ -1562,7 +1643,7 @@ export function cerrarSemana(e, plan) {
   if (serv.envios || serv.diseno.length) {
     const partes = [];
     if (reparto.vos.envios || serv.envios) partes.push(`${serv.envios} envío${serv.envios === 1 ? '' : 's'} a domicilio${reparto.vos.envios ? ` (${reparto.vos.envios} los hiciste vos)` : ' (los hizo tu equipo)'}`);
-    if (serv.diseno.length) partes.push(`${serv.diseno.length} diseño${serv.diseno.length === 1 ? '' : 's'} personalizado${serv.diseno.length === 1 ? '' : 's'}`);
+    if (serv.diseno.length) partes.push(`${serv.diseno.length} diseño${serv.diseno.length === 1 ? '' : 's'} personalizado${serv.diseno.length === 1 ? '' : 's'}${reparto.disenadores.some((d) => d.horas > 0) ? (reparto.vos.horasDiseno > 0 ? ' (parte los hizo tu diseñador)' : ' (los hizo tu diseñador)') : ''}`);
     linea(`Servicios especiales: ${partes.join(' y ')}.`);
   }
   else if (!sem.pedidos.length) linea('No llegaron pedidos esta semana.');
@@ -1652,7 +1733,7 @@ export function cerrarSemana(e, plan) {
       e.mejorDeLaCiudad = true;
       r.hito = 'mejorDeLaCiudad';
       e.leloVuelve = e.semana + 1 + LELO_VIAJE.semanas;
-      evento('¡Lograste ser el mejor de la ciudad! Lelo se dio cuenta de que no tenía nada que hacer contra tu majestuosidad: cerró el taller, vendió la máquina de tazas y con la plata se fue un mes a Mar del Plata.', 'hito');
+      evento('¡Lograste ser el mejor de la ciudad! Lelo se dio cuenta de que no tenía nada que hacer contra tu majestuosidad: cerró el taller, vendió la máquina de tazas y con la plata se fue un mes a Santa Clara del Mar.', 'hito');
       evento(`Arranca la pelea por la provincia contra ${TRAICIO.nombre}, de ${TRAICIO.empresa}. Tu reputación en la provincia arranca en 0, pero el mercado es el doble de grande.`, 'hito');
       iniciarProvincia(e);
     } else if (e.reconquista) {
@@ -1690,6 +1771,7 @@ export function jugarSemana(e, plan) {
     const d = e.decisiones[0];
     resolverDecision(e, plan.decision?.[d.id] || Object.keys(MAZO.decisiones[d.id].opciones)[0]);
   }
+  if (abuelaPide(e)) responderAbuela(e, plan.abuela ?? true);
   const p = publicar(e, {
     horasRedes: plan.horasRedes || 0, promo: plan.promo, feria: plan.feria, curso: plan.curso,
     capacitar: plan.capacitar, feriaVendedor: plan.feriaVendedor, volantes: plan.volantes, volantesVendedor: plan.volantesVendedor, cyber: plan.cyber,
@@ -1811,7 +1893,7 @@ function finDeAnio(e, r, evento) {
   r.fiestas = { tuyo, delPrimo };
   if (enProvincia(e)) evento(`Fiestas: el tío levanta la copa por ${nombreDelTaller(e)}. ${e.mejorDeLaProvincia ? 'El mejor de la provincia: nadie habla de otra cosa.' : `Todos te preguntan por ${TRAICIO.empresa}.`}`, 'buena');
   else if (e.mejorDeLaCiudad && leloDeViaje(e)) evento('Fiestas: Lelo mandó un audio desde la playa para brindar. Todos te miran con respeto.', 'buena');
-  else if (e.mejorDeLaCiudad && !e.reconquista) evento('Fiestas: Lelo brinda por su jefe. Todos te miran con respeto.', 'buena');
+  else if (e.mejorDeLaCiudad && !e.reconquista && e.equipo.empleados.some((x) => x.esLelo)) evento('Fiestas: Lelo brinda por su jefe. Todos te miran con respeto.', 'buena');
   else if (tuyo >= delPrimo) evento(`Fiestas: el tío los compara delante de toda la familia. Tu reputación ${Math.round(tuyo)} contra ${Math.round(delPrimo)} de Lelo. "¡Este pibe va a llegar lejos!"`, 'buena');
   else evento(`Fiestas: el tío los compara delante de toda la familia. Tu reputación ${Math.round(tuyo)} contra ${Math.round(delPrimo)} de Lelo. "Che, ¿y vos qué estuviste haciendo todo el año?"`, 'mala');
 }
@@ -1855,15 +1937,23 @@ function perderProvincia(e, r, evento) {
   e.meta = 'ciudad';
   e.reconquista = true;
   e.rep = PROVINCIA.repAlPerder;
+  const trabajaba = e.equipo.empleados.some((x) => x.esLelo);
+  const desaparecido = !trabajaba && e.abuela?.fin && !e.abuela.acepto;
+  r.textoLelo = trabajaba
+    ? 'Lelo vio tu ineptitud para manejar algo grande: renunció y vuelve a intentarlo solo. Ahora es tu competencia.'
+    : desaparecido
+      ? 'Sorpresa: Lelo fingió su muerte. En realidad estaba escondido en la Patagonia, y ahora volvió a abrir su taller para competirte.'
+      : 'Lelo dejó de buscar trabajo y volvió a abrir su taller para competirte.';
   e.leloGerente = false;
   e.leloVuelve = null;
+  e.abuela = null;
   e.equipo.empleados = e.equipo.empleados.filter((x) => !x.esLelo);
   e.primo.rep = PROVINCIA.repLeloAlVolver;
   e.pedidosEmpresa = [];
   e.licitacion.abierta = null;
   if (e.traicio) e.traicio.sabotaje = null;
   r.hito = 'perdisteProvincia';
-  evento(`${TRAICIO.empresa} llegó primero: ${TRAICIO.nombre} es el mejor de la provincia. Perdiste el título y volvés a pelear la ciudad. Lelo vio cómo manejaste todo, renunció y volvió a abrir su taller para competirte.`, 'hito');
+  evento(`${TRAICIO.empresa} llegó primero: ${TRAICIO.nombre} es el mejor de la provincia. Perdiste el título y volvés a pelear la ciudad. ${r.textoLelo}`, 'hito');
 }
 
 function ganarProvincia(e, r, evento) {
@@ -1871,18 +1961,19 @@ function ganarProvincia(e, r, evento) {
   e.rep = 100;
   if (e.traicio) e.traicio.sabotaje = null;
   const lelo = e.equipo.empleados.find((x) => x.esLelo);
-  e.leloGerente = true;
-  if (lelo) lelo.sueldo = LELO_GERENTE.sueldo;
+  if (lelo) { e.leloGerente = true; lelo.sueldo = LELO_GERENTE.sueldo; }
   r.hito = 'mejorDeLaProvincia';
-  evento(`¡${nombreDelTaller(e)} es el mejor de la provincia! ${TRAICIO.nombre} cerró Talleres Judas. Lelo asciende a gerente de operaciones: deja de producir, pero baja los errores de todo el taller y te cansás menos (${plata$(LELO_GERENTE.sueldo)} por mes).`, 'hito');
+  r.leloAsciende = Boolean(lelo);
+  evento(`¡${nombreDelTaller(e)} es el mejor de la provincia! ${TRAICIO.nombre} cerró Talleres Judas.${lelo ? ` Lelo asciende a gerente de operaciones: deja de producir, pero baja los errores de todo el taller y te cansás menos (${plata$(LELO_GERENTE.sueldo)} por mes).` : ''}`, 'hito');
 }
 
-// Volver a ganar la ciudad después de perder la provincia: Lelo se rinde y vuelve.
+// Volver a ganar la ciudad después de perder la provincia: Lelo se rinde y se va otra vez de viaje.
 function reconquistarCiudad(e, r, evento) {
-  sumarLelo(e);
+  e.leloVuelve = e.semana + 1 + LELO_VIAJE.semanas;
+  e.abuela = null;
   iniciarProvincia(e, true);
   r.hito = 'reconquista';
-  evento(`¡Volviste a ser el mejor de la ciudad! Lelo se rindió y volvió a trabajar para vos. Arranca otra vez la pelea por la provincia: ${TRAICIO.nombre} te espera con ${PROVINCIA.repTraicioRevancha} de reputación.`, 'hito');
+  evento(`¡Volviste a ser el mejor de la ciudad! Lelo se rindió otra vez: cerró el taller y se fue un mes a Santa Clara del Mar. Arranca otra vez la pelea por la provincia: ${TRAICIO.nombre} te espera con ${PROVINCIA.repTraicioRevancha} de reputación.`, 'hito');
 }
 
 // ---------- Ritmo de Traicio: un 3-5% más lento que el tuyo, con un piso ----------
@@ -1943,34 +2034,34 @@ function ejecutarSabotaje(e, r, evento) {
     case 'resenas': {
       const d = -1 * dano;
       e.rep = limitar(redondear(e.rep + d), 0, 100);
-      evento(`${prefijo}${def.texto} (${formatoRep(d)} de reputación)`, 'mala');
+      evento(`${prefijo}${def.texto} (${formatoRep(d)} de reputación)`, 'desastre');
       break;
     }
     case 'hablaMal':
       e.traicio.malDemanda = { factor: 1 - 0.1 * dano, hasta: e.semana + 2 };
-      evento(`${prefijo}${def.texto}`, 'mala');
+      evento(`${prefijo}${def.texto}`, 'desastre');
       break;
     case 'soborno': {
       const h = 4 * dano;
       e.horasPerdidas += h;
-      evento(`${prefijo}${def.texto} (−${h} h)`, 'mala');
+      evento(`${prefijo}${def.texto} (−${h} h)`, 'desastre');
       break;
     }
     case 'tintura': {
       const tazas = ['tazaCeramica', 'tazaPlastico'].reduce((t, id) => t + e.stock[id], 0);
       if (!tazas) { evento(`${prefijo}${def.texto.split(':')[0]}. Por suerte no tenías tazas guardadas.`, 'info'); break; }
       e.decisiones.push({ id: 'tintura', texto: def.texto, monto: Math.round((base * 0.2 * dano * seguro) / 1000) * 1000, dano });
-      evento(`${prefijo}${def.texto} Lo decidís el domingo.`, 'mala');
+      evento(`${prefijo}${def.texto} Lo decidís el domingo.`, 'desastre');
       break;
     }
     case 'propaganda':
       e.decisiones.push({ id: 'propaganda', texto: def.texto, factor: dano });
-      evento(`${prefijo}${def.texto} Lo decidís el domingo.`, 'mala');
+      evento(`${prefijo}${def.texto} Lo decidís el domingo.`, 'desastre');
       break;
     case 'entregaTrucha': {
       const d = -2 * dano;
       e.rep = limitar(redondear(e.rep + d), 0, 100);
-      evento(`${prefijo}${def.texto} (${formatoRep(d)} de reputación)`, 'mala');
+      evento(`${prefijo}${def.texto} (${formatoRep(d)} de reputación)`, 'desastre');
       break;
     }
     case 'roboCliente': {
@@ -1979,11 +2070,11 @@ function ejecutarSabotaje(e, r, evento) {
         const p = vivos.sort((a, b) => b.precio - a.precio)[0];
         e.pedidosEmpresa = e.pedidosEmpresa.filter((x) => x !== p);
         delete e.empresas.clientes[p.cliente];
-        evento(`${prefijo}${TRAICIO.nombre} se quedó con el pedido de ${p.cliente} a último momento. Y no vuelve más.`, 'mala');
+        evento(`${prefijo}${TRAICIO.nombre} se quedó con el pedido de ${p.cliente} a último momento. Y no vuelve más.`, 'desastre');
       } else {
         const fijo = Object.keys(e.empresas.clientes).find((c) => e.empresas.clientes[c].fijo);
-        if (fijo) { delete e.empresas.clientes[fijo]; evento(`${prefijo}${TRAICIO.nombre} convenció a ${fijo}: dejó de ser tu cliente fijo.`, 'mala'); }
-        else { e.traicio.malDemanda = { factor: 1 - 0.2 * dano, hasta: e.semana + 2 }; evento(`${prefijo}${TRAICIO.nombre} les ofreció precios de remate a tus mejores clientes: por un par de semanas te van a pedir menos.`, 'mala'); }
+        if (fijo) { delete e.empresas.clientes[fijo]; evento(`${prefijo}${TRAICIO.nombre} convenció a ${fijo}: dejó de ser tu cliente fijo.`, 'desastre'); }
+        else { e.traicio.malDemanda = { factor: 1 - 0.2 * dano, hasta: e.semana + 2 }; evento(`${prefijo}${TRAICIO.nombre} les ofreció precios de remate a tus mejores clientes: por un par de semanas te van a pedir menos.`, 'desastre'); }
       }
       break;
     }
@@ -2095,7 +2186,7 @@ function nuevaOfertaEmpresa(e, tipo, enDia, evento) {
     id: `emp${e.semana}-${tipo}`, tipo, cliente, items, precio, vence: e.semana + def.plazo, cobro,
     estado: 'oferta', tercerizar: false, factorTerc: redondear(entre(e, TERCERIZAR.min, TERCERIZAR.max), 3), fijo: Boolean(info?.fijo),
   });
-  enDia(dia, `🏢 ${cliente}${info?.fijo ? ' (cliente fijo)' : ''} te encargó ${describirUnidades(items)} para dentro de ${def.plazo} semanas.`, 'pedido');
+  enDia(dia, `🏢 ${cliente}${info?.fijo ? ' (cliente fijo)' : ''} te encargó ${describirUnidades(items)} para dentro de ${def.plazo} semanas.`, 'oportunidad');
 }
 
 export function responderPedidoEmpresa(e, id, acepta) {
@@ -2131,6 +2222,11 @@ function cerrarEmpresas(e, r, evento, sumarRep) {
       if (p.tercerizar) {
         const costo = Math.round(p.precio * p.factorTerc);
         e.plata -= costo; r.gastos += costo;
+        if (siguienteAzar(e) < TERCERIZAR.falla) {
+          e.rep = limitar(redondear(e.rep + TERCERIZAR.repFalla), 0, 100);
+          evento(`🏭 La tercerizadora le erró a la calidad del pedido de ${p.cliente}: perdiste el pedido y lo que pagaste (−0,02 de reputación).`, 'desastre');
+          continue;
+        }
       } else {
         for (const [id, n] of Object.entries(p.items)) e.stock[id] -= n;
       }
@@ -2178,7 +2274,7 @@ function abrirLicitacion(e, evento) {
   for (const x of rivales) x.oferta = Math.round((L.precioRef * entre(e, L.rivales.ofertaMin, L.rivales.ofertaMax)) / 1000) * 1000;
   const club = L.clubes[Math.floor(siguienteAzar(e) * L.clubes.length)];
   e.licitacion.abierta = { semana: e.semana, club, rivales, oferta: null };
-  evento?.(`🏟️ ${club} abrió una licitación: ${L.combos} combos para dentro de un mes. Se ofertan el domingo.`, 'rumor');
+  evento?.(`🏟️ ${club} abrió una licitación: ${L.combos} combos para dentro de un mes. Se ofertan el domingo.`, 'oportunidad');
 }
 
 export function calidadLicitacion(e) {
@@ -2248,6 +2344,36 @@ export function tercerizarPedido(e, idPedido, si = true) {
   return { ok: true };
 }
 
+// Terceriza exactamente los pedidos de esta lista (los demás vuelven a producirse). Los rechazados no se tocan.
+export function tercerizarVarios(e, ids) {
+  const sem = e.semanaEnCurso;
+  if (!sem) return { ok: false, motivo: 'No hay pedidos esta semana.' };
+  if (!e.mejorDeLaCiudad) return { ok: false, motivo: 'La tercerización se habilita al ser el mejor de la ciudad.' };
+  const lista = new Set(ids);
+  for (const p of sem.pedidos) if (!p.rechazado) p.tercerizado = lista.has(p.id);
+  const n = sem.pedidos.filter((p) => p.tercerizado).length;
+  return { ok: true, mensaje: n ? `Tercerizaste ${n} pedido${n > 1 ? 's' : ''}.` : 'No tercerizás ningún pedido.' };
+}
+
+export function tercerizarTodo(e) {
+  return tercerizarVarios(e, (e.semanaEnCurso?.pedidos || []).filter((p) => !p.rechazado).map((p) => p.id));
+}
+
+// Terceriza los pedidos que no llegás a cubrir con tu stock y lo que pensás producir (en el orden de entrega).
+export function tercerizarResto(e, producir = {}) {
+  const sem = e.semanaEnCurso;
+  if (!sem) return { ok: false, motivo: 'No hay pedidos esta semana.' };
+  const hay = Object.fromEntries(Object.keys(PRODUCTOS).map((id) => [id, (e.stock[id] || 0) + (producir[id] || 0)]));
+  const ids = [];
+  for (const p of sem.pedidos) {
+    if (p.rechazado) continue;
+    if (p.tercerizado) { ids.push(p.id); continue; }
+    if (hay[p.producto] >= p.cantidad) hay[p.producto] -= p.cantidad;
+    else ids.push(p.id);
+  }
+  return tercerizarVarios(e, ids);
+}
+
 // ---------- La semana de Traicio (al cerrar cada semana en la provincia) ----------
 function semanaDeTraicio(e, r, evento, repBruta) {
   const t = e.traicio;
@@ -2278,4 +2404,5 @@ export function fmt(n) {
 export {
   HORAS_POR_SEMANA, PRODUCTOS, MAQUINAS, CURSOS, VENTAS, PRESTAMO, TUTORIAL, PROMO, CANSANCIO, PUESTOS, RASGOS, EQUIPO, CAPACITACION,
   MAZO, LOCALES, VOLANTES, SERVICIOS, CYBER, TRAICIO, LELO_VIAJE, PROVINCIA, LELO_GERENTE, DEFENSAS, SEGURIDAD, EMPRESAS, LICITACION, TERCERIZAR,
+  LELO_EMPLEADO, ABUELA,
 };

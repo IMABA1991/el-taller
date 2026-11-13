@@ -5,7 +5,7 @@ import {
   nuevaPartida, jugarSemana, demandaEsperada, horasPorUnidad, horasPorVenta, validarPlan, validarPublicidad,
   comprarMaquina, pagarPrestamoA, costoPagoAnticipadoA, calendario, unidadesPedidas, horasDelPlan, stockTotal, PRODUCTOS, VENTAS,
   capacidadEquipo, presentes, empleadosContratados, cupoEquipo, llamarAChuchu, chuchuDisponible, irALaBolsa, contratar,
-  publicarAnuncio, responderAumento, horasEmpleado, HORAS_POR_SEMANA, publicar,
+  publicarAnuncio, responderAumento, horasEmpleado, HORAS_POR_SEMANA, publicar, abuelaPide, responderAbuela,
 } from '../js/engine.js';
 
 // Contrata cuando no le dan las horas: primero un operario, después un vendedor.
@@ -217,9 +217,31 @@ chequear(ph < pa, 'La promo rinde menos cuando el rumor era humo');
   e.stock.tazaCeramica = 20; e.stock.tazaPlastico = 20;
   jugarSemana(e, { horasRedes: 6, producir: {} });
   chequear(e.mejorDeLaCiudad && !e.equipo.empleados.some((x) => x.esLelo), 'Al ganar la ciudad, Lelo se va un mes de viaje');
+  const sinLelo = structuredClone(e);
   for (let i = 0; i < 4; i++) jugarSemana(e, { horasRedes: 2, producir: {} });
+  chequear(abuelaPide(e) && !e.equipo.empleados.some((x) => x.esLelo), 'Cuando Lelo vuelve del viaje, la abuela te pide trabajo para él');
+  const repAntes = e.rep;
+  responderAbuela(e, true);
+  chequear(e.rep === Math.min(100, repAntes + 7.5), 'Aceptar a Lelo suma 7,5 de reputación');
+  jugarSemana(e, { horasRedes: 2, producir: {} });
   const lelo = e.equipo.empleados.find((x) => x.esLelo);
-  chequear(Boolean(lelo) && lelo.exp === 60 && lelo.sueldo === 40000, 'Cuatro semanas después, Lelo entra con experiencia 60 y $40.000');
+  chequear(Boolean(lelo) && lelo.exp === 60 && lelo.sueldo === 40000, 'Si le decís que sí, Lelo entra con experiencia 60 y $40.000');
+  chequear(horasEmpleado(e, lelo, {}) === 40 && empleadosContratados(e) === e.equipo.empleados.length - 1, 'Lelo pone 40 h y no ocupa cupo');
+  // Si le decís que no 4 veces: castigos 2,5 · 5 · 10 · 20 y la abuela no pide más
+  for (let i = 0; i < 4; i++) jugarSemana(sinLelo, { horasRedes: 2, producir: {} });
+  const castigos = [];
+  for (let i = 0; i < 20 && !sinLelo.abuela?.fin; i++) {
+    if (abuelaPide(sinLelo)) {
+      const h = sinLelo.tio.historial;
+      responderAbuela(sinLelo, false);
+      castigos.push(h - sinLelo.tio.historial);
+      sinLelo.tio.historial = 40; // para que el piso no tape el castigo
+    }
+    jugarSemana(sinLelo, { horasRedes: 2, producir: {}, abuela: false });
+  }
+  chequear(JSON.stringify(castigos) === JSON.stringify([2.5, 5, 10, 20]), `Rechazar a Lelo castiga 2,5 · 5 · 10 · 20 (dio ${castigos.join(' · ')})`);
+  for (let i = 0; i < 8; i++) jugarSemana(sinLelo, { horasRedes: 2, producir: {} });
+  chequear(!abuelaPide(sinLelo) && !sinLelo.equipo.empleados.some((x) => x.esLelo), 'Después del cuarto no, la abuela no pide más');
   // El operario produce por vos: tus horas bajan
   const f = nuevaPartida('A', 77);
   f.plata = 500000;

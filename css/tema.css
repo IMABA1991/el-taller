@@ -26,6 +26,9 @@
   --rumor-borde: #7f77dd;
   --chuchu-borde: #1d9e75; /* Chuchu */
   --pedido-fondo: #e8f0fd;
+  --oportunidad: #f5c518; /* eventos de oportunidad (amarillo fuerte) */
+  --oportunidad-texto: #3d2e00;
+  --desastre: #c62828; /* desastres (rojo fuerte) */
 
   /* Secciones: cada una con su fondo pastel, y borde y título en un tono fuerte del mismo color */
   --publicidad-fondo: #fbeaf0; --publicidad-borde: #ed93b1; --publicidad-titulo: #72243e; /* rosa */
