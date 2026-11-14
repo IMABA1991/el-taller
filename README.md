@@ -11,14 +11,15 @@ Arrancás con un préstamo de tu tío y una máquina de tazas, competís con tu 
 - Tutorial de enero y febrero, estacionalidad y fechas especiales.
 - Reputación, experiencia, cansancio (40 h por semana; cansa desde las 25) y cursos cortos.
 - Equipo desde la primera semana: operarios y vendedores, con rasgos y sueldos. Se contratan en la bolsa del municipio, por Chuchu o con un anuncio. Capacitaciones para el equipo.
-- Lelo se suma como empleado un mes después de que sos el mejor de la ciudad (antes se va de viaje).
+- Al ser el mejor de la ciudad, Lelo se va un mes a Santa Clara del Mar. Cuando vuelve, la abuela te pide que le des trabajo (cada 4 semanas, hasta 4 veces): si aceptás, suma 40 h por semana sin ocupar cupo; cada rechazo baja reputación, experiencia y confianza del tío.
 - El primo como rival: rumores, promo de contraataque (falla 1 de cada 10) y clientes que cancelan para irse con él.
 - Mazo de eventos por trimestre: cartas de plata, horas, stock y reputación, algunas con decisiones.
 - Fechas especiales casi todos los meses (San Valentín, Día de la Mujer, Pascuas, 25 de Mayo, Día del Amigo, CyberMonday y más).
 - El tío vuelve a prestar para la próxima máquina, según su confianza (historial de pago y reputación).
 - Local chico para tener más de 2 empleados, volantes y servicios especiales (envío y diseño personalizado).
 - Experiencia por máquina: en una máquina nueva arrancás con la mitad.
-- **Provincia:** pelea contra Traicio Nero (Talleres Judas): sabotajes, robo de empleados, La Voz de Adentro, defensas y persona de seguridad. Plancha 30x30, plancha 1x1 m y calandra; diseñadores; local grande; tercerización; pedidos de empresas con cobro a 30 días; licitaciones de clubes del ascenso; Lelo gerente. Si Traicio te gana, volvés a la ciudad y hay revancha.
+- **Provincia:** pelea contra Traicio Nero (Talleres Judas): sabotajes, robo de empleados, La Voz de Adentro, defensas y persona de seguridad. Plancha 30x30, plancha 1x1 m y calandra; diseñadores (bajan errores y hacen los diseños personalizados de sus máquinas); local grande; tercerización en bloque (todo, el resto o elegir cuáles; 15% de falla); pedidos de empresas con cobro a 30 días; licitaciones de clubes del ascenso; Lelo gerente. Si Traicio te gana, volvés a la ciudad y hay revancha.
+- Pantalla: cantidades a producir que se ajustan manteniendo apretado o escribiendo el número, semana animada que no se desplaza sola (oportunidades en amarillo, desastres en rojo) y secciones que se achican con +/−.
 - La partida se guarda en el navegador (las cuentas con Firebase llegan en el próximo paso).
 
 ## Estructura
@@ -31,6 +32,7 @@ Arrancás con un préstamo de tu tío y una máquina de tazas, competís con tu 
 - `js/main.js`: pantallas e interacción.
 - `js/storage.js`: guardado de la partida.
 - `tests/simulacion.js`: juega 400 partidas automáticas y controla el balance de la ciudad.
+- `docs/REGLAS.md`: documento de diseño del juego (reglas y números, versión 0.19).
 - `tests/provincia.js`: juega 240 partidas de hasta 3 años y controla el balance de la provincia (`npm test` corre las dos).
 
-Las reglas completas están en el documento de diseño del proyecto.
+Las reglas completas están en `docs/REGLAS.md` (copia del documento de diseño del proyecto).
