@@ -21,12 +21,14 @@ Arrancás con un préstamo de tu tío y una máquina de tazas, competís con tu 
 - **Provincia:** pelea contra Traicio Nero (Talleres Judas): sabotajes, robo de empleados, La Voz de Adentro, defensas y persona de seguridad. Plancha 30x30, plancha 1x1 m y calandra; diseñadores (bajan errores y hacen los diseños personalizados de sus máquinas); local grande; tercerización en bloque (todo, el resto o elegir cuáles; 15% de falla); pedidos de empresas con cobro a 30 días; licitaciones de clubes del ascenso; Lelo gerente. Si Traicio te gana, volvés a la ciudad y hay revancha.
 - **País:** al arrancar elegís provincia y municipio. Tu taller pasa a ser una S.A. y deja de vender: venden los locales (uno por provincia, con encargado y alquiler según la población), los pedidos llegan en 2 semanas con traslado (y pérdidas en el camino), la reputación del país es el promedio de los locales. Topa lidera y gana a los 2 años y medio; Gambeta Sport, Penalazo, La Remera Feliz y Estampados del Plata atacan locales; InfoArg, eventos de marca, ofertas esporádicas, clubes de barrio y empresas (tope de 3 por semana), licitaciones de segunda con Niko y Ardidos, estaciones de costura y bordado, Recursos Humanos, galpón y planta. Si Topa gana, volvés a la provincia y vuelve Traicio.
 - Pantalla: cantidades a producir que se ajustan manteniendo apretado o escribiendo el número, semana animada que no se desplaza sola (oportunidades en amarillo, desastres en rojo) y secciones que se achican con +/−.
+- Gráficos y efectos: escena del taller que cambia con el lugar, las máquinas y el equipo (animada); mapa de Argentina con las provincias pintadas según la reputación de cada local y camiones en camino; la plata que salta cuando cambia, sonidos cortos (con botón para silenciar) y un resumen semanal más visual.
 - La partida se guarda en el navegador (las cuentas con Firebase llegan en el próximo paso).
 
 ## Estructura
 
 - `index.html`, `css/style.css`: pantallas, pensadas para celular.
 - `css/tema.css`: todos los colores y medidas del juego (para cambiar el estilo, se toca acá).
+- `js/escena.js` (taller), `js/mapa.js` y `js/mapa-datos.js` (mapa, contornos de Natural Earth, dominio público) y `js/efectos.js` (sonidos y números que saltan): todo dibujado en código, sin imágenes.
 - `js/arte.js` y `assets/img/`: imágenes del juego, con emoji de respaldo. La guía para generarlas está en `docs/ARTE.md`.
 - `js/data.js`: todos los números del juego (para balancear, se cambia acá).
 - `js/engine.js`: reglas del juego, sin pantalla.

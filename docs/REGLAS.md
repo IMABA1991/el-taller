@@ -1,6 +1,6 @@
 # El Taller — Documento de diseño del juego
 
-> Versión 0.20 · Reglas en definición
+> Versión 0.21 · Reglas en definición
 > Juego web por turnos, para jugar solo, contra bots o online.
 
 ---
@@ -36,6 +36,9 @@ Simulador de emprendedor de sublimación con humor argentino. Arrancás sin nada
 - **Cantidades a producir:** se suben o bajan con + y −; si mantenés apretado el botón, el número sigue corriendo cada vez más rápido. También se puede tocar el número y escribirlo con el teclado. No hay alertas nuevas: valen las validaciones de siempre.
 - **Semana animada:** la pantalla queda fija mientras aparecen los eventos; si querés ver los nuevos, deslizás vos.
 - **Eventos destacados:** las **oportunidades** (pedidos de empresas, licitaciones que abren, la abuela pidiendo trabajo para Lelo) salen en **amarillo fuerte**; los **desastres** (sabotajes de Traicio, cartas malas grandes del mazo, tercerizaciones que fallan) en **rojo fuerte**.
+- **Gráficos (v0.21):** escena del taller dibujada en código que cambia según el lugar (casa, local, galpón, planta), las máquinas compradas, el equipo y el stock, con animaciones (prensas, calandra, vapor); mapa de Argentina con las provincias pintadas según la reputación de cada local (⭐ tu ciudad, 😏 Lelo, 🚚 mercadería en camino); tocar una provincia libre la elige para abrir un local.
+- **Efectos:** la plata que salta (+/−) cuando cambia, sonidos cortos sintetizados (caja registradora, prensa, pedidos, desastres, logros) con botón para silenciar, y un resumen semanal con el resultado grande, lo más importante arriba y el resto desplegable.
+- **Estilo de las ilustraciones:** a definir entre caricatura plana, pixel art, isométrico, historieta de tinta, arcilla 3D o acuarela (o una combinación); las imágenes se generan con Gemini y reemplazan de a poco los dibujos en código.
 - **Secciones contraíbles:** cada sección con título tiene un **+/−** en el borde superior derecho para achicarla o mostrarla. El juego recuerda cuáles dejaste cerradas.
 
 ---

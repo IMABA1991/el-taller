@@ -235,3 +235,62 @@ button.chico.peligro { color: var(--mal); border-color: #efc2bc; }
 .requisito.si::before { content: '✔ '; color: var(--bien); }
 .requisito.no::before { content: '✖ '; color: var(--mal); }
 .grupo-local { font-weight: 700; margin: 10px 0 2px; font-size: 0.9rem; color: var(--suave); }
+
+/* ---------- Efectos ---------- */
+.flotante { position: absolute; z-index: 50; transform: translate(-50%, 0); font-weight: 800; font-size: 1.1rem; pointer-events: none; animation: flotar 1.5s ease-out forwards; text-shadow: 0 1px 2px rgba(0,0,0,.25); }
+.flotante.positivo { color: var(--bien); }
+.flotante.negativo { color: var(--mal); }
+@keyframes flotar { 0% { opacity: 0; transform: translate(-50%, 6px) scale(.8); } 15% { opacity: 1; transform: translate(-50%, -6px) scale(1.15); } 100% { opacity: 0; transform: translate(-50%, -48px) scale(1); } }
+.sonido-boton { background: transparent; border: 0; color: inherit; font-size: 1.1rem; padding: 4px 6px; cursor: pointer; }
+.barra.anima span { transform-origin: left; animation: llenar .9s ease-out both; }
+@keyframes llenar { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+.feed li.nuevo { animation: entrar .35s ease-out both; }
+@keyframes entrar { from { opacity: 0; transform: translateX(-10px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .flotante, .barra.anima span, .feed li.nuevo { animation: none; } }
+
+/* ---------- Resumen visual ---------- */
+.res-grande { text-align: center; padding: 6px 0 2px; }
+.res-grande .icono { font-size: 2.4rem; line-height: 1; }
+.res-grande .monto { font-size: 2rem; font-weight: 800; margin-top: 4px; }
+.res-grande .monto.positivo { color: var(--bien); }
+.res-grande .monto.negativo { color: var(--mal); }
+.res-grande .etiqueta { color: var(--suave); font-size: .9rem; }
+.res-tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
+.res-tile { background: var(--fondo); border-radius: 10px; padding: 8px 10px; }
+.res-tile .etiqueta { font-size: .8rem; color: var(--suave); }
+.res-tile .valor { font-size: 1.15rem; font-weight: 700; }
+.destacados { list-style: none; padding: 0; margin: 0; }
+.destacados li { display: flex; gap: 10px; align-items: flex-start; padding: 8px 0; border-top: 1px solid var(--borde); }
+.destacados li:first-child { border-top: 0; }
+.destacados .ico { font-size: 1.4rem; line-height: 1.2; flex: 0 0 auto; }
+details.detalle-semana summary { cursor: pointer; font-weight: 700; padding: 6px 0; }
+
+/* ---------- Escena del taller ---------- */
+.escena { width: 100%; height: auto; display: block; border-radius: 10px; }
+.escena .esc-trabaja { animation: trabaja 1.4s ease-in-out infinite; transform-box: fill-box; transform-origin: bottom; }
+.escena .esc-palanca { animation: palanca 1.8s ease-in-out infinite; transform-box: fill-box; transform-origin: bottom; }
+.escena .esc-plancha { animation: plancha 2s ease-in-out infinite; }
+.escena .esc-sube { animation: plancha 2.4s ease-in-out infinite; }
+.escena .esc-gira { animation: gira 3s linear infinite; transform-box: view-box; }
+.escena .esc-aguja { animation: aguja .25s linear infinite alternate; }
+.escena .esc-latido { animation: latido 1s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+.escena .esc-vapor, .escena .esc-humo { animation: vapor 2.2s ease-out infinite; }
+.escena .esc-d2 { animation-delay: .7s; }
+.escena .esc-sol { animation: latido 4s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+.escena .esc-zzz { animation: vapor 1.6s ease-out infinite; }
+@keyframes trabaja { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-2px); } }
+@keyframes palanca { 0%, 60%, 100% { transform: rotate(0); } 75% { transform: rotate(-35deg); } }
+@keyframes plancha { 0%, 55%, 100% { transform: translateY(0); } 70%, 85% { transform: translateY(8px); } }
+@keyframes gira { to { transform: rotate(360deg); } }
+@keyframes aguja { from { transform: translateY(0); } to { transform: translateY(4px); } }
+@keyframes latido { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.25); } }
+@keyframes vapor { 0% { opacity: 0; transform: translateY(0); } 30% { opacity: .9; } 100% { opacity: 0; transform: translateY(-12px); } }
+@media (prefers-reduced-motion: reduce) { .escena * { animation: none !important; } }
+
+/* ---------- Mapa del país ---------- */
+.mapa { width: 100%; max-width: 340px; height: auto; display: block; margin: 0 auto; }
+.mapa .prov { stroke: #fff; stroke-width: .8; cursor: pointer; transition: fill .6s; }
+.mapa .prov:hover { stroke: #1f2a44; stroke-width: 1.4; }
+.mapa .prov.seleccionada { stroke: #2f6fde; stroke-width: 2.2; }
+.leyenda-mapa { display: flex; flex-wrap: wrap; gap: 6px 12px; justify-content: center; font-size: .78rem; color: var(--suave); margin: 6px 0 4px; }
+.leyenda-mapa i { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 4px; vertical-align: -2px; }

@@ -22,6 +22,9 @@ import {
 } from './engine.js';
 import { guardar, cargar, borrar } from './storage.js';
 import { imagen } from './arte.js';
+import { sonido, sonidoDeEvento, alternarSonido, sonidoActivo, flotar, contar } from './efectos.js';
+import { escenaTaller } from './escena.js';
+import { mapaPais, leyendaMapa } from './mapa.js';
 
 const app = document.getElementById('app');
 let partida = null;
@@ -39,6 +42,7 @@ let seleccionTerc = null; // pedidos marcados para tercerizar (null = sin modo s
 let origenForm = { provincia: '', municipio: '' }; // provincia y municipio al arrancar
 let localForm = { prov: null, variante: 'junior' }; // local que pensás abrir
 let cambioEnc = null; // local al que le estás cambiando el encargado
+let plataVista = null; // para mostrar el número que salta cuando cambia la plata
 const DIAS_LARGOS = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
 
 // ---------- Utilidades ----------
@@ -178,6 +182,7 @@ function bloqueEncabezado(e, extra = '') {
       <div class="fila">
         <span class="plata">${plata(e.plata)}</span>
         <span class="fecha">Semana ${e.semana} · ${c.nombreMes} (${c.estacion})${e.origen ? ` · ${nombreCiudad(e)}` : ''}</span>
+        <button class="sonido-boton" id="sonidoBoton" aria-label="${sonidoActivo() ? 'Silenciar' : 'Activar sonido'}">${sonidoActivo() ? '🔊' : '🔇'}</button>
         <button class="menu-boton" id="menuBoton" aria-label="Menú">⋮</button>
       </div>
       ${extra}
@@ -223,6 +228,16 @@ function hacerContraibles() {
 function conectarMenu() {
   hacerContraibles();
   document.getElementById('menuBoton').onclick = () => { menuAbierto = !menuAbierto; confirmarReinicio = false; refrescar(); };
+  const sb = document.getElementById('sonidoBoton');
+  if (sb) sb.onclick = () => { alternarSonido(); refrescar(); };
+  // La plata que salta: si cambió desde la última vez que la viste
+  const pl = app.querySelector('.encabezado .plata');
+  if (partida && pl && plataVista !== null && partida.plata !== plataVista) {
+    const d = partida.plata - plataVista;
+    flotar(pl, `${d > 0 ? '+' : '−'}${plata(Math.abs(d))}`, d > 0 ? 'positivo' : 'negativo');
+    sonido(d > 0 ? 'cobro' : 'gasto');
+  }
+  if (partida) plataVista = partida.plata;
   const inicio = document.getElementById('menuInicio');
   if (inicio) inicio.onclick = () => { menuAbierto = false; pantallaInicio(); };
   const reiniciar = document.getElementById('reiniciar');
@@ -288,6 +303,7 @@ function barraInferior(horas, costo, errores, textoBoton, idBoton) {
 }
 
 function accionCompra(r) {
+  if (!r.ok) sonido('mala');
   aviso = r.ok ? r.mensaje : r.motivo;
   if (r.ok) guardarPartida();
   refrescar(true);
@@ -479,7 +495,9 @@ function bloquePais(e) {
   const locales = [...e.pais.locales].sort((a, b) => (b.origen ? 1 : 0) - (a.origen ? 1 : 0) || a.rep - b.rep);
   let html = `<div class="tarjeta sec-trabajo">
       <h2>Tus locales (${e.pais.locales.length})</h2>
-      <p class="suave">Venden ellos: juntan pedidos en la semana, el sábado producís y mandás, y llegan la semana siguiente. La reputación del país es el promedio de tus locales: un local nuevo arranca en 0. Cuantos más locales, más rápido crecen todos.</p>
+      ${mapaPais(e, { seleccion: localForm.prov })}
+      ${leyendaMapa()}
+      <p class="suave">Tocá una provincia sin local para ver cuánto cuesta abrir ahí. Venden ellos: juntan pedidos en la semana, el sábado producís y mandás, y llegan la semana siguiente. La reputación del país es el promedio de tus locales: un local nuevo arranca en 0. Cuantos más locales, más rápido crecen todos.</p>
       ${locales.map((l) => {
         const enc = l.encargado;
         const v = ENCARGADO.variantes[enc.variante];
@@ -548,6 +566,16 @@ function conectarPais() {
   const ce = document.getElementById('cancelarEnc');
   if (ce) ce.onclick = () => { cambioEnc = null; refrescar(); };
   app.querySelectorAll('[data-encargado]').forEach((b) => { b.onclick = () => { cambioEnc = null; accionCompra(cambiarEncargado(partida, b.dataset.encargado, b.dataset.variante)); }; });
+  app.querySelectorAll('.mapa [data-prov]').forEach((el) => {
+    el.onclick = () => {
+      const prov = el.dataset.prov;
+      if (!provinciasLibres(partida).includes(prov)) return;
+      localForm.prov = prov;
+      sonido('click');
+      refrescar();
+      document.getElementById('provLocal')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    };
+  });
   const pl = document.getElementById('provLocal');
   if (pl) pl.onchange = () => { localForm.prov = pl.value; refrescar(); };
   app.querySelectorAll('input[name="variante"]').forEach((r) => { r.onchange = () => { localForm.variante = r.value; refrescar(); }; });
@@ -791,6 +819,7 @@ function pantallaPublicidad() {
     ${bloqueEncabezado(e, '<div class="paso-semana">Domingo · Publicidad</div>')}
     ${aviso ? `<div class="tarjeta tio"><p>${aviso}</p></div>` : ''}
     ${tutorial ? `<div class="tarjeta tio con-avatar">${imagen('tio')}<p>${tutorial}</p></div>` : ''}
+    <div class="tarjeta"><h2>Tu taller</h2>${escenaTaller(e)}</div>
     ${fecha ? `<div class="tarjeta tio con-avatar">${imagen('calendario')}<p>${fecha}</p></div>` : ''}
     ${bloqueAbuela(e)}
     ${bloqueDecision(e)}
@@ -924,7 +953,8 @@ function pantallaAnimacion(sem) {
     el.classList.toggle('activo', n === i);
     el.classList.toggle('pasado', n < i);
   });
-  const agregar = (item) => {
+  const agregar = (item, conSonido = false) => {
+    if (conSonido) sonidoDeEvento(item.tipo);
     const li = document.createElement('li');
     li.className = `nuevo ${item.tipo}`;
     li.textContent = item.texto;
@@ -958,7 +988,7 @@ function pantallaAnimacion(sem) {
     }, t));
     t += 350;
     d.items.forEach((item) => {
-      temporizadores.push(setTimeout(() => agregar(item), t));
+      temporizadores.push(setTimeout(() => agregar(item, true), t));
       t += 450;
     });
     t += 300;
@@ -1197,6 +1227,7 @@ function refrescar(arriba = false) {
 
 function terminarSemana() {
   seleccionTerc = null;
+  sonido('prensa');
   const r = cerrarSemana(partida, plan);
   if (!r.ok) { aviso = r.errores.join(' '); refrescar(true); return; }
   guardarPartida();
@@ -1205,30 +1236,62 @@ function terminarSemana() {
 }
 
 // ---------- Pantalla: resumen de la semana ----------
+// Ícono para cada evento del resumen, según de qué habla.
+function iconoEvento(ev) {
+  const t = ev.texto;
+  const emoji = t.match(/^\p{Extended_Pictographic}/u);
+  if (emoji) return { ico: emoji[0], texto: t.slice(emoji[0].length).trim() };
+  const ico = ev.tipo === 'hito' ? '🏆' : ev.tipo === 'desastre' ? '💥' : ev.tipo === 'oportunidad' ? '✨' : ev.tipo === 'rumor' ? '👂'
+    : /cuota|pagaste|sueldos|alquiler|gastos fijos/i.test(t) ? '🧾' : /te pagó|cobraste|cobraron/i.test(t) ? '💰'
+      : ev.tipo === 'buena' ? '👍' : ev.tipo === 'mala' ? '👎' : '•';
+  return { ico, texto: t };
+}
+
 function pantallaResumen(r) {
   window.scrollTo(0, 0);
+  plataVista = r.plata;
   const neto = r.ingresos - r.gastos;
+  const prioridad = { hito: 0, desastre: 1, oportunidad: 2, mala: 3, rumor: 4, buena: 5 };
+  const destacados = r.eventos.filter((ev) => prioridad[ev.tipo] !== undefined).sort((a, b) => prioridad[a.tipo] - prioridad[b.tipo]).slice(0, 5);
+  const resto = r.eventos.filter((ev) => !destacados.includes(ev));
+  const repTxt = `${Math.floor(r.rep)}/100`;
   app.innerHTML = `
     <div class="encabezado">
       <div class="fila"><span class="plata">${plata(r.plata)}</span><span class="fecha">Resumen · semana ${r.semana} · ${r.mes}</span></div>
     </div>
     <div class="tarjeta sec-finanzas">
-      <div class="numeros">
-        <span>Ingresos</span><span class="positivo">+${plata(r.ingresos)}</span>
-        <span>Gastos</span><span class="negativo">−${plata(r.gastos)}</span>
-        <span><strong>Resultado de la semana</strong></span><span class="${neto >= 0 ? 'positivo' : 'negativo'}">${neto >= 0 ? '+' : ''}${plata(neto)}</span>
-        <span>Reputación</span><span>${Math.floor(r.rep)}/100 (${r.repDelta >= 0 ? '+' : ''}${r.repDelta})</span>
-        ${r.gananciaMes !== undefined ? `<span>Resultado del mes</span><span class="${r.gananciaMes >= 0 ? 'positivo' : 'negativo'}">${plata(r.gananciaMes)}</span>` : ''}
+      <div class="res-grande">
+        <div class="icono">${neto > 0 ? '💰' : neto < 0 ? '💸' : '🪙'}</div>
+        <div class="monto ${neto >= 0 ? 'positivo' : 'negativo'}" id="resNeto">${plata(0)}</div>
+        <div class="etiqueta">Resultado de la semana</div>
+      </div>
+      <div class="res-tiles">
+        <div class="res-tile"><div class="etiqueta">Ingresos</div><div class="valor positivo">+${plata(r.ingresos)}</div></div>
+        <div class="res-tile"><div class="etiqueta">Gastos</div><div class="valor negativo">−${plata(r.gastos)}</div></div>
+        <div class="res-tile"><div class="etiqueta">⭐ Reputación</div><div class="valor">${repTxt} <span class="suave" style="font-size:.85rem">(${r.repDelta >= 0 ? '+' : ''}${String(r.repDelta).replace('.', ',')})</span></div><div class="barra anima"><span style="width:${pct(r.rep)}"></span></div></div>
+        ${r.gananciaMes !== undefined ? `<div class="res-tile"><div class="etiqueta">📅 Resultado del mes</div><div class="valor ${r.gananciaMes >= 0 ? 'positivo' : 'negativo'}">${plata(r.gananciaMes)}</div></div>` : `<div class="res-tile"><div class="etiqueta">🏦 En la caja</div><div class="valor">${plata(r.plata)}</div></div>`}
       </div>
     </div>
+    ${destacados.length ? `<div class="tarjeta">
+      <h2>Lo más importante</h2>
+      <ul class="destacados">${destacados.map((ev) => { const x = iconoEvento(ev); return `<li class="${ev.tipo}"><span class="ico">${x.ico}</span><span>${x.texto}</span></li>`; }).join('')}</ul>
+    </div>` : ''}
     <div class="tarjeta">
       ${r.lineas.map((l) => `<p>${l}</p>`).join('')}
-      ${r.eventos.length ? `<ul class="eventos">${r.eventos.map((ev) => `<li class="${ev.tipo}">${ev.texto}</li>`).join('')}</ul>` : ''}
+      ${resto.length ? `<details class="detalle-semana"><summary>Ver el resto de la semana (${resto.length})</summary>
+        <ul class="eventos">${resto.map((ev) => `<li class="${ev.tipo}">${ev.texto}</li>`).join('')}</ul></details>` : ''}
     </div>
     <div class="barra-inferior"><div class="contenido">
       <button class="boton" id="seguir">${r.hito === 'quiebra' ? 'Ver final' : ['mejorDeLaCiudad', 'mejorDeLaProvincia', 'perdisteProvincia', 'reconquista', 'mejorDelPais', 'perdistePais'].includes(r.hito) ? 'Seguir' : 'Siguiente semana'}</button>
     </div></div>
   `;
+  contar(document.getElementById('resNeto'), neto, (n) => `${n >= 0 ? '+' : '−'}${plata(Math.abs(Math.round(n)))}`);
+  const tipos = r.eventos.map((ev) => ev.tipo);
+  setTimeout(() => {
+    if (r.hito && r.hito !== 'quiebra' && !['perdisteProvincia', 'perdistePais'].includes(r.hito)) sonido('logro');
+    else if (tipos.includes('desastre')) sonido('desastre');
+    else sonido(neto >= 0 ? 'cobro' : 'gasto');
+  }, 250);
   document.getElementById('seguir').onclick = () => {
     const e = partida;
     if (r.hito === 'mejorDeLaCiudad') pantallaLogro();
