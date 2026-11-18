@@ -504,7 +504,7 @@ function bloquePais(e) {
         return `<div class="local">
           <div class="cabeza-local"><strong>${nombreProv(l.prov)}${l.origen ? ' <span class="chip">tu ciudad</span>' : ''}${leloAca(l.prov) ? ' <span class="chip">Lelo</span>' : ''}</strong><span>${Math.floor(l.rep)}/100</span></div>
           <div class="barra"><span style="width:${pct(l.rep)}"></span></div>
-          <div class="detalle">Encargado: ${enc.nombre} (${v.nombre.toLowerCase()}, ${plata(enc.sueldo)} por mes) · alquiler ${plata(alquilerLocal(e, l))}</div>
+          <div class="detalle con-avatar">${imagen('encargado', 'avatar mini')}<span>Encargado: ${enc.nombre} (${v.nombre.toLowerCase()}, ${plata(enc.sueldo)} por mes) · alquiler ${plata(alquilerLocal(e, l))}</span></div>
           ${htmlRasgosEncargado(enc)}
           <div class="alterna">
             ${e.leloComercial && !leloAca(l.prov) && puedeMoverLelo ? `<button class="chico" data-lelo="${l.prov}">Mandar a Lelo acá</button>` : ''}

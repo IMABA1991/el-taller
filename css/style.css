@@ -294,3 +294,5 @@ details.detalle-semana summary { cursor: pointer; font-weight: 700; padding: 6px
 .mapa .prov.seleccionada { stroke: #2f6fde; stroke-width: 2.2; }
 .leyenda-mapa { display: flex; flex-wrap: wrap; gap: 6px 12px; justify-content: center; font-size: .78rem; color: var(--suave); margin: 6px 0 4px; }
 .leyenda-mapa i { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 4px; vertical-align: -2px; }
+.avatar.mini { --avatar: 32px; }
+.detalle.con-avatar { align-items: center; }

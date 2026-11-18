@@ -24,8 +24,11 @@ gris &= ~contorno
 lab, n = ndimage.label(gris)
 bordes = set(np.unique(np.concatenate([lab[0], lab[-1], lab[:, 0], lab[:, -1]]))) - {0}
 fondo = np.isin(lab, list(bordes))
-# Huecos encerrados (entre las piernas, bajo el brazo): son fondo si tienen los dos tonos del cuadriculado
-for i in range(1, n + 1):
+# Huecos encerrados (entre las piernas, bajo el brazo): son fondo si tienen los dos tonos del cuadriculado.
+# Si el fondo es liso (sin cuadriculado), no se toca nada adentro del dibujo.
+borde_lum = np.concatenate([lum[:8].ravel(), lum[-8:].ravel(), lum[:, :8].ravel(), lum[:, -8:].ravel()])
+liso = borde_lum.std() < 7
+for i in ([] if liso else range(1, n + 1)):
     if i in bordes:
         continue
     zona = lab == i
