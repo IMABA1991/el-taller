@@ -11,7 +11,7 @@ export const IMAGENES = {
   chuchu: { archivo: 'chuchu.png', emoji: '🚂', texto: 'Chuchu' },
   operario: { archivo: 'operario.png', emoji: '👷', texto: 'Operario' },
   vendedor: { archivo: 'vendedor.png', emoji: '🧑‍💼', texto: 'Vendedor' },
-  tazaCeramica: { archivo: '', emoji: '☕', texto: 'Taza de cerámica' },
+  tazaCeramica: { archivo: 'taza-ceramica.png', emoji: '☕', texto: 'Taza de cerámica' },
   tazaPlastico: { archivo: '', emoji: '🥤', texto: 'Taza de plástico' },
   gorra: { archivo: '', emoji: '🧢', texto: 'Gorra' },
   feria: { archivo: '', emoji: '🛍️', texto: 'Feria' },

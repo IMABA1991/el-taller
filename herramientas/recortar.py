@@ -6,8 +6,11 @@ import numpy as np
 from PIL import Image, ImageFilter
 from scipy import ndimage
 
-nombre, ruta = sys.argv[1], sys.argv[2]
-destino = sys.argv[3] if len(sys.argv) > 3 else 'assets/img'
+# Con --producto, la imagen chica es el objeto entero (cuadrado), en vez de la cabeza.
+producto = '--producto' in sys.argv
+args = [x for x in sys.argv[1:] if x != '--producto']
+nombre, ruta = args[0], args[1]
+destino = args[2] if len(args) > 2 else 'assets/img'
 a = np.asarray(Image.open(ruta).convert('RGB')).astype(int)
 mx, mn = a.max(2), a.min(2)
 lum = a.mean(2)
@@ -54,6 +57,13 @@ w, h = im.size
 cuerpo = im.copy()
 cuerpo.thumbnail((400, 400), Image.LANCZOS)
 cuerpo.quantize(colors=200, method=Image.Quantize.FASTOCTREE).save(f'{destino}/{nombre}-cuerpo.png', optimize=True)
+if producto:
+    lado = max(w, h)
+    lienzo = Image.new('RGBA', (lado, lado), (0, 0, 0, 0))
+    lienzo.paste(im, ((lado - w) // 2, (lado - h) // 2), im)
+    lienzo.resize((192, 192), Image.LANCZOS).quantize(colors=200, method=Image.Quantize.FASTOCTREE).save(f'{destino}/{nombre}.png', optimize=True)
+    print(nombre, 'listo (producto)', bb)
+    sys.exit(0)
 # Avatar: un cuadrado arriba, centrado en la cabeza
 lado = min(w, int(h * 0.5))
 arriba = np.asarray(im.split()[3])[: int(h * 0.15)]
