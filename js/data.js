@@ -550,7 +550,9 @@ export const NOMBRES_EMPLEADOS = [
   'Brian', 'Yésica', 'Maxi', 'Romina', 'Kevin', 'Daiana', 'Lautaro', 'Micaela', 'Gonzalo', 'Ailén',
   'Matías', 'Abril', 'Ezequiel', 'Luz', 'Franco', 'Milagros', 'Thiago', 'Belén', 'Rodrigo', 'Celeste',
 ];
-export const NOMBRES_FEMENINOS = ['Yésica', 'Romina', 'Daiana', 'Micaela', 'Ailén', 'Abril', 'Luz', 'Milagros', 'Belén', 'Celeste'];
+// Nombres de mujer (empleadas y encargadas): definen cómo se dibujan y cómo se escriben sus rasgos.
+export const NOMBRES_FEMENINOS = ['Yésica', 'Romina', 'Daiana', 'Micaela', 'Ailén', 'Abril', 'Luz', 'Milagros', 'Belén', 'Celeste',
+  'Graciela', 'Mirta', 'Norma', 'Susana', 'Estela', 'Liliana', 'Silvia', 'Marta'];
 
 export const EQUIPO = {
   bolsa: { horas: 3, candidatos: 3, recargo: 0.2 }, // ves todo, pero cobran un 20% más que la media

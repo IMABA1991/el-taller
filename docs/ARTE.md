@@ -4,6 +4,10 @@
 
 Mientras una imagen no exista, el juego muestra un emoji (o el dibujo hecho en código). No hace falta tenerlas todas para empezar: cada imagen que se suma reemplaza a su emoji.
 
+**Prompts listos para copiar:** los que faltan están en `docs/PROMPTS.md`, uno por bloque.
+
+**Hombre o mujer:** cada empleado y cada encargado tiene su género guardado. Las imágenes de puesto que hay (operario, vendedor, diseñador, Recursos Humanos y encargado, hombres; costurera y bordadora, mujeres) se muestran solo a quien coincide; para el otro género hay una segunda versión (`operarioMujer`, `costureroHombre`, etc. en `arte.js`), y mientras no tenga imagen se ve su emoji.
+
 ## Cómo sumar una imagen
 
 **La forma más fácil:** pasale las imágenes a Claude en el chat y él las recorta, las achica y las activa en el juego.
@@ -116,7 +120,7 @@ Tamaño 512 × 512. Peso: menos de 60 KB. Todas a la misma escala (una persona m
 | `iso-vos-hombre.png` | Vos (hombre): joven con delantal, de pie, trabajando. |
 | `iso-vos-mujer.png` | Vos (mujer): joven con delantal y el pelo atado, de pie, trabajando. |
 | `iso-lelo.png` | Lelo de pie, con el celular. |
-| `iso-empleado-1.png`, `iso-empleado-2.png`, `iso-empleado-3.png` | Tres empleados distintos de pie, trabajando (delantal, gorra, guantes). |
+| `iso-empleado.png`, `iso-empleada.png` | Un empleado y una empleada de pie, trabajando (delantal, gorra, guantes). Se repiten con colores distintos según el puesto. |
 | `iso-cajas.png` | Pila de cajas de cartón con mercadería. |
 | `iso-pc.png` | Escritorio chico con una computadora de escritorio encendida. |
 | `iso-celular.png` | Un celular apoyado de pie en un soporte, con la pantalla encendida (más grande que en la realidad, para que se pueda tocar). |

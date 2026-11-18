@@ -189,7 +189,7 @@ export function escenaTaller(e, { zona = null, alertas = new Set(), fantasmas = 
     gente.push({ fila: k % 3, html: persona({
       x: 18 + ((k * 61) % 300), y: filas[k % 3], color: COLORES_PUESTO[x.puesto] || '#2f6fde', retraso: (i % 7) * 0.19,
       piel: PIELES[(x.nombre.length + i) % PIELES.length], pelo: PELOS[(x.nombre.length * 3 + i) % PELOS.length],
-      mujer: NOMBRES_FEMENINOS.includes(x.nombre), escala: esc, dx: ((i % 5) - 2) * 9 || 12, t: 3 + (i % 4), zona: interactiva ? 'equipo' : '',
+      mujer: (x.genero || (NOMBRES_FEMENINOS.includes(x.nombre) ? 'mujer' : 'hombre')) === 'mujer', escala: esc, dx: ((i % 5) - 2) * 9 || 12, t: 3 + (i % 4), zona: interactiva ? 'equipo' : '',
     }) });
   });
   if (lelo) gente.push({ fila: 1, html: persona({ x: 80, y: filas[1], color: '#f5c518', retraso: 0.3, etiqueta: 'Lelo', escala: esc, dx: -14, t: 5, zona: interactiva ? 'equipo' : '' }) });

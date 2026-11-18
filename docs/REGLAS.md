@@ -47,9 +47,10 @@ Simulador de emprendedor de sublimación con humor argentino. Arrancás sin nada
   - **Puerta:** locales del país, feria del domingo y mudarte de lugar.
   - **Cajas:** el stock y el traslado a los locales.
   - **Vos:** estudiar y cómo vas (finanzas, reputación, rivales). **Equipo** (cualquier persona): contratar, despedir, capacitar; el sábado, cuántas horas tiene tu equipo.
+  - **Botones debajo del dibujo (provisorios):** mientras la escena sea la dibujada en código, cada objeto tiene también su botón con nombre. Cuando esté la escena isométrica (objetos más grandes y claros), **los botones se sacan** y se toca directamente el dibujo.
   - Lo que pide atención lleva un **❗** que late (una decisión pendiente, una licitación sin ofertar, pedidos sin cubrir); al entrar se abre solo el primero (el sábado, primero las máquinas). El botón **Ver todo en lista** muestra la pantalla entera como antes, y el juego recuerda cuál elegiste.
 - **La gente del taller:** se ve una persona por cada empleado, más vos (con una flechita amarilla) y Lelo, paseando y trabajando. Si son muchos, se achican.
-- **Hombre o mujer:** al arrancar elegís cómo te mostramos en el taller. Las partidas guardadas de antes lo preguntan una sola vez al continuar. Las empleadas con nombre de mujer se dibujan como mujeres.
+- **Hombre o mujer:** al arrancar elegís cómo te mostramos en el taller. Las partidas guardadas de antes lo preguntan una sola vez al continuar. Cada empleado y cada encargado tiene su **género guardado** (según su nombre): se dibuja así en el taller y su foto coincide ("Encargada: Norma"). Mientras falte la imagen del otro género de un puesto, se muestra un emoji.
 - **Secciones contraíbles:** cada sección con título tiene un **+/−** en el borde superior derecho para achicarla o mostrarla. El juego recuerda cuáles dejaste cerradas.
 
 ---

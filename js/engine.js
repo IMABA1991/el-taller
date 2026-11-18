@@ -209,6 +209,8 @@ export function migrarPartida(e) {
   if (e.origen === undefined) e.origen = null;
   // Versión 6: cómo te mostramos en el taller (hombre o mujer); si falta, se pregunta al continuar
   if (e.genero === undefined) e.genero = null;
+  for (const x of e.equipo.empleados) if (!x.genero) x.genero = x.esLelo ? 'hombre' : generoDeNombre(x.nombre);
+  for (const l of e.pais?.locales || []) if (l.encargado && !l.encargado.genero) l.encargado.genero = generoDeNombre(l.encargado.nombre);
   if (!e.equipo.rrhhCubre) e.equipo.rrhhCubre = [];
   const ab = e.licitacion.abierta;
   if (ab && ab.combos === undefined) Object.assign(ab, { tipo: 'ascenso', combos: LICITACION.combos, precioRef: LICITACION.precioRef, costo: LICITACION.costo, sena: LICITACION.sena, plazo: LICITACION.plazo, multa: LICITACION.multa, cobroSemanas: 0, requisitos: [], especial: null, grande: null, repGanada: LICITACION.repGanada, repIncompleta: LICITACION.repIncompleta });
@@ -451,8 +453,9 @@ function productosPosibles(e) {
 
 function crearCandidato(e, puesto, variante, { origen, sueldo, probMalo = 0.5, rasgoVisible }) {
   const v = PUESTOS[puesto].variantes[variante];
+  const nombre = nombreLibre(e);
   const c = {
-    nombre: nombreLibre(e), puesto, variante, origen,
+    nombre, genero: generoDeNombre(nombre), puesto, variante, origen,
     sueldo: sueldo ?? mediaSueldo(e, puesto, variante),
     exp: limitar(Math.round(v.exp + entre(e, -5, 5)), 0, 100),
     rasgo: sortearRasgo(e, puesto, probMalo),
@@ -903,6 +906,11 @@ export function coberturaRRHH(e) {
   return { personas: n, cupo: n * RRHH.cubre, empleados: resto, sinAtender: Math.max(0, resto - n * RRHH.cubre) };
 }
 
+// Hombre o mujer según el nombre (empleados y encargados). Se guarda al crearlos.
+export function generoDeNombre(nombre) {
+  return NOMBRES_FEMENINOS.includes(nombre) ? 'mujer' : 'hombre';
+}
+
 // "Prolijo" → "Prolija" si es mujer.
 export function nombreRasgo(rasgo, nombre) {
   const r = RASGOS[rasgo].nombre;
@@ -917,7 +925,7 @@ function promedioDe(xs) {
 function sumarLelo(e) {
   if (e.equipo.empleados.some((x) => x.esLelo)) return;
   e.equipo.empleados.push({
-    id: 'lelo', nombre: 'Lelo', esLelo: true, puesto: 'operario', variante: 'operario', origen: 'familia',
+    id: 'lelo', nombre: 'Lelo', genero: 'hombre', esLelo: true, puesto: 'operario', variante: 'operario', origen: 'familia',
     sueldo: LELO_EMPLEADO.sueldo, exp: LELO_EMPLEADO.exp, rasgo: null, rasgoVisible: true, leal: true,
     desde: e.semana, semanasMes: 0, capacitadoMes: false, desganado: false, pideAumento: null, falta: false, semanasTrabajadas: 0,
     retraso: {},
@@ -2750,8 +2758,9 @@ function crearEncargado(e, variante) {
   const usados = new Set((e.pais?.locales || []).map((l) => l.encargado?.nombre));
   const libres = ENCARGADO.nombres.filter((n) => !usados.has(n));
   const lista = libres.length ? libres : ENCARGADO.nombres;
+  const nombre = lista[Math.floor(siguienteAzar(e) * lista.length)];
   return {
-    nombre: lista[Math.floor(siguienteAzar(e) * lista.length)], variante, rasgos: [...buenos, ...malos],
+    nombre, genero: generoDeNombre(nombre), variante, rasgos: [...buenos, ...malos],
     visible: tieneRRHH(e), sueldo: sueldoEncargado(e, variante), semanasMes: 0, desde: e.semana,
   };
 }

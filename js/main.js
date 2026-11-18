@@ -631,7 +631,7 @@ function bloquePais(e) {
         return `<div class="local">
           <div class="cabeza-local"><strong>${nombreProv(l.prov)}${l.origen ? ' <span class="chip">tu ciudad</span>' : ''}${leloAca(l.prov) ? ' <span class="chip">Lelo</span>' : ''}</strong><span>${Math.floor(l.rep)}/100</span></div>
           <div class="barra"><span style="width:${pct(l.rep)}"></span></div>
-          <div class="detalle con-avatar">${imagen('encargado', 'avatar mini')}<span>Encargado: ${enc.nombre} (${v.nombre.toLowerCase()}, ${plata(enc.sueldo)} por mes) · alquiler ${plata(alquilerLocal(e, l))}</span></div>
+          <div class="detalle con-avatar">${imagen('encargado', 'avatar mini', enc.genero)}<span>${enc.genero === 'mujer' ? 'Encargada' : 'Encargado'}: ${enc.nombre} (${v.nombre.toLowerCase()}, ${plata(enc.sueldo)} por mes) · alquiler ${plata(alquilerLocal(e, l))}</span></div>
           ${htmlRasgosEncargado(enc)}
           <div class="alterna">
             ${e.leloComercial && !leloAca(l.prov) && puedeMoverLelo ? `<button class="chico" data-lelo="${l.prov}">Mandar a Lelo acá</button>` : ''}
@@ -753,7 +753,7 @@ function htmlProductosVendedor(x) {
 
 function htmlCandidato(c, origen, indice, extra = '') {
   return `<div class="empleado">
-      <div class="cabeza">${imagen(c.puesto)}<div>
+      <div class="cabeza">${imagen(c.puesto, 'avatar', c.genero)}<div>
         <div class="nombre">${c.nombre} <span class="chip">${tituloPuesto(c)}</span></div>
         <div class="detalle">Experiencia ${c.exp} · ${plata(c.sueldo)} por mes · ${textoTarea(c)}</div>
         ${htmlProductosVendedor(c)}
@@ -780,7 +780,7 @@ function htmlEmpleado(e, x) {
       : `<button class="chico" data-despedir="${x.id}">Despedir</button>`;
   }
   return `<div class="empleado">
-      <div class="cabeza">${imagen(x.esLelo ? 'lelo' : x.puesto)}<div>
+      <div class="cabeza">${imagen(x.esLelo ? 'lelo' : x.puesto, 'avatar', x.genero)}<div>
         <div class="nombre">${x.nombre} <span class="chip">${tituloPuesto(x)}</span>${x.leal && !x.esLelo ? ' <span class="chip">de Chuchu</span>' : ''}</div>
         <div class="detalle">${tarea} · experiencia ${Math.floor(x.exp)} · ${plata(x.sueldo)} por mes${x.falta ? ' · <strong>falta esta semana</strong>' : h ? ` · ${String(h).replace('.', ',')} h esta semana` : ''}</div>
         ${htmlProductosVendedor(x)}

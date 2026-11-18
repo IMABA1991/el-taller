@@ -9,18 +9,26 @@ export const IMAGENES = {
   lelo: { archivo: 'lelo.png', emoji: '😏', texto: 'Lelo, tu primo' },
   leloCuerpo: { archivo: 'lelo-cuerpo.png', emoji: '😏', texto: 'Lelo, tu primo' },
   chuchu: { archivo: 'chuchu.png', emoji: '🚂', texto: 'Chuchu' },
-  operario: { archivo: 'operario.png', emoji: '👷', texto: 'Operario' },
-  vendedor: { archivo: 'vendedor.png', emoji: '🧑‍💼', texto: 'Vendedor' },
+  operario: { archivo: 'operario.png', emoji: '👷', texto: 'Operario', genero: 'hombre' },
+  vendedor: { archivo: 'vendedor.png', emoji: '🧑‍💼', texto: 'Vendedor', genero: 'hombre' },
   tazaCeramica: { archivo: 'taza-ceramica.png', emoji: '☕', texto: 'Taza de cerámica' },
   tazaPlastico: { archivo: 'taza-plastico.png', emoji: '🥤', texto: 'Taza de plástico' },
   gorra: { archivo: 'gorra.png', emoji: '🧢', texto: 'Gorra' },
   feria: { archivo: 'feria.png', emoji: '🛍️', texto: 'Feria' },
   calendario: { archivo: 'calendario.png', emoji: '📅', texto: 'Fecha especial' },
-  disenador: { archivo: 'disenador.png', emoji: '🎨', texto: 'Diseñador' },
-  costurero: { archivo: 'costurero.png', emoji: '🧵', texto: 'Costurero' },
-  bordador: { archivo: 'bordador.png', emoji: '🪡', texto: 'Bordador' },
-  rrhh: { archivo: 'rrhh.png', emoji: '🗂️', texto: 'Recursos Humanos' },
-  encargado: { archivo: 'encargado.png', emoji: '🏪', texto: 'Encargado de local' },
+  disenador: { archivo: 'disenador.png', emoji: '🎨', texto: 'Diseñador', genero: 'hombre' },
+  costurero: { archivo: 'costurero.png', emoji: '🧵', texto: 'Costurero', genero: 'mujer' },
+  bordador: { archivo: 'bordador.png', emoji: '🪡', texto: 'Bordador', genero: 'mujer' },
+  rrhh: { archivo: 'rrhh.png', emoji: '🗂️', texto: 'Recursos Humanos', genero: 'hombre' },
+  encargado: { archivo: 'encargado.png', emoji: '🏪', texto: 'Encargado de local', genero: 'hombre' },
+  // La otra versión de cada puesto (hombre o mujer). Mientras no tenga archivo, se muestra su emoji.
+  operarioMujer: { archivo: '', emoji: '👩‍🏭', texto: 'Operaria' },
+  vendedorMujer: { archivo: '', emoji: '👩‍💼', texto: 'Vendedora' },
+  disenadorMujer: { archivo: '', emoji: '👩‍🎨', texto: 'Diseñadora' },
+  rrhhMujer: { archivo: '', emoji: '👩‍💼', texto: 'Recursos Humanos' },
+  encargadoMujer: { archivo: '', emoji: '👩‍💼', texto: 'Encargada de local' },
+  costureroHombre: { archivo: '', emoji: '🧑‍🔧', texto: 'Costurero' },
+  bordadorHombre: { archivo: '', emoji: '🧑‍🎨', texto: 'Bordador' },
   infoarg: { archivo: 'infoarg.png', emoji: '📰', texto: 'InfoArg' },
   abuela: { archivo: 'abuela.png', emoji: '👵', texto: 'La abuela' },
   traicio: { archivo: 'traicio.png', emoji: '🗡️', texto: 'Traicio Nero' },
@@ -45,8 +53,11 @@ export const IMAGENES = {
 const CARPETA = 'assets/img/';
 
 // Devuelve el HTML de la imagen (o su emoji). clase: 'avatar' (redonda) o 'logo'.
-export function imagen(nombre, clase = 'avatar') {
-  const im = IMAGENES[nombre];
+// genero ('hombre' o 'mujer'): si la imagen del puesto es del otro, usa su otra versión (o su emoji).
+export function imagen(nombre, clase = 'avatar', genero = null) {
+  const base = IMAGENES[nombre];
+  const otra = base?.genero && genero && genero !== base.genero ? `${nombre}${genero === 'mujer' ? 'Mujer' : 'Hombre'}` : null;
+  const im = otra && IMAGENES[otra] ? IMAGENES[otra] : base;
   if (!im) return '';
   const contenido = im.archivo
     ? `<img src="${CARPETA}${im.archivo}" alt="${im.texto}" loading="lazy">`
