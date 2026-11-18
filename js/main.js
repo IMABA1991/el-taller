@@ -408,7 +408,7 @@ function bloqueAbuela(e) {
   if (!abuelaPide(e)) return '';
   const primera = e.abuela.veces === 1;
   return `<div class="tarjeta oportunidad">
-      <p><strong>👵 ${primera ? 'La abuela te pide trabajo para Lelo' : 'La abuela vuelve a la carga'}</strong></p>
+      <div class="con-avatar">${imagen('abuela')}<p><strong>${primera ? 'La abuela te pide trabajo para Lelo' : 'La abuela vuelve a la carga'}</strong></p></div>
       <p>${primera ? 'Lelo volvió de Santa Clara del Mar y no consigue trabajo. Le lloró a la abuela, y ella te pregunta si le podés dar trabajo en tu taller.' : 'Lelo sigue sin conseguir trabajo y la abuela te vuelve a preguntar si le podés hacer un lugar.'}</p>
       <p class="suave">Lelo no te ocupa un lugar en el equipo: trabaja ${LELO_EMPLEADO.horas} h por semana y cobra ${plata(LELO_EMPLEADO.sueldo)} por mes.</p>
       <div class="alterna"><button class="chico" data-abuela="si">Sí, que venga</button><button class="chico" data-abuela="no">No</button></div>
@@ -457,7 +457,7 @@ function bloqueProvincia(e) {
   if (!despuesDeLaCiudad(e)) return '';
   let html = '';
   const rumor = rumorTraicio(e);
-  if (rumor) html += `<div class="tarjeta rumor"><p>🗡️ ${rumor} Preparate: ${e.defensas.proteccion || e.defensas.seguro || e.seguridad ? 'tus defensas ayudan.' : 'todavía no tenés ninguna defensa.'}</p></div>`;
+  if (rumor) html += `<div class="tarjeta rumor con-avatar">${imagen('traicio')}<p>${rumor} Preparate: ${e.defensas.proteccion || e.defensas.seguro || e.seguridad ? 'tus defensas ayudan.' : 'todavía no tenés ninguna defensa.'}</p></div>`;
   html += bloqueLicitacion(e);
   const c = e.licitacion.contrato;
   if (c) html += `<div class="tarjeta sec-trabajo"><p>🏟️ Contrato con <strong>${c.club}</strong>: ${c.combos} combos a ${plata(c.precio)}. Tenés ${e.stock.combo}. Vence en ${Math.max(0, c.vence - e.semana)} semana${c.vence - e.semana === 1 ? '' : 's'}: producilos el sábado.</p></div>`;
