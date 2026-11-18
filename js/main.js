@@ -263,7 +263,7 @@ function bloqueEstado(e) {
   if (enPais(e)) {
     const t = e.pais.topa;
     const valor = e.mejorDelPais ? 'Segundo' : t.visible === null ? 'Sin noticias todavía' : `${t.visible}/100`;
-    rival = `<div class="stat"><div class="etiqueta">${TOPA.nombre} (la marca de toda la vida)</div><div class="valor" style="font-size:${t.visible === null ? '.85rem' : '1.1rem'}">${valor}</div><div class="barra"><span style="width:${pct(e.mejorDelPais ? 0 : t.visible || 0)}"></span></div>${t.mesVisible && !e.mejorDelPais ? `<div class="detalle suave">Según InfoArg (${t.mesVisible.toLowerCase()})</div>` : ''}</div>`;
+    rival = `<div class="stat"><div class="etiqueta con-avatar" style="align-items:center">${imagen('topa', 'avatar mini')}<span>${TOPA.nombre} (la marca de toda la vida)</span></div><div class="valor" style="font-size:${t.visible === null ? '.85rem' : '1.1rem'}">${valor}</div><div class="barra"><span style="width:${pct(e.mejorDelPais ? 0 : t.visible || 0)}"></span></div>${t.mesVisible && !e.mejorDelPais ? `<div class="detalle suave">Según InfoArg (${t.mesVisible.toLowerCase()})</div>` : ''}</div>`;
   } else if (enProvincia(e)) {
     const t = e.traicio;
     const valor = e.mejorDeLaProvincia ? 'Cerró' : t?.visible === null || t?.visible === undefined ? 'Sin noticias todavía' : `${t.visible}/100`;
@@ -1240,6 +1240,7 @@ function terminarSemana() {
 function iconoEvento(ev) {
   const t = ev.texto;
   const emoji = t.match(/^\p{Extended_Pictographic}/u);
+  if (emoji && /^📰 InfoArg/u.test(t)) return { ico: imagen('infoarg', 'avatar mini'), texto: t.slice(emoji[0].length).trim() };
   if (emoji) return { ico: emoji[0], texto: t.slice(emoji[0].length).trim() };
   const ico = ev.tipo === 'hito' ? '🏆' : ev.tipo === 'desastre' ? '💥' : ev.tipo === 'oportunidad' ? '✨' : ev.tipo === 'rumor' ? '👂'
     : /cuota|pagaste|sueldos|alquiler|gastos fijos/i.test(t) ? '🧾' : /te pagó|cobraste|cobraron/i.test(t) ? '💰'

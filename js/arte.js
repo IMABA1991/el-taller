@@ -3,7 +3,7 @@
 //   1. Guardá la imagen en assets/img/ (ver docs/ARTE.md: tamaños y descripciones).
 //   2. Escribí el nombre del archivo en "archivo" acá abajo.
 export const IMAGENES = {
-  logo: { archivo: '', emoji: '☕', texto: 'El Taller' },
+  logo: { archivo: 'logo.png', emoji: '☕', texto: 'El Taller' },
   tio: { archivo: 'tio.png', emoji: '🧔', texto: 'El tío' },
   tioCuerpo: { archivo: 'tio-cuerpo.png', emoji: '🧔', texto: 'El tío' },
   lelo: { archivo: 'lelo.png', emoji: '😏', texto: 'Lelo, tu primo' },
@@ -21,10 +21,10 @@ export const IMAGENES = {
   bordador: { archivo: 'bordador.png', emoji: '🪡', texto: 'Bordador' },
   rrhh: { archivo: 'rrhh.png', emoji: '🗂️', texto: 'Recursos Humanos' },
   encargado: { archivo: 'encargado.png', emoji: '🏪', texto: 'Encargado de local' },
-  infoarg: { archivo: '', emoji: '📰', texto: 'InfoArg' },
+  infoarg: { archivo: 'infoarg.png', emoji: '📰', texto: 'InfoArg' },
   abuela: { archivo: 'abuela.png', emoji: '👵', texto: 'La abuela' },
   traicio: { archivo: 'traicio.png', emoji: '🗡️', texto: 'Traicio Nero' },
-  topa: { archivo: '', emoji: '👟', texto: 'Topa' },
+  topa: { archivo: 'topa.png', emoji: '👟', texto: 'Topa' },
   niko: { archivo: '', emoji: '🪈', texto: 'Niko' },
   ardidos: { archivo: '', emoji: '🔥', texto: 'Ardidos' },
   remera: { archivo: 'remera.png', emoji: '👕', texto: 'Remera' },
@@ -34,12 +34,12 @@ export const IMAGENES = {
   mangaLargaFC: { archivo: 'manga-larga-fc.png', emoji: '👚', texto: 'Manga larga full color' },
   buzoFC: { archivo: 'buzo-fc.png', emoji: '🧥', texto: 'Buzo full color' },
   combo: { archivo: 'combo.png', emoji: '⚽', texto: 'Combo de club' },
-  camisetaBarrio: { archivo: '', emoji: '🎽', texto: 'Camiseta de club de barrio' },
-  camisetaEscudo: { archivo: '', emoji: '🎽', texto: 'Camiseta con escudo bordado' },
-  gorraBordada: { archivo: '', emoji: '🧢', texto: 'Gorra bordada' },
-  remeraBordada: { archivo: '', emoji: '👕', texto: 'Remera bordada' },
+  camisetaBarrio: { archivo: 'camiseta-barrio.png', emoji: '🎽', texto: 'Camiseta de club de barrio' },
+  camisetaEscudo: { archivo: 'camiseta-escudo.png', emoji: '🎽', texto: 'Camiseta con escudo bordado' },
+  gorraBordada: { archivo: 'gorra-bordada.png', emoji: '🧢', texto: 'Gorra bordada' },
+  remeraBordada: { archivo: 'remera-bordada.png', emoji: '👕', texto: 'Remera bordada' },
   chombaBordada: { archivo: '', emoji: '👔', texto: 'Chomba bordada' },
-  mantel: { archivo: '', emoji: '🧺', texto: 'Mantel' },
+  mantel: { archivo: 'mantel.png', emoji: '🧺', texto: 'Mantel' },
 };
 
 const CARPETA = 'assets/img/';
