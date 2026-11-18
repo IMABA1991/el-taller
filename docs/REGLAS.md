@@ -1,6 +1,6 @@
 # El Taller — Documento de diseño del juego
 
-> Versión 0.21 · Reglas en definición
+> Versión 0.22 · Reglas en definición
 > Juego web por turnos, para jugar solo, contra bots o online.
 
 ---
@@ -38,7 +38,18 @@ Simulador de emprendedor de sublimación con humor argentino. Arrancás sin nada
 - **Eventos destacados:** las **oportunidades** (pedidos de empresas, licitaciones que abren, la abuela pidiendo trabajo para Lelo) salen en **amarillo fuerte**; los **desastres** (sabotajes de Traicio, cartas malas grandes del mazo, tercerizaciones que fallan) en **rojo fuerte**.
 - **Gráficos (v0.21):** escena del taller dibujada en código que cambia según el lugar (casa, local, galpón, planta), las máquinas compradas, el equipo y el stock, con animaciones (prensas, calandra, vapor); mapa de Argentina con las provincias pintadas según la reputación de cada local (⭐ tu ciudad, 😏 Lelo, 🚚 mercadería en camino); tocar una provincia libre la elige para abrir un local.
 - **Efectos:** la plata que salta (+/−) cuando cambia, sonidos cortos sintetizados (caja registradora, prensa, pedidos, desastres, logros) con botón para silenciar, y un resumen semanal con el resultado grande, lo más importante arriba y el resto desplegable.
-- **Estilo de las ilustraciones:** a definir entre caricatura plana, pixel art, isométrico, historieta de tinta, arcilla 3D o acuarela (o una combinación); las imágenes se generan con Gemini y reemplazan de a poco los dibujos en código.
+- **Estilo de las ilustraciones:** caricatura plana para personajes, productos e íconos; isométrico solo para la escena del taller. Las imágenes se generan con Gemini y reemplazan de a poco los emojis y los dibujos en código (ver `docs/ARTE.md`).
+- **El taller es el menú (v0.22):** el domingo y el sábado arrancan con la escena del taller. Tocás un objeto (o su botón debajo) y abajo se ve **solo lo de ese objeto**:
+  - **Cada máquina:** el sábado, qué producir con ella; el domingo, qué hace y su stock. Las que todavía no tenés se ven en gris con un **+**: tocándolas, el precio y el botón de comprar.
+  - **PC:** decisiones del mazo, CyberMonday, publicidad y volantes; el sábado, los eventos de la semana y los pedidos.
+  - **Celular:** la abuela, la promo contra Lelo y llamar al tío (pagarle o pedirle otro préstamo).
+  - **Corcho:** fechas especiales, cómo viene la etapa, licitaciones, defensas contra Traicio y pedidos de empresas.
+  - **Puerta:** locales del país, feria del domingo y mudarte de lugar.
+  - **Cajas:** el stock y el traslado a los locales.
+  - **Vos:** estudiar y cómo vas (finanzas, reputación, rivales). **Equipo** (cualquier persona): contratar, despedir, capacitar; el sábado, cuántas horas tiene tu equipo.
+  - Lo que pide atención lleva un **❗** que late (una decisión pendiente, una licitación sin ofertar, pedidos sin cubrir); al entrar se abre solo el primero (el sábado, primero las máquinas). El botón **Ver todo en lista** muestra la pantalla entera como antes, y el juego recuerda cuál elegiste.
+- **La gente del taller:** se ve una persona por cada empleado, más vos (con una flechita amarilla) y Lelo, paseando y trabajando. Si son muchos, se achican.
+- **Hombre o mujer:** al arrancar elegís cómo te mostramos en el taller. Las partidas guardadas de antes lo preguntan una sola vez al continuar. Las empleadas con nombre de mujer se dibujan como mujeres.
 - **Secciones contraíbles:** cada sección con título tiene un **+/−** en el borde superior derecho para achicarla o mostrarla. El juego recuerda cuáles dejaste cerradas.
 
 ---

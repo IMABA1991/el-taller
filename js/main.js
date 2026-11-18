@@ -18,12 +18,12 @@ import {
   enPais, despuesDeLaCiudad, PROVINCIAS_AR, ENCARGADO, TRANSPORTE, TOPA, DEFENSAS_PAIS, LELO_COMERCIAL, LICITACION_SEGUNDA, PAIS, GRANDES,
   TRAICIO_TEXTOS, elegirOrigen, nombreCiudad, pistaProvincia, abrirLocal, cambiarEncargado, asignarLelo, cambiarDefensaPais, costoDefensaPais,
   gastosLocalesDelMes, provinciasLibres, costoAbrirLocal, alquilerLocal, sueldoEncargado, ofertaPaisVigente, tomarOfertaPais, enCamino,
-  costoTraslado, cumpleRequisito, puedeOfertarLicitacion, coberturaRRHH, tieneRRHH, horasCostura,
+  costoTraslado, cumpleRequisito, puedeOfertarLicitacion, coberturaRRHH, tieneRRHH, horasCostura, elegirGenero,
 } from './engine.js';
 import { guardar, cargar, borrar } from './storage.js';
 import { imagen } from './arte.js';
 import { sonido, sonidoDeEvento, alternarSonido, sonidoActivo, flotar, contar } from './efectos.js';
-import { escenaTaller } from './escena.js';
+import { escenaTaller, maquinasDeLaEscena } from './escena.js';
 import { mapaPais, leyendaMapa } from './mapa.js';
 
 const app = document.getElementById('app');
@@ -39,7 +39,7 @@ let montoPrestamo = null; // monto que le pedís al tío (préstamo para la pró
 let ofertaLic = null; // precio por combo que ofertás en la licitación
 let temporizadores = [];
 let seleccionTerc = null; // pedidos marcados para tercerizar (null = sin modo selección)
-let origenForm = { provincia: '', municipio: '' }; // provincia y municipio al arrancar
+let origenForm = { provincia: '', municipio: '', genero: '' }; // provincia y municipio al arrancar
 let localForm = { prov: null, variante: 'junior' }; // local que pensás abrir
 let cambioEnc = null; // local al que le estás cambiando el encargado
 let plataVista = null; // para mostrar el número que salta cuando cambia la plata
@@ -103,6 +103,28 @@ function pantallaInicio() {
   }
 }
 
+// ---------- Cómo te mostramos (hombre o mujer) ----------
+function selectorGenero(elegido) {
+  return `<div class="genero">${[['hombre', '🙋‍♂️', 'Hombre'], ['mujer', '🙋‍♀️', 'Mujer']].map(([v, ico, txt]) => `<label><input type="radio" name="genero" value="${v}" ${elegido === v ? 'checked' : ''}><span style="font-size:2.4rem">${ico}</span>${txt}</label>`).join('')}</div>`;
+}
+
+// Partidas guardadas de antes: se pregunta una sola vez.
+function pantallaGenero() {
+  window.scrollTo(0, 0);
+  app.innerHTML = `
+    <h1>Una cosa más</h1>
+    <p class="suave">Ahora el taller te muestra trabajando, con tu equipo. ¿Cómo querés que te dibujemos?</p>
+    <div class="tarjeta">${selectorGenero('')}<p class="suave" id="generoError"></p></div>
+    <button class="boton" id="seguir">Seguir</button>
+  `;
+  document.getElementById('seguir').onclick = () => {
+    const r = elegirGenero(partida, app.querySelector('input[name="genero"]:checked')?.value);
+    if (!r.ok) { document.getElementById('generoError').textContent = r.motivo; return; }
+    guardarPartida();
+    siguientePantalla();
+  };
+}
+
 // ---------- Pantalla: de dónde sos ----------
 function opcionesProvincia(elegida) {
   const ids = Object.keys(PROVINCIAS_AR).sort((a, b) => PROVINCIAS_AR[a].nombre.localeCompare(PROVINCIAS_AR[b].nombre, 'es'));
@@ -121,14 +143,15 @@ function pantallaOrigen() {
       <label class="campo"><span>Municipio o ciudad</span>
         <input type="text" id="origenMuni" maxlength="40" placeholder="Por ejemplo: Río Cuarto" value="${origenForm.municipio}">
       </label>
+      <div class="campo"><span>¿Cómo te mostramos en el taller?</span>${selectorGenero(origenForm.genero)}</div>
       <p class="suave" id="origenError"></p>
     </div>
     <button class="boton" id="seguir">Seguir</button>
     <button class="boton secundario" id="volver">Volver</button>
   `;
   document.getElementById('seguir').onclick = () => {
-    origenForm = { provincia: document.getElementById('origenProv').value, municipio: document.getElementById('origenMuni').value.trim() };
-    const err = !origenForm.provincia ? 'Elegí tu provincia.' : !origenForm.municipio ? 'Escribí tu municipio o ciudad.' : '';
+    origenForm = { provincia: document.getElementById('origenProv').value, municipio: document.getElementById('origenMuni').value.trim(), genero: app.querySelector('input[name="genero"]:checked')?.value || '' };
+    const err = !origenForm.provincia ? 'Elegí tu provincia.' : !origenForm.municipio ? 'Escribí tu municipio o ciudad.' : !origenForm.genero ? 'Elegí cómo te mostramos.' : '';
     if (err) { document.getElementById('origenError').textContent = err; return; }
     pantallaPrestamo();
   };
@@ -223,6 +246,70 @@ function hacerContraibles() {
     t.prepend(b);
     pintar();
   });
+}
+
+// ---------- La escena como menú ----------
+// Tocás algo del taller y abajo se ve solo lo de eso. "Ver todo en lista" muestra la pantalla entera, como antes.
+const CLAVE_VISTA = 'el-taller-vista';
+let vista = 'escena';
+try { vista = localStorage.getItem(CLAVE_VISTA) === 'lista' ? 'lista' : 'escena'; } catch { vista = 'escena'; }
+let zonaActiva = null;
+let zonaDePantalla = null; // para volver a la zona por defecto cuando cambia la pantalla
+const ZONAS = {
+  pc: { icono: '🖥️', nombre: 'PC' },
+  celular: { icono: '📱', nombre: 'Celular' },
+  corcho: { icono: '📌', nombre: 'Corcho' },
+  puerta: { icono: '🚪', nombre: 'Puerta' },
+  cajas: { icono: '📦', nombre: 'Cajas' },
+  vos: { icono: '🙋', nombre: 'Vos' },
+  equipo: { icono: '👥', nombre: 'Equipo' },
+};
+const ORDEN_ZONAS = ['pc', 'celular', 'corcho', 'puerta', 'cajas', 'vos', 'equipo'];
+const datosZona = (id) => ZONAS[id] || { icono: '⚙️', nombre: MAQUINAS[id]?.nombre || id };
+
+// partes: [{ zona, html, alerta, arriba, soloLista, soloEscena }]; zona null = se ve siempre.
+// pantalla: clave para saber si cambió (y volver a la zona por defecto).
+function armarConEscena(e, partes, { pantalla, porDefecto = 'pc', fantasmas = false, maquinasPrimero = false }) {
+  const conContenido = partes.filter((x) => x.zona && x.html && !x.soloLista);
+  const alertas = new Set(conContenido.filter((x) => x.alerta).map((x) => x.zona));
+  if (zonaDePantalla !== pantalla) {
+    zonaDePantalla = pantalla;
+    zonaActiva = (maquinasPrimero ? [...Object.keys(MAQUINAS), ...ORDEN_ZONAS] : [...ORDEN_ZONAS, ...Object.keys(MAQUINAS)]).find((z) => alertas.has(z)) || porDefecto;
+  }
+  const lista = vista === 'lista';
+  const maqs = maquinasDeLaEscena(e, { fantasmas, enPais: enPais(e) });
+  const zonasConCosas = new Set(conContenido.map((x) => x.zona));
+  const chips = [...ORDEN_ZONAS.filter((z) => zonasConCosas.has(z) || z === zonaActiva), ...maqs]
+    .map((z) => { const d = datosZona(z); return `<button type="button" data-ir-zona="${z}" class="${z === zonaActiva ? 'activa' : ''}">${z === 'vos' && e.genero === 'mujer' ? '🙋‍♀️' : d.icono} ${d.nombre}${!e.maquinas[z] && MAQUINAS[z] ? ' +' : ''}${alertas.has(z) ? '<span class="punto">!</span>' : ''}</button>`; }).join('');
+  const tarjetaEscena = `<div class="tarjeta">
+      ${escenaTaller(e, { zona: lista ? null : zonaActiva, alertas: lista ? new Set() : alertas, fantasmas: fantasmas && !lista, enPais: enPais(e), interactiva: !lista })}
+      ${lista ? '' : `<div class="zonas">${chips}</div>`}
+      <div class="vista-lista"><button type="button" class="chico" id="vistaBoton">${lista ? '🏠 Ver el taller' : '☰ Ver todo en lista'}</button></div>
+    </div>`;
+  const arriba = partes.filter((x) => !x.zona && x.arriba).map((x) => x.html).join('');
+  const abajo = partes.filter((x) => !x.zona && !x.arriba).map((x) => x.html).join('');
+  if (lista) return `${arriba}${tarjetaEscena}${partes.filter((x) => x.zona && !x.soloEscena).map((x) => x.html).join('')}${abajo}`;
+  const delPanel = partes.filter((x) => x.zona === zonaActiva && !x.soloLista).map((x) => x.html).join('');
+  const d = datosZona(zonaActiva);
+  return `${arriba}${tarjetaEscena}${delPanel || `<div class="tarjeta panel-zona"><p class="suave">${d.icono} ${d.nombre}: esta vez no hay nada para hacer acá.</p></div>`}${abajo}`;
+}
+
+function conectarEscena() {
+  app.querySelectorAll('[data-zona], [data-ir-zona]').forEach((el) => {
+    el.addEventListener('click', () => {
+      zonaActiva = el.dataset.zona || el.dataset.irZona;
+      sonido('click');
+      refrescar();
+      const t = app.querySelector('.zonas');
+      if (t) t.scrollIntoView({ block: 'start', behavior: 'smooth' });
+    });
+  });
+  const vb = document.getElementById('vistaBoton');
+  if (vb) vb.onclick = () => {
+    vista = vista === 'lista' ? 'escena' : 'lista';
+    try { localStorage.setItem(CLAVE_VISTA, vista); } catch { /* sin guardado */ }
+    refrescar();
+  };
 }
 
 function conectarMenu() {
@@ -370,6 +457,44 @@ function bloqueComprasYReinicio(e) {
     </div>`;
 }
 
+// Partes de "Comprar y pagar" para la escena: cada máquina, el tío (celular) y la mudanza (puerta).
+function htmlMaquinaDomingo(e, m) {
+  const mq = MAQUINAS[m];
+  const prods = Object.keys(PRODUCTOS).filter((id) => PRODUCTOS[id].maquina === m);
+  const lista = prods.map((id) => PRODUCTOS[id].nombre.toLowerCase()).join(', ');
+  if (e.maquinas[m]) {
+    return `<div class="tarjeta panel-zona"><h3>⚙️ ${mq.nombre}</h3>
+      <p class="suave">Hace: ${lista}. El sábado, cuando lleguen los pedidos, tocala para cargar cuánto producir.</p>
+      ${prods.map((id) => `<div class="producto">${imagen(id)}<div class="info"><div class="nombre">${PRODUCTOS[id].nombre}</div><div class="detalle">Stock ${e.stock[id]} · ${Math.round(horasPorUnidad(e, id) * 60)} min c/u · costo ${plata(PRODUCTOS[id].costo)}</div></div></div>`).join('')}
+    </div>`;
+  }
+  const d = prestamoDisponible(e);
+  return `<div class="tarjeta panel-zona sec-finanzas"><h3>➕ ${mq.nombre}</h3>
+    <p class="suave">Todavía no la tenés. Con ella podés hacer: ${lista}.</p>
+    <button class="boton secundario" data-comprar="${m}">Comprar ${mq.nombre.toLowerCase()} (${plata(mq.precio)})</button>
+    ${e.prestamo.pagado && d.ok && d.maquina?.nombre === mq.nombre ? '<p class="suave">¿No te alcanza? Tocá el celular y llamá al tío: te presta para esta.</p>' : ''}
+  </div>`;
+}
+
+function bloqueTio(e) {
+  const p = e.prestamo;
+  const pagar = p.opcion === 'A' && !p.pagado ? `<button class="boton secundario" id="pagarTio">Pagarle al tío ahora (${plata(p.vencido ? p.deuda : costoPagoAnticipadoA(e.semana, p))})</button>` : '';
+  const nuevo = bloquePrestamoNuevo(e);
+  if (!pagar && !nuevo) return '';
+  return `<div class="tarjeta sec-finanzas"><div class="con-avatar" style="align-items:center">${imagen('tio', 'avatar mini')}<h2 style="margin:0">Llamar al tío</h2></div>${pagar}${nuevo}</div>`;
+}
+
+function bloqueMudanza(e) {
+  const local = localActual(e);
+  return `<div class="tarjeta sec-finanzas">
+      <h2>Dónde trabajás: ${local.nombre.toLowerCase()}</h2>
+      <p class="suave">Entran hasta ${local.cupo} empleados${local.alquiler ? `. Pagás ${plata(local.alquiler)} de alquiler y ${plata(local.luz)} más de luz por mes` : ''}.</p>
+      ${localesDisponibles(e).filter((id) => id !== 'casa' && id !== (e.local || 'casa')).map((id) => `<button class="boton secundario" data-local="${id}">Mudarte a ${LOCALES[id].desdePais ? 'una' : 'un'} ${LOCALES[id].nombre.toLowerCase()}: hasta ${LOCALES[id].cupo} empleados, ${plata(LOCALES[id].alquiler)} + ${plata(LOCALES[id].luz)} de luz por mes${LOCALES[id].localesMin ? ` (con ${LOCALES[id].localesMin} locales de venta abiertos)` : ''}</button>`).join('').replace('a una galpón', 'a un galpón')}
+      ${(e.local || 'casa') !== 'casa' ? '<button class="chico" id="dejarLocal">Devolver el local y volver a tu casa</button>' : ''}
+      ${!despuesDeLaCiudad(e) ? `<p class="suave">El ${LOCALES.grande.nombre.toLowerCase()} (hasta ${LOCALES.grande.cupo}) se consigue en la provincia.</p>` : !enPais(e) ? `<p class="suave">En el país vas a poder mudarte a un galpón (hasta ${LOCALES.galpon.cupo}) o a una planta industrial pequeña (hasta ${LOCALES.planta.cupo}).</p>` : ''}
+    </div>`;
+}
+
 // ---------- Equipo ----------
 const semEquipoPub = () => ({ capacitacion: pub.capacitar, feriaVendedor: pub.feriaVendedor });
 const nombreVariante = (x) => (x.esLelo ? (partida?.leloComercial ? 'Gerente comercial' : partida?.leloGerente ? 'Gerente de operaciones' : 'Primo') : PUESTOS[x.puesto].variantes[x.variante].nombre);
@@ -385,7 +510,9 @@ const tituloPuesto = (x) => {
   if (x.esLelo && partida?.leloGerente) return v;
   return v === p ? p : x.esLelo ? `${v} · ${p.toLowerCase()}` : `${p} · ${v}`;
 };
-const listaNombres = (xs) => xs.map((x) => x.nombre).join(' y ');
+const mayuscula = (t) => t.charAt(0).toUpperCase() + t.slice(1);
+const listaNombres = (xs) => (xs.length > 4 ? `tus ${xs.length} ${xs.every((x) => x.puesto === 'operario') ? 'operarios' : 'empleados'}`
+  : xs.length > 1 ? `${xs.slice(0, -1).map((x) => x.nombre).join(', ')} y ${xs[xs.length - 1].nombre}` : xs.map((x) => x.nombre).join(''));
 
 function lineaVendedores(e) {
   const vs = presentes(e, 'vendedor');
@@ -795,7 +922,7 @@ function lineaOperarios(e) {
   const faltan = e.equipo.empleados.filter((x) => x.falta);
   if (!ops.length && !faltan.length) return '';
   const cap = capacidadEquipo(e);
-  return `<p class="suave">${ops.length ? `${listaNombres(ops)} ${ops.length > 1 ? 'tienen' : 'tiene'} <strong>${String(cap.produccion).replace('.', ',')} h</strong> para producir. Lo que no les entra lo hacés vos.` : ''}${faltan.length ? ` ${listaNombres(faltan)} faltó esta semana.` : ''}</p>`;
+  return `<p class="suave">${ops.length ? `${mayuscula(listaNombres(ops))} ${ops.length > 1 ? 'tienen' : 'tiene'} <strong>${String(cap.produccion).replace('.', ',')} h</strong> para producir. Lo que no les entra lo hacés vos.` : ''}${faltan.length ? ` ${mayuscula(listaNombres(faltan))} ${faltan.length > 1 ? 'faltaron' : 'faltó'} esta semana.` : ''}</p>`;
 }
 
 function repartoTexto(e) {
@@ -815,36 +942,21 @@ function pantallaPublicidad() {
   const v = validarPublicidad(e, pub);
   const horas = horasDomingo(e, pub);
 
-  app.innerHTML = `
-    ${bloqueEncabezado(e, '<div class="paso-semana">Domingo · Publicidad</div>')}
-    ${aviso ? `<div class="tarjeta tio"><p>${aviso}</p></div>` : ''}
-    ${tutorial ? `<div class="tarjeta tio con-avatar">${imagen('tio')}<p>${tutorial}</p></div>` : ''}
-    <div class="tarjeta"><h2>Tu taller</h2>${escenaTaller(e)}</div>
-    ${fecha ? `<div class="tarjeta tio con-avatar">${imagen('calendario')}<p>${fecha}</p></div>` : ''}
-    ${bloqueAbuela(e)}
-    ${bloqueDecision(e)}
-    ${enPais(e) ? `<div class="tarjeta"><p>${e.mejorDelPais ? `<strong>${nombreDelTaller(e)} es la marca del país.</strong> La pelea por Sudamérica llega en la próxima versión: mientras tanto, podés seguir jugando.` : `<strong>Peleás el país contra ${TOPA.nombre}.</strong> Tu taller ya no vende: produce y hace publicidad de marca. Venden los locales, y la reputación del país es el promedio de todos. ${TOPA.nombre} sube despacio, pero no para: InfoArg te cuenta cómo viene una vez por mes.`}</p></div>`
-      : e.mejorDeLaProvincia ? `<div class="tarjeta"><p><strong>${nombreDelTaller(e)} es el mejor de la provincia.</strong></p></div>`
-      : enProvincia(e) ? `<div class="tarjeta"><p><strong>Peleás la provincia contra ${TRAICIO.nombre}.</strong> ${leloDeViaje(e) ? 'Lelo anda de vacaciones por Santa Clara del Mar.' : ''} Cada venta suma menos reputación que en la ciudad, pero los pedidos de empresas y las licitaciones suman mucho.</p></div>`
-      : e.reconquista ? `<div class="tarjeta"><p><strong>Perdiste la provincia.</strong> Volvé a ser el mejor de la ciudad para revancharte: Lelo te la está peleando.</p></div>` : ''}
-    ${bloquePais(e)}
-    ${bloqueProvincia(e)}
-    ${puedeHacerPromo(e) ? `<div class="tarjeta rumor">
-      <div class="con-avatar">${imagen('lelo')}<p>${e.primo.rumor}</p></div>
-      <label class="interruptor">
-        <span><strong>Lanzar promo de contraataque</strong><br><span class="suave">${Math.round(PROMO.descuento * 100)}% de descuento en los pedidos de esta semana · ${PROMO.horas} h. Si Lelo ataca, casi siempre lo frenás: no te saca pedidos y te llegan un ${Math.round(PROMO.extraDemanda * 100)}% más. Si era humo, regalaste el descuento. Y alguna vez la promo no prende.</span></span>
-        <input type="checkbox" id="promo" ${pub.promo ? 'checked' : ''}>
-      </label>
-    </div>` : ''}
-
-    ${esSemanaCyber(e.semana) ? `<div class="tarjeta sec-publicidad">
+  const maqs = maquinasDeLaEscena(e, { fantasmas: true, enPais: enPais(e) });
+  const abuela = bloqueAbuela(e);
+  const decision = bloqueDecision(e);
+  const provincia = bloqueProvincia(e);
+  const partes = [
+    { arriba: true, html: aviso ? `<div class="tarjeta tio"><p>${aviso}</p></div>` : '' },
+    { arriba: true, html: tutorial ? `<div class="tarjeta tio con-avatar">${imagen('tio')}<p>${tutorial}</p></div>` : '' },
+    { zona: 'pc', html: decision, alerta: !!decision },
+    { zona: 'pc', html: esSemanaCyber(e.semana) ? `<div class="tarjeta sec-publicidad">
       <label class="interruptor" style="border-top:0">
         <span><strong>Sumarte al CyberMonday</strong><br><span class="suave">Bajás todos los precios un ${Math.round(CYBER.descuento * 100)}% esta semana y la gente te pide mucho más de todo. Si no te sumás, no ganás nada extra.</span></span>
         <input type="checkbox" id="cyber" ${pub.cyber ? 'checked' : ''}>
       </label>
-    </div>` : ''}
-
-    <div class="tarjeta sec-publicidad">
+    </div>` : '', alerta: esSemanaCyber(e.semana) },
+    { zona: 'pc', html: `<div class="tarjeta sec-publicidad">
       <h2>${enPais(e) ? 'Publicidad de marca' : 'Publicidad en redes'}</h2>
       <p class="suave">${enPais(e) ? `Desde el taller hacés publicidad de la marca en todo el país (vos y tus vendedores). No trae pedidos: los traen los locales. Pero con ${PAIS.marca.horasCompletas} h por semana, entre todos, los locales ganan reputación un ${Math.round(PAIS.marca.extra * 100)}% más rápido (con menos, proporcional).` : 'Publicás en Instagram y Marketplace y respondés consultas: <strong>así te llegan los pedidos</strong>. Cuantas más horas, más pedidos, hasta que el mercado se agota. Al final de la semana te vas a enterar si te quedaste corto o si te pasaste.'}</p>
       <div class="producto">
@@ -861,18 +973,33 @@ function pantallaPublicidad() {
         <input type="checkbox" id="volantes" ${pub.volantes ? 'checked' : ''}>
       </label>
       ${opcionVolantesVendedor(e)}`}
-    </div>
-
-    ${enPais(e) ? '' : `<div class="tarjeta sec-feria">
+    </div>` },
+    { zona: 'celular', html: abuela, alerta: !!abuela },
+    { zona: 'celular', html: puedeHacerPromo(e) ? `<div class="tarjeta rumor">
+      <div class="con-avatar">${imagen('lelo')}<p>${e.primo.rumor}</p></div>
+      <label class="interruptor">
+        <span><strong>Lanzar promo de contraataque</strong><br><span class="suave">${Math.round(PROMO.descuento * 100)}% de descuento en los pedidos de esta semana · ${PROMO.horas} h. Si Lelo ataca, casi siempre lo frenás: no te saca pedidos y te llegan un ${Math.round(PROMO.extraDemanda * 100)}% más. Si era humo, regalaste el descuento. Y alguna vez la promo no prende.</span></span>
+        <input type="checkbox" id="promo" ${pub.promo ? 'checked' : ''}>
+      </label>
+    </div>` : '', alerta: puedeHacerPromo(e) },
+    { zona: 'celular', html: bloqueTio(e), soloEscena: true },
+    { zona: 'corcho', html: fecha ? `<div class="tarjeta tio con-avatar">${imagen('calendario')}<p>${fecha}</p></div>` : '', alerta: !!fecha },
+    { zona: 'corcho', html: enPais(e) ? `<div class="tarjeta"><p>${e.mejorDelPais ? `<strong>${nombreDelTaller(e)} es la marca del país.</strong> La pelea por Sudamérica llega en la próxima versión: mientras tanto, podés seguir jugando.` : `<strong>Peleás el país contra ${TOPA.nombre}.</strong> Tu taller ya no vende: produce y hace publicidad de marca. Venden los locales, y la reputación del país es el promedio de todos. ${TOPA.nombre} sube despacio, pero no para: InfoArg te cuenta cómo viene una vez por mes.`}</p></div>`
+      : e.mejorDeLaProvincia ? `<div class="tarjeta"><p><strong>${nombreDelTaller(e)} es el mejor de la provincia.</strong></p></div>`
+      : enProvincia(e) ? `<div class="tarjeta"><p><strong>Peleás la provincia contra ${TRAICIO.nombre}.</strong> ${leloDeViaje(e) ? 'Lelo anda de vacaciones por Santa Clara del Mar.' : ''} Cada venta suma menos reputación que en la ciudad, pero los pedidos de empresas y las licitaciones suman mucho.</p></div>`
+      : e.reconquista ? `<div class="tarjeta"><p><strong>Perdiste la provincia.</strong> Volvé a ser el mejor de la ciudad para revancharte: Lelo te la está peleando.</p></div>` : '' },
+    { zona: 'corcho', html: provincia, alerta: !!(e.licitacion?.abierta && e.licitacion.abierta.semana === e.semana && !e.licitacion.abierta.oferta) },
+    { zona: 'puerta', html: bloquePais(e) },
+    { zona: 'puerta', html: enPais(e) ? '' : `<div class="tarjeta sec-feria">
       <div class="con-avatar" style="align-items:center">${imagen('feria', 'avatar mini')}<h2 style="margin:0">Feria del domingo</h2></div>
       <label class="interruptor" style="border-top:0">
         <span><strong>Ir a la feria</strong><br><span class="suave">Mesa ${plata(VENTAS.feria.costoMesa)} · ${VENTAS.feria.horas} h · vendés lo que te sobró de stock (${stockTotal(e) ? `tenés ${stockTotal(e)}` : 'hoy no tenés nada'}). En la feria siempre pasa algo.</span></span>
         <input type="checkbox" id="feria" ${pub.feria ? 'checked' : ''} ${stockTotal(e) ? '' : 'disabled'}>
       </label>
       ${opcionFeriaVendedor(e)}
-    </div>`}
-
-    <div class="tarjeta sec-estudio">
+    </div>` },
+    { zona: 'puerta', html: bloqueMudanza(e), soloEscena: true },
+    { zona: 'vos', html: `<div class="tarjeta sec-estudio">
       <h2>Estudiar</h2>
       ${e.curso.semanasRestantes > 0
         ? `<p>Estás haciendo el curso de <strong>${CURSOS[e.curso.id].nombre.toLowerCase()}</strong>: ${CURSOS[e.curso.id].horasPorSemana} h esta semana y termina ${e.curso.semanasRestantes === 1 ? 'esta semana' : `en ${e.curso.semanasRestantes} semanas`}.</p>`
@@ -882,15 +1009,21 @@ function pantallaPublicidad() {
             <input type="radio" name="curso" value="${id}" ${pub.curso === id ? 'checked' : ''}>
           </label>`).join('')}
           ${pub.curso ? '<button class="chico" id="sinCurso" style="margin-top:8px">No estudiar esta semana</button>' : ''}`}
-    </div>
+    </div>` },
+    { zona: 'vos', html: bloqueEstado(e) },
+    { zona: 'equipo', html: bloqueEquipo(e) },
+    ...maqs.map((m) => ({ zona: m, html: htmlMaquinaDomingo(e, m), soloEscena: true })),
+    { zona: 'vos', html: bloqueComprasYReinicio(e), soloLista: true },
+    { html: barraInferior(horas, v.costo || null, v.errores, 'Arrancar la semana', 'publicar') },
+  ];
 
-    ${bloqueEquipo(e)}
-    ${bloqueEstado(e)}
-    ${bloqueComprasYReinicio(e)}
-    ${barraInferior(horas, v.costo || null, v.errores, 'Arrancar la semana', 'publicar')}
+  app.innerHTML = `
+    ${bloqueEncabezado(e, '<div class="paso-semana">Domingo · Publicidad</div>')}
+    ${armarConEscena(e, partes, { pantalla: `d${e.semana}`, porDefecto: 'pc', fantasmas: true })}
   `;
   aviso = null;
   conectarMenu();
+  conectarEscena();
 
   app.querySelectorAll('[data-redes]').forEach((b) => { b.onclick = () => { pub.horasRedes = Math.max(0, pub.horasRedes + Number(b.dataset.redes)); refrescar(); }; });
   const promo = document.getElementById('promo');
@@ -1011,38 +1144,10 @@ function pantallaPedidos() {
   const combos = e.licitacion?.contrato ? Math.max(0, e.licitacion.contrato.combos) : 0;
   const servicios = (p) => `${p.envio ? ` · 🚚 envío (+${Math.round(SERVICIOS.envio.recargo * 100)}%, ${SERVICIOS.envio.horas} h)` : ''}${p.diseno ? ` · 🎨 diseño propio (+${Math.round(SERVICIOS.diseno.recargo * 100)}%, lleva más tiempo)` : ''}`;
 
-  app.innerHTML = `
-    ${bloqueEncabezado(e, '<div class="paso-semana">Sábado · Pedidos y producción</div>')}
-    ${aviso ? `<div class="tarjeta tio"><p>${aviso}</p></div>` : ''}
-    ${sem.eventos.length ? `<div class="tarjeta"><ul class="eventos">${sem.eventos.map((ev) => `<li class="${ev.tipo}">${ev.texto}</li>`).join('')}</ul></div>` : ''}
-
-    <div class="tarjeta sec-trabajo">
-      <h2>Pedidos de la semana (${sem.pedidos.filter((p) => !p.rechazado).length})</h2>
-      ${enPais(e) ? htmlPedidosPais(e, sem, precio, costoTerc) : sem.pedidos.length ? sem.pedidos.map((p) => `
-        <div class="pedido ${p.rechazado ? 'rechazado' : ''}">
-          <div class="info">
-            <div class="nombre">${p.cantidad} ${nombreUnidades(p.producto, p.cantidad)}</div>
-            <div class="detalle">${p.cliente} · ${plata(precio(p))}${servicios(p)}${p.rechazado ? ' · rechazado' : ''}${p.tercerizado ? ` · <strong>tercerizado</strong> (${plata(costoTerc(p))})` : ''}</div>
-          </div>
-          <div class="acciones-pedido">
-            ${seleccionTerc && !p.rechazado ? `<label class="marcar"><input type="checkbox" data-marcar="${p.id}" ${seleccionTerc.has(p.id) ? 'checked' : ''}> ${plata(costoTerc(p))}</label>`
-              : p.tercerizado ? '' : `<button class="chico" data-rechazar="${p.id}">${p.rechazado ? 'Aceptar' : 'Rechazar'}</button>`}
-          </div>
-        </div>`).join('') : '<p class="suave">No llegaron pedidos. Probá con más horas de publicidad la semana que viene.</p>'}
-      ${e.mejorDeLaCiudad && sem.pedidos.some((p) => !p.rechazado) ? (seleccionTerc
-        ? `<div class="alterna" style="margin-top:8px"><button class="chico activo" id="tercConfirmar">Tercerizar marcados (${seleccionTerc.size})</button><button class="chico" id="tercCancelar">Cancelar</button></div>`
-        : `<div class="alterna" style="margin-top:8px"><button class="chico" id="tercTodo">Tercerizar todo</button><button class="chico" id="tercResto">Tercerizar el resto</button><button class="chico" id="tercElegir">Elegir cuáles</button>${sem.pedidos.some((p) => p.tercerizado) ? '<button class="chico" id="tercNada">No tercerizar nada</button>' : ''}</div>`) : ''}
-      ${e.mejorDeLaCiudad ? '<p class="suave" style="margin-top:8px">Tercerizar: otro taller lo hace por vos. No te lleva horas ni stock, pero te queda solo un 5-10% de ganancia. "El resto" son los pedidos que no cubrís con tu stock y lo que vas a producir. Ojo: a veces la tercerizadora entrega mal y perdés el pedido y el insumo.</p>' : ''}
-      <p class="suave" style="margin-top:8px">Si no entregás un pedido aceptado perdés reputación. Si sabés que no llegás, rechazalo: perdés mucho menos.${sem.pedidos.some((p) => p.envio || p.diseno) ? ' Los envíos los hace un operario con horas libres (si no, vos) y suman reputación; el diseño propio lo hace tu diseñador de esa máquina (si no tenés, o no le alcanzan las horas, vos).' : ''}</p>
-    </div>
-
-    ${bloqueTransporte(e, sem)}
-    ${bloqueEmpresas(e)}
-
-    <div class="tarjeta sec-trabajo">
-      <h2>Producir</h2>
+  const tarjetaProducir = (lista, titulo = 'Producir') => (lista.length ? `<div class="tarjeta sec-trabajo">
+      <h2>${titulo}</h2>
       ${lineaOperarios(e)}
-      ${productos.map((id) => {
+      ${lista.map((id) => {
         const pr = PRODUCTOS[id];
         const necesita = pedidas[id] + empresa[id] + (id === 'combo' ? combos : 0);
         const faltan = Math.max(0, necesita - e.stock[id] - plan.producir[id]);
@@ -1062,13 +1167,54 @@ function pantallaPedidos() {
       ${repartoTexto(e)}
       <p class="suave" style="margin-top:8px">Alguna puede salir mal en la prensa. Cuanta más experiencia tengas, menos errores vas a cometer: producir una de más te cubre.</p>
       <p class="suave">${enPais(e) ? 'Lo que te sobre queda en stock para la semana que viene. Pero no acumules mucho: lo guardado siempre se termina rompiendo.' : 'Lo que te sobre queda en stock para llevar a la feria del domingo. Pero no acumules mucho: lo guardado siempre se termina rompiendo.'}</p>
-    </div>
+    </div>` : '');
+  const faltanDe = (id) => Math.max(0, pedidas[id] + empresa[id] + (id === 'combo' ? combos : 0) - e.stock[id] - plan.producir[id]);
+  const maqs = maquinasDeLaEscena(e, { fantasmas: false });
+  const stockHtml = Object.keys(PRODUCTOS).filter((id) => e.stock[id]).map((id) => `${e.stock[id]} ${nombreUnidades(id, e.stock[id])}`).join(', ');
+  const empresas = bloqueEmpresas(e);
+  const partes = [
+    { arriba: true, html: aviso ? `<div class="tarjeta tio"><p>${aviso}</p></div>` : '' },
+    { zona: 'pc', html: sem.eventos.length ? `<div class="tarjeta"><ul class="eventos">${sem.eventos.map((ev) => `<li class="${ev.tipo}">${ev.texto}</li>`).join('')}</ul></div>` : '' },
+    { zona: 'pc', html: `<div class="tarjeta sec-trabajo">
+      <h2>Pedidos de la semana (${sem.pedidos.filter((p) => !p.rechazado).length})</h2>
+      ${enPais(e) ? htmlPedidosPais(e, sem, precio, costoTerc) : sem.pedidos.length ? sem.pedidos.map((p) => `
+        <div class="pedido ${p.rechazado ? 'rechazado' : ''}">
+          <div class="info">
+            <div class="nombre">${p.cantidad} ${nombreUnidades(p.producto, p.cantidad)}</div>
+            <div class="detalle">${p.cliente} · ${plata(precio(p))}${servicios(p)}${p.rechazado ? ' · rechazado' : ''}${p.tercerizado ? ` · <strong>tercerizado</strong> (${plata(costoTerc(p))})` : ''}</div>
+          </div>
+          <div class="acciones-pedido">
+            ${seleccionTerc && !p.rechazado ? `<label class="marcar"><input type="checkbox" data-marcar="${p.id}" ${seleccionTerc.has(p.id) ? 'checked' : ''}> ${plata(costoTerc(p))}</label>`
+              : p.tercerizado ? '' : `<button class="chico" data-rechazar="${p.id}">${p.rechazado ? 'Aceptar' : 'Rechazar'}</button>`}
+          </div>
+        </div>`).join('') : '<p class="suave">No llegaron pedidos. Probá con más horas de publicidad la semana que viene.</p>'}
+      ${e.mejorDeLaCiudad && sem.pedidos.some((p) => !p.rechazado) ? (seleccionTerc
+        ? `<div class="alterna" style="margin-top:8px"><button class="chico activo" id="tercConfirmar">Tercerizar marcados (${seleccionTerc.size})</button><button class="chico" id="tercCancelar">Cancelar</button></div>`
+        : `<div class="alterna" style="margin-top:8px"><button class="chico" id="tercTodo">Tercerizar todo</button><button class="chico" id="tercResto">Tercerizar el resto</button><button class="chico" id="tercElegir">Elegir cuáles</button>${sem.pedidos.some((p) => p.tercerizado) ? '<button class="chico" id="tercNada">No tercerizar nada</button>' : ''}</div>`) : ''}
+      ${e.mejorDeLaCiudad ? '<p class="suave" style="margin-top:8px">Tercerizar: otro taller lo hace por vos. No te lleva horas ni stock, pero te queda solo un 5-10% de ganancia. "El resto" son los pedidos que no cubrís con tu stock y lo que vas a producir. Ojo: a veces la tercerizadora entrega mal y perdés el pedido y el insumo.</p>' : ''}
+      <p class="suave" style="margin-top:8px">Si no entregás un pedido aceptado perdés reputación. Si sabés que no llegás, rechazalo: perdés mucho menos.${sem.pedidos.some((p) => p.envio || p.diseno) ? ' Los envíos los hace un operario con horas libres (si no, vos) y suman reputación; el diseño propio lo hace tu diseñador de esa máquina (si no tenés, o no le alcanzan las horas, vos).' : ''}</p>
+    </div>` },
+    { zona: 'cajas', html: `<div class="tarjeta panel-zona"><h3>📦 Stock</h3><p class="suave">${stockHtml ? `Tenés guardado: ${stockHtml}.` : 'No tenés nada guardado.'} Se usa primero para los pedidos.</p></div>`, soloEscena: true },
+    { zona: 'cajas', html: bloqueTransporte(e, sem) },
+    { zona: 'corcho', html: empresas, alerta: (e.pedidosEmpresa || []).some((x) => x.estado === 'oferta') },
+    ...maqs.map((m) => {
+      const deEsta = productos.filter((id) => PRODUCTOS[id].maquina === m);
+      return { zona: m, html: tarjetaProducir(deEsta, `Producir · ${MAQUINAS[m].nombre}`), alerta: deEsta.some((id) => faltanDe(id) > 0), soloEscena: true };
+    }),
+    { zona: 'pc', html: tarjetaProducir(productos), soloLista: true },
+    { zona: 'equipo', html: `<div class="tarjeta panel-zona"><h3>👥 Tu equipo el sábado</h3>${lineaOperarios(e) || '<p class="suave">Producís solo. El domingo podés contratar gente desde Equipo.</p>'}${repartoTexto(e)}</div>`, soloEscena: true },
+    { zona: 'vos', html: bloqueEstado(e) },
+    { html: barraInferior(v.horas, v.costo, v.errores, 'Producir y entregar el domingo', 'terminar') },
+  ];
+  const conFaltantes = maqs.find((m) => productos.some((id) => PRODUCTOS[id].maquina === m && faltanDe(id) > 0));
 
-    ${bloqueEstado(e)}
-    ${barraInferior(v.horas, v.costo, v.errores, 'Producir y entregar el domingo', 'terminar')}
+  app.innerHTML = `
+    ${bloqueEncabezado(e, '<div class="paso-semana">Sábado · Pedidos y producción</div>')}
+    ${armarConEscena(e, partes, { pantalla: `s${e.semana}`, porDefecto: conFaltantes || 'pc', maquinasPrimero: true })}
   `;
   aviso = null;
   conectarMenu();
+  conectarEscena();
 
   app.querySelectorAll('[data-rechazar]').forEach((b) => {
     b.onclick = () => {
@@ -1396,6 +1542,7 @@ function pantallaQuiebra() {
 
 function siguientePantalla() {
   if (partida.fin === 'quiebra') pantallaQuiebra();
+  else if (!partida.genero) pantallaGenero();
   else if (partida.pedirNombreSA) pantallaPaisArranque();
   else { window.scrollTo(0, 0); pantallaSemana(); }
 }

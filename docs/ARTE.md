@@ -17,7 +17,7 @@ Si lo querés hacer vos:
 4. En `js/arte.js`, escribí el nombre del archivo en `archivo` (por ejemplo `tio: { archivo: 'tio.png', ... }`).
 5. Subí los cambios a GitHub: en un par de minutos se ve en la web.
 
-Las piezas isométricas del taller no van en `arte.js`: cuando estén todas (o casi), se arma la escena nueva en `js/escena.js` usando esos archivos. Hasta entonces sigue la escena dibujada en código.
+Ya llegó `iso-casa` (guardada en `herramientas/fuentes/`). Las piezas isométricas del taller no van en `arte.js`: cuando estén todas (o casi), se arma la escena nueva en `js/escena.js` usando esos archivos. Hasta entonces sigue la escena dibujada en código.
 
 ## Cómo lograr que salgan parejas
 
@@ -113,10 +113,17 @@ Tamaño 512 × 512. Peso: menos de 60 KB. Todas a la misma escala (una persona m
 | `iso-calandra.png` | Calandra industrial con un rodillo grande y tela saliendo. |
 | `iso-costura.png` | Estación de costura: mesa con máquina de coser industrial. |
 | `iso-bordado.png` | Bordadora industrial con bastidor. |
-| `iso-vos.png` | Vos: joven con delantal, de pie, trabajando. |
+| `iso-vos-hombre.png` | Vos (hombre): joven con delantal, de pie, trabajando. |
+| `iso-vos-mujer.png` | Vos (mujer): joven con delantal y el pelo atado, de pie, trabajando. |
 | `iso-lelo.png` | Lelo de pie, con el celular. |
 | `iso-empleado-1.png`, `iso-empleado-2.png`, `iso-empleado-3.png` | Tres empleados distintos de pie, trabajando (delantal, gorra, guantes). |
 | `iso-cajas.png` | Pila de cajas de cartón con mercadería. |
+| `iso-pc.png` | Escritorio chico con una computadora de escritorio encendida. |
+| `iso-celular.png` | Un celular apoyado de pie en un soporte, con la pantalla encendida (más grande que en la realidad, para que se pueda tocar). |
+| `iso-corcho.png` | Tablero de corcho colgado en la pared, con papelitos, un calendario y chinches de colores. |
+| `iso-puerta.png` | Puerta de madera de calle, cerrada, con picaporte dorado. |
+
+Estas piezas también son **botones**: en el juego, tocar cada una abre su menú (ver `docs/REGLAS.md`, 1.1). Por eso conviene que se vean claras y no muy chicas.
 
 ## Cómo cambiar los colores
 

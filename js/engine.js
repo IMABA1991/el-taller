@@ -10,7 +10,7 @@ import {
   GRANDES, INFOARG, EVENTOS_MARCA, EMPRESAS_PAIS, CLUBES_BARRIO, LICITACION_SEGUNDA, TRAICIO_TEXTOS,
 } from './data.js';
 
-export const VERSION_PARTIDA = 5;
+export const VERSION_PARTIDA = 6;
 
 // ---------- Azar con semilla (para poder guardar y reproducir partidas) ----------
 function siguienteAzar(estado) {
@@ -207,6 +207,8 @@ export function migrarPartida(e) {
   // Versión 5: el país
   if (e.pais === undefined) e.pais = null;
   if (e.origen === undefined) e.origen = null;
+  // Versión 6: cómo te mostramos en el taller (hombre o mujer); si falta, se pregunta al continuar
+  if (e.genero === undefined) e.genero = null;
   if (!e.equipo.rrhhCubre) e.equipo.rrhhCubre = [];
   const ab = e.licitacion.abierta;
   if (ab && ab.combos === undefined) Object.assign(ab, { tipo: 'ascenso', combos: LICITACION.combos, precioRef: LICITACION.precioRef, costo: LICITACION.costo, sena: LICITACION.sena, plazo: LICITACION.plazo, multa: LICITACION.multa, cobroSemanas: 0, requisitos: [], especial: null, grande: null, repGanada: LICITACION.repGanada, repIncompleta: LICITACION.repIncompleta });
@@ -973,6 +975,7 @@ export function nuevaPartida(opcionPrestamo, semilla = Date.now() >>> 0, origen 
     volantesSemana: null,
     leloVuelve: null,
     origen: origen && PROVINCIAS_AR[origen.provincia] ? { provincia: origen.provincia, municipio: String(origen.municipio || '').trim().slice(0, 40) || 'tu ciudad' } : null,
+    genero: ['hombre', 'mujer'].includes(origen?.genero) ? origen.genero : null,
     pais: null,
     mejorDelPais: false,
     leloComercial: false,
@@ -3296,3 +3299,10 @@ export {
   LELO_EMPLEADO, ABUELA, RRHH, PROVINCIAS_AR, PAIS, ENCARGADO, TRANSPORTE, LELO_COMERCIAL, TOPA, MARCAS, DEFENSAS_PAIS, GRANDES,
   EMPRESAS_PAIS, CLUBES_BARRIO, LICITACION_SEGUNDA, EVENTOS_MARCA, TRAICIO_TEXTOS,
 };
+
+// Cómo te mostramos en el taller.
+export function elegirGenero(e, genero) {
+  if (!['hombre', 'mujer'].includes(genero)) return { ok: false, motivo: 'Elegí cómo te mostramos.' };
+  e.genero = genero;
+  return { ok: true };
+}
