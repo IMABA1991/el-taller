@@ -6,9 +6,14 @@ Mientras una imagen no exista, el juego muestra un emoji (o el dibujo hecho en c
 
 ## Cómo sumar una imagen
 
+**La forma más fácil:** pasale las imágenes a Claude en el chat y él las recorta, las achica y las activa en el juego.
+
+Si lo querés hacer vos:
+
 1. Generá la imagen con Gemini usando la descripción de estilo y la de la imagen (abajo).
 2. Guardala en `assets/img/` con el nombre de archivo de la tabla, en PNG con fondo transparente.
 3. Pasala por [squoosh.app](https://squoosh.app) (o similar) para achicarla: que pese menos de lo que dice la tabla.
+   - Ojo: Gemini a veces **dibuja** el cuadriculado gris y blanco del "fondo transparente" en vez de dejarlo transparente. `herramientas/recortar.py` lo saca y arma el avatar (cabeza) y el cuerpo entero: `python3 herramientas/recortar.py tio imagen.jpg`.
 4. En `js/arte.js`, escribí el nombre del archivo en `archivo` (por ejemplo `tio: { archivo: 'tio.png', ... }`).
 5. Subí los cambios a GitHub: en un par de minutos se ve en la web.
 

@@ -4,8 +4,10 @@
 //   2. Escribí el nombre del archivo en "archivo" acá abajo.
 export const IMAGENES = {
   logo: { archivo: '', emoji: '☕', texto: 'El Taller' },
-  tio: { archivo: '', emoji: '🧔', texto: 'El tío' },
-  lelo: { archivo: '', emoji: '😏', texto: 'Lelo, tu primo' },
+  tio: { archivo: 'tio.png', emoji: '🧔', texto: 'El tío' },
+  tioCuerpo: { archivo: 'tio-cuerpo.png', emoji: '🧔', texto: 'El tío' },
+  lelo: { archivo: 'lelo.png', emoji: '😏', texto: 'Lelo, tu primo' },
+  leloCuerpo: { archivo: 'lelo-cuerpo.png', emoji: '😏', texto: 'Lelo, tu primo' },
   chuchu: { archivo: '', emoji: '🚂', texto: 'Chuchu' },
   operario: { archivo: '', emoji: '👷', texto: 'Operario' },
   vendedor: { archivo: '', emoji: '🧑‍💼', texto: 'Vendedor' },
