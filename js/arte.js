@@ -15,7 +15,7 @@ export const IMAGENES = {
   tazaPlastico: { archivo: 'taza-plastico.png', emoji: '🥤', texto: 'Taza de plástico' },
   gorra: { archivo: 'gorra.png', emoji: '🧢', texto: 'Gorra' },
   feria: { archivo: '', emoji: '🛍️', texto: 'Feria' },
-  calendario: { archivo: '', emoji: '📅', texto: 'Fecha especial' },
+  calendario: { archivo: 'calendario.png', emoji: '📅', texto: 'Fecha especial' },
   disenador: { archivo: 'disenador.png', emoji: '🎨', texto: 'Diseñador' },
   costurero: { archivo: 'costurero.png', emoji: '🧵', texto: 'Costurero' },
   bordador: { archivo: 'bordador.png', emoji: '🪡', texto: 'Bordador' },
@@ -25,8 +25,8 @@ export const IMAGENES = {
   abuela: { archivo: 'abuela.png', emoji: '👵', texto: 'La abuela' },
   traicio: { archivo: 'traicio.png', emoji: '🗡️', texto: 'Traicio Nero' },
   topa: { archivo: 'topa.png', emoji: '👟', texto: 'Topa' },
-  niko: { archivo: '', emoji: '🪈', texto: 'Niko' },
-  ardidos: { archivo: '', emoji: '🔥', texto: 'Ardidos' },
+  niko: { archivo: 'niko.png', emoji: '🪈', texto: 'Niko' },
+  ardidos: { archivo: 'ardidos.png', emoji: '🔥', texto: 'Ardidos' },
   remera: { archivo: 'remera.png', emoji: '👕', texto: 'Remera' },
   mangaLarga: { archivo: 'manga-larga.png', emoji: '👚', texto: 'Manga larga' },
   buzo: { archivo: 'buzo.png', emoji: '🧥', texto: 'Buzo' },
@@ -38,7 +38,7 @@ export const IMAGENES = {
   camisetaEscudo: { archivo: 'camiseta-escudo.png', emoji: '🎽', texto: 'Camiseta con escudo bordado' },
   gorraBordada: { archivo: 'gorra-bordada.png', emoji: '🧢', texto: 'Gorra bordada' },
   remeraBordada: { archivo: 'remera-bordada.png', emoji: '👕', texto: 'Remera bordada' },
-  chombaBordada: { archivo: '', emoji: '👔', texto: 'Chomba bordada' },
+  chombaBordada: { archivo: 'chomba-bordada.png', emoji: '👔', texto: 'Chomba bordada' },
   mantel: { archivo: 'mantel.png', emoji: '🧺', texto: 'Mantel' },
 };
 

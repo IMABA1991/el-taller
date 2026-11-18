@@ -437,7 +437,7 @@ function bloqueLicitacion(e) {
   const puede = puedeOfertarLicitacion(e);
   const reqs = segunda ? `<div class="subtitulo">Requisitos de esta licitación</div>${a.requisitos.map((id) => `<p class="requisito ${cumpleRequisito(e, id) ? 'si' : 'no'}">${LICITACION_SEGUNDA.requisitos[id]}</p>`).join('')}
     ${a.especial ? `<p class="requisito ${LICITACION_SEGUNDA.especiales[a.especial].requiere.every((m) => e.maquinas[m]) ? 'si' : 'no'}">Pide ${LICITACION_SEGUNDA.especiales[a.especial].texto} (${LICITACION_SEGUNDA.especiales[a.especial].requiere.map((m) => MAQUINAS[m].nombre.toLowerCase()).join(' y ')}): paga más</p>` : ''}` : '';
-  const grande = a.grande ? `<p><strong>Se presenta ${a.grande}</strong> (${GRANDES.find((g) => g.nombre === a.grande)?.logo}). Es una de las grandes marcas deportivas: contra ellos, hoy no hay con qué.</p>` : '';
+  const grande = a.grande ? `<div class="con-avatar">${imagen(a.grande.toLowerCase())}<p><strong>Se presenta ${a.grande}</strong> (${GRANDES.find((g) => g.nombre === a.grande)?.logo}). Es una de las grandes marcas deportivas: contra ellos, hoy no hay con qué.</p></div>` : '';
   let pie;
   if (!puede.ok) pie = `<p><strong>${puede.motivo}</strong></p>`;
   else pie = `
