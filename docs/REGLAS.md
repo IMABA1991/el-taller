@@ -1,6 +1,6 @@
 # El Taller — Documento de diseño del juego
 
-> Versión 0.19 · Reglas en definición
+> Versión 0.20 · Reglas en definición
 > Juego web por turnos, para jugar solo, contra bots o online.
 
 ---
@@ -45,6 +45,7 @@ Simulador de emprendedor de sublimación con humor argentino. Arrancás sin nada
 Terminaste el secundario en diciembre y no sabés qué hacer. En las fiestas hablás con tu tío, que conoce el rubro: te cuenta que la sublimación puede ser un buen negocio y que te puede prestar la plata para arrancar. Pero el tío es justo: **le presta lo mismo a tu primo**, que arranca con el mismo negocio. Desde ahí, compiten a medida que crecen.
 
 - **Inicio de la partida:** enero (el tío te da el dinero en enero).
+- **De dónde sos:** al arrancar elegís tu **provincia** (de una lista) y escribís tu **municipio o ciudad**. El juego te nombra tu ciudad en la pantalla y, al llegar al país, tu primer local queda en esa provincia.
 
 ### 2.1 Tutorial (enero y febrero)
 
@@ -112,8 +113,8 @@ Terminaste el secundario en diciembre y no sabés qué hacer. En las fiestas hab
 |---|---|
 | Ciudad | Tu primo (misma ciudad, competencia endeble) |
 | Provincia | **Traicio Nero**, de **Talleres Judas**: ex empleado de Lelo que se independizó; es el mejor de otra ciudad de tu provincia (ver 2.4) |
-| País | Marcas nacionales (nombres paródicos inspirados en marcas reales) |
-| Sudamérica | Las grandes marcas deportivas internacionales (nombres paródicos) |
+| País | **Topa** (la líder, la de toda la vida) y otras cuatro marcas que atacan tus locales (ver 5.4) |
+| Sudamérica | Las grandes marcas deportivas internacionales (nombres paródicos). **Niko** y **Ardidos** ya asoman en el país, solo en las licitaciones |
 
 - El modo multijugador online queda para más adelante.
 
@@ -157,7 +158,9 @@ Terminaste el secundario en diciembre y no sabés qué hacer. En las fiestas hab
   - **Conservás todo** (máquinas, plata, empleados), pero el **mercado vuelve al tamaño de la ciudad**; los empleados de más te siguen costando el sueldo.
   - **Lelo vuelve a competir** en la ciudad (arranca con 50 de reputación), con la excusa que corresponda (ver 2.2), hasta que llegás de nuevo a 100. Los pedidos de empresas pendientes se cancelan.
   - **Revancha:** al volver a ganar la ciudad, Lelo se va otra vez a Santa Clara del Mar (y al volver la abuela pide de nuevo) y arranca otra vez la provincia, con Traicio en 30.
-- **Nombre del taller:** al pasar a la meta de la provincia, el juego te pide **bautizar tu taller** (por ejemplo, "Talleres Iván"). Desde ahí competís como empresa.
+- **Cómo se va:** al ganar la provincia aparece: *"Traicio estaba armando bombas de humo y cohetes en su taller para tirártelos en la puerta durante la semana, pero tuvo un error y terminó prendiendo fuego su propio taller."* En el país no aparece más (salvo en los chismes de InfoArg: vende pastelitos en la terminal).
+- **Si después perdés el país** contra Topa: *"Durante tu tiempo compitiendo por el país, Traicio volvió a juntar fondos vendiendo pastelitos y ahora volvió a montar su taller para competirte."* Volvés a la provincia con **25** de reputación y Traicio arranca con **30**.
+- **Nombre del taller:** al pasar a la meta de la provincia, el juego te pide **bautizar tu taller** (por ejemplo, "Talleres Iván"). Desde ahí competís como empresa. Al llegar al país, el taller **vuelve a cambiar de nombre** y pasa a ser una sociedad anónima: el nombre que elijas, con **"S.A."** al final.
 
 ---
 
@@ -220,7 +223,7 @@ Terminaste el secundario en diciembre y no sabés qué hacer. En las fiestas hab
 
 ### 4.1 Máquinas
 
-Tazas → Gorras → Plancha 30x30 → Plancha 1x1 m → Calandra
+Tazas → Gorras → Plancha 30x30 → Plancha 1x1 m → Calandra → (en el país) Estación de costura → Estación de bordado
 
 - **Experiencia por máquina:** al comprar una máquina nueva, vos, Lelo y los empleados arrancan en ella con **la mitad de su experiencia general**. Lo que falta se recupera produciendo en esa máquina, al doble del ritmo normal.
 
@@ -256,6 +259,7 @@ Se sube por **reputación**:
 
 - Ritmo esperado: con unos 4 pedidos por semana, ser el mejor de la ciudad lleva unos 6 meses (26 turnos).
 - **Provincia: mucho más lenta.** Ser el mejor de la provincia tiene que llevar **unos 50 turnos** después de ganar la ciudad. Para eso, **cada venta suma un 5% de lo que suma en la ciudad** (se probó con la mitad, pero con el mercado de la provincia se venden 70 a 140 unidades por semana y la meta se ganaba en 8 semanas). Lo que más suma son los pedidos grandes: cada pedido de empresa entregado y cada licitación cumplida suman +3. Los sabotajes de Traicio frenan todavía más.
+- **País:** la reputación del país es el **promedio de tus locales** (ver 5.5). Sin aprovechar los eventos de marca se tarda unos 2 años y 8 meses; aprovechándolos, entre 1,5 y 2 años. **Topa llega a 100 a los 2 años y medio**, así que quien no aprovecha los eventos pierde.
 - **Balance probado con la simulación** (240 partidas de un jugador razonable, v0.19): la provincia se gana en unas 46-47 semanas y se le gana a Traicio de primera unas 7 de cada 10 veces (73%). Sin el arranque de Traicio en 8, aceptar a Lelo (40 h y +7,5) subía las victorias al 90%. Quien gasta todo en máquinas y no paga defensas sufre más sabotajes y pierde más seguido. Queda 1 quiebra en 240 partidas (el jugador de prueba se queda sin caja después de comprar la calandra).
 
 ### 4.5 Expansión mundial (después de Sudamérica)
@@ -338,6 +342,13 @@ Se sube por **reputación**:
 | | | Camiseta, club de segunda | $80.000 | $5.000 | $75.000 | |
 | | | Camiseta, club de primera | $100.000 | $5.000 | $95.000 | |
 | | | Short | 50% de la camiseta | $2.500 | — | La mitad de una camiseta |
+| Estación de costura (país) | $15.000.000 | Corte y costura de los combos | — | — | — | Los 30 min de cada combo los hacen los costureros |
+| Estación de bordado (país) | $20.000.000 | Gorra bordada | $18.000 (x1,8) | $3.500 | $14.500 | 1 h 36 min |
+| | | Remera bordada | $30.000 (x2) | $7.000 | $23.000 | 1 h 48 min |
+| | | Chomba bordada (empresas) | $30.000 | $8.000 | $22.000 | 1 h 30 min |
+| | | Camiseta con escudo bordado (clubes de barrio) | $36.400 (x1,3) | $8.000 | $28.400 | 1 h 48 min |
+| Plancha 30x30 | | Camiseta de club de barrio (país, por pedido) | $28.000 | $6.000 | $22.000 | 1 h 36 min |
+| Plancha 1x1 m | | Mantel full color (salones de eventos) | $40.000 | $12.000 | $28.000 | 2 h |
 
 **Cómo se definen los tiempos:**
 - **Productos comunes** (tazas, gorra, remera, manga larga): el tiempo es proporcional al margen, y cada máquina nueva rinde un **25% más de ganancia por hora** que la anterior (tazas $4.000/h, gorras $5.000/h, plancha 30x30 $6.250/h).
@@ -345,7 +356,8 @@ Se sube por **reputación**:
 - La experiencia baja los tiempos (ver 7.1).
 
 **Notas:**
-- **Luz extra por máquina:** gorras +$5.000, plancha 30x30 +$10.000, plancha 1x1 m +$20.000, calandra +$40.000 por mes.
+- **Luz extra por máquina:** gorras +$5.000, plancha 30x30 +$10.000, plancha 1x1 m +$20.000, calandra +$40.000, costura +$30.000, bordado +$40.000 por mes.
+- **Estaciones del país:** son **más caras que la calandra a propósito** (con lo que se gana en la provincia, si no, se compraban antes). Solo se pueden comprar en el país. Los productos bordados los hacen los **bordadores** (o vos); los operarios no tocan la estación.
 - Las máquinas se pueden comprar en cualquier orden; el préstamo del tío es siempre para la próxima en el orden.
 - Con la plancha 1x1 m, el full color **duplica el precio de venta** y mantiene el costo. Cada producto full color tiene el **30% de la demanda** del producto común (es premium).
 - Un conjunto (camiseta + short) para un club de primera se vende a $150.000 y cuesta $7.500.
@@ -359,10 +371,18 @@ El precio **triplica el costo** (el costo es un tercio del precio).
 | Categoría | Precio de referencia por combo | Costo por combo | Combos por pedido | Plazo de entrega | Requisito para participar |
 |---|---|---|---|---|---|
 | Ascenso | $90.000 | $30.000 | 60 | Alrededor de un mes | Tener calandra |
-| Segunda división | $120.000 | $40.000 | 100 | Alrededor de un mes | Calandra + ser el mejor de la provincia |
+| Segunda división | $156.000 (+30%) | $40.000 | 100 | Alrededor de un mes | Calandra + ser el mejor de la provincia + 4 requisitos rotativos (ver abajo) |
 | Primera división | $150.000 | $50.000 | 200 | Alrededor de un mes | Calandra + diseñador deportivo + ser el mejor del país |
 
-**Tiempo por combo:** 1 h de calandrado + 30 min de corte y costura (dos procesos distintos). Con experiencia baja a 30 min + 15 min. Con el plazo de un mes, a medida que crecés **necesitás sí o sí empleados y experiencia** para cumplir (200 combos al principio son 300 horas).
+**Licitaciones de segunda división (país):**
+- Cada ~12 semanas. Margen **30% más jugoso** que el original ($156.000 de referencia), pero la **seña es del 25%** (tenés que poner capital) y **el resto se cobra 8 semanas después de entregar**.
+- **Requisitos rotativos:** de estos 6, cada licitación pide **4 al azar**, y la pantalla los muestra (con ✔ o ✖) antes de ofertar: tener diseñador deportivo; tener diseñador textil; tener al menos 5 locales; tener locales en Buenos Aires, Córdoba y Santa Fe; tener 30 de reputación nacional; tener 3 clientes empresa fijos.
+- **Competencia más dura:** la mitad de las veces los rivales ofrecen apenas un **5% arriba del límite inferior** (94,5% de la referencia).
+- **Licitaciones especiales:** 1 de cada 3 pide **corte especializado** (solo con estación de costura, precio x1,3); 1 de cada 4 pide **escudos bordados** (solo con estación de bordado, x1,5); algunas raras piden **las dos** (x2).
+- **Niko y Ardidos:** aparecen en **1 de cada 4** licitaciones, se ven antes de ofertar y **siempre ganan**. Es el anticipo de Sudamérica. Logos paródicos sin copiar: Niko lleva **una pipa de fumar bien dibujada**; Ardidos, **tres llamitas** ("ardido" = quemado).
+- Las licitaciones del ascenso siguen apareciendo en el país.
+
+**Tiempo por combo:** 1 h de calandrado + 30 min de corte y costura (dos procesos distintos). Con experiencia baja a 30 min + 15 min. Con la **estación de costura**, los 30 min de corte y costura los hacen los costureros (lo que no les alcanza, vos). Con el plazo de un mes, a medida que crecés **necesitás sí o sí empleados y experiencia** para cumplir (200 combos al principio son 300 horas).
 
 **Cómo funciona la licitación:**
 - Cada tanto un club abre una licitación (ascenso cada ~8 semanas, segunda cada ~12, primera una vez por temporada).
@@ -409,28 +429,93 @@ El precio **triplica el costo** (el costo es un tercio del precio).
 
 **Etapa país:**
 
-- **Clubes de barrio** (por localidad): pedidos chicos, sin licitación, por ejemplo 15 a 20 camisetas. Se pueden hacer con la plancha antes de tener la calandra, o tercerizados.
-- **Clientes empresa:** salones de belleza (indumentaria), merchandising para empresas grandes, salones de eventos (mantelería, indumentaria). Pedidos grandes y recurrentes, pensados para la plancha de 1x1 m.
-- Las marcas rivales del país son **varias a la vez** peleando el mercado (ver 5.4).
+| Cliente | Pedido | Frecuencia | Plazo | Pago |
+|---|---|---|---|---|
+| Clubes de barrio | 15 a 20 camisetas de club de barrio, a precio de lista. Con la estación de bordado, 4 de cada 10 piden el escudo bordado | Cada ~4 semanas **por cada provincia con local** | 3 semanas | A 30 días |
+| Salones de belleza | 15 a 25 remeras full color (ambos y remeras) | Cada ~4 semanas | 2 semanas | A 30 días |
+| Merchandising de empresas grandes | 80 a 150 unidades (tazas, gorras, remeras), con 10% de descuento | Cada ~8 semanas | 3 semanas | A 60 días |
+| Salones de eventos | 30 a 50 manteles full color | Cada ~6 semanas | 2 semanas | A 30 días |
 
-### 5.4 Marcas rivales del país (nombres provisorios, se pueden cambiar)
+- **Tope:** clubes de barrio y empresas comparten un **máximo de 3 pedidos por semana en todo el país**, para que no sea tedioso aunque tengas 24 locales. Los clientes de la provincia (catering, colectivos) siguen pidiendo y entran en el mismo tope.
+- **Diseño propio en los clubes de barrio:** el 10% trae escudo y camiseta con diseño propio (+20% de precio); con el **diseñador deportivo**, el 30% (así se le da uso a su porcentaje).
+- Funcionan igual que en la provincia: llegan en amarillo, se aceptan el sábado, se entregan cuando tenés todo y suman reputación (en el país, mucho menos: ver 5.5).
 
-Cada marca pelea un frente distinto:
+### 5.4 Marcas rivales del país
 
-| Marca | Frente | Ataques | Defensa |
+**Topa, la líder:** la marca de toda la vida. **No ataca:** sube despacio. Llega a **99 a los 2 años y 4 meses** de arrancar el país, **se queda ahí 2 meses** (InfoArg avisa cuando llega y otra vez al mes) y, si no ganaste antes, llega a **100 a los 2 años y medio** y te gana el país. Esos dos meses son la última chance para apurarse (eventos de marca, Lelo en el local más flojo, más publicidad).
+
+**Las otras cuatro atacan tus locales** (ya no roban empleados: solo buscan dañar tu reputación). Atacan cada 2 a 4 semanas; cada ataque le baja **un 10% de la reputación a un local** (el 5% con la defensa de esa marca).
+
+| Marca | Ataque | Ritmo (no se dice) | Defensa (pago mensual) |
 |---|---|---|---|
-| **Topa** | Tradición, la de toda la vida | *Campaña nostalgia:* 2 semanas con menos pedidos de remeras y gorras. *Club de clientes:* algún cliente empresa recurrente se puede ir | Calidad: buena formación y pocos errores bajan el efecto |
-| **Penalazo** | Clubes | *Remate en licitación:* ofrece muy por debajo del precio de referencia. *Te roba al diseñador deportivo* ofreciéndole más sueldo | Reputación alta; los recomendados de Chuchu nunca se van |
-| **Gambeta Sport** | Redes | *Influencers pagos:* tu publicidad rinde menos esa semana. *Sorteo viral:* se queda con algunos pedidos | Curso de redes y promo de contraataque |
-| **La Remera Feliz** | Precio | *Liquidación:* 3 semanas con precios muy bajos en productos simples; decidís si igualás (ganás menos) o no (perdés pedidos). *2x1 en remeras* | Diferenciarte: los productos premium (full color, buzos) no los afecta |
-| **Estampados del Plata** | Clientes empresa | *Le ofrece precio más bajo a tus clientes empresa:* si no igualás, podés perder uno. *Se lleva los pedidos grandes* (más de 50 unidades) | Entregar siempre a tiempo da fidelidad con cada cliente; tercerizar ayuda a cubrir pedidos grandes |
+| **Gambeta Sport** | Influencers que se burlan de un local | Impulsiva: a la semana siguiente del anuncio | **Community manager** (3% de tu ganancia mensual, mínimo $60.000) |
+| **Penalazo** | Le dice a los clubes que tus camisetas se deshilachan | Lenta: 2 o 3 semanas | **Abogado de marca** (4%, mínimo $80.000) |
+| **La Remera Feliz** | Liquidación enfrente de un local | 1 a 3 semanas | **Precio de batalla**: sin costo fijo, bajás un 5% los productos simples (tazas, gorras, remeras) |
+| **Estampados del Plata** | Habla pestes de tu marca en los comercios de la zona | 1 a 3 semanas | **Ejecutivo de cuentas** (3%, mínimo $60.000) |
 
-**Las noticias: "La Voz de Adentro"** (parodia de un diario provincial):
-- Anuncia lo que van a hacer las marcas ("Penalazo promete camisetas a precio de remate para la próxima licitación"). En la provincia, publica una vez por mes cómo viene Talleres Judas (ver 2.4).
-- Mezclado con **información basura** que no sirve para nada y chismes absurdos: "Chuchu fue visto persiguiendo un tren de carga en bicicleta", "Lelo se casó... aunque después la familia se dio cuenta de que ya estaba casado".
-- El jugador tiene que separar lo útil de lo irrelevante.
-- **Lo que publica el diario siempre es cierto.** La única duda es **cuándo**: el ataque llega a la semana siguiente, a las 2 o hasta a las 3 semanas. Con experiencia, el jugador aprende a estimar cuándo puede pasar.
-- **Cada marca tiene su propio ritmo** (el juego nunca lo dice; el jugador lo descubre jugando): Gambeta Sport es impulsiva y casi siempre ataca a la semana siguiente; Topa es lenta y suele tardar 2 o 3 semanas; Penalazo ataca cuando se abre la próxima licitación; La Remera Feliz y Estampados del Plata son variables (1 a 3 semanas).
+- Un encargado que **"le cuenta todo a la competencia"** hace que su local reciba ataques tres veces más seguido.
+
+**Las noticias: "InfoArg"** (parodia de un portal nacional; en la provincia seguía **La Voz de Adentro**):
+- Anuncia lo que van a hacer las marcas ("Gambeta Sport contrató influencers para dar vuelta el mercado"). **Lo que publica siempre es cierto**; la duda es cuándo pasa.
+- Una vez por mes publica cómo viene Topa (la barra de Topa se actualiza solo con esa nota), mezclado con chismes inútiles: Chuchu, Lelo, la abuela jugando al truco, Traicio vendiendo pastelitos.
+
+**Si perdés el país:** vendés (o liquidás) los locales por la mitad de lo que pagaste de armado, volvés a la provincia con **25** de reputación y vuelve Traicio con **30** (ver 2.4). Conservás máquinas, plata y equipo.
+
+**Niko y Ardidos** no te hacen perder: en el país solo aparecen en las licitaciones (ver 5.1).
+
+### 5.5 Locales del país
+
+- **Mercado:** el país arranca con **1,5 veces el mercado de la provincia** (la provincia con 100 de reputación), en tu **local de origen**. El mercado no crece hasta que abrís locales: **los 24 locales juntos suman 3 mercados más**, repartidos según la **población de cada provincia** (Censo 2022). Con todo abierto, el país es **4,5 veces la provincia**.
+- **El juego nunca muestra el mercado de cada provincia:** solo da pistas ("hay un mar de gente y el alquiler te va a doler", "hay poca gente y el alquiler es accesible").
+- **Tu taller ya no vende** (ni redes ni feria): solo **produce** y hace **publicidad de marca**.
+- **Local de origen:** tu provincia se convierte sola en el primer local, sin costo de armado, con el mercado base más la parte de tu provincia, pero pagando **el alquiler de tu provincia desde el primer día**. Arrancar en Buenos Aires da más mercado, con alquiler caro.
+- **Abrir un local:** pagás el alquiler del mes más **2 alquileres de armado, preparación y lanzamiento**. El alquiler de cada provincia sale de lo que factura un local ahí con 75 de reputación: deja un **margen final de 10 a 20%** (con 0 de reputación, menos; con 100, más). Ejemplos: Buenos Aires ~$5 M por mes, Córdoba ~$1 M, Tierra del Fuego ~$50.000.
+- **Encargado (indispensable):** sueldo de un empleado estándar (sigue la media del mercado).
+
+| Encargado | Sueldo | Rinde | Rasgos |
+|---|---|---|---|
+| Aprendiz | $25.000 | −15% | 2 contras |
+| Junior | $40.000 | +10%, pero a veces pierde algún pedido | 1 pro y 1 contra |
+| Senior | $70.000 | +15% | 2 pros |
+
+| Pros | Contras |
+|---|---|
+| **Vendedor nato:** el local vende un 10% más | **Se toma siestas largas:** vende un 10% menos |
+| **Ahorrativo:** el alquiler sale un 15% menos | **Manos largas:** se queda con un 5% de lo que cobra el local |
+| **Conocido en el pueblo:** la reputación del local crece un 30% más rápido | **Peleador:** el local pierde 1 de reputación por mes |
+| **Puntual con las empresas:** las empresas de la zona te piden más seguido | **Fanático del fútbol:** cierra los días de partido (−8% de ventas) |
+| **Amigo de los proveedores:** lo que vende ese local te cuesta un 10% menos de insumo | **Le cuenta todo a la competencia:** las marcas atacan ese local 3 veces más seguido |
+
+  - Los rasgos se conocen después de la primera semana (con Recursos Humanos, al contratarlo). Cambiar de encargado cuesta medio sueldo más lo trabajado.
+- **Pedidos a 2 semanas:** cada local junta pedidos en la semana; el sábado los producís y los mandás (**semana 1**), y llegan y se cobran a la semana siguiente (**semana 2**).
+- **Traslado** (el local de tu ciudad no lo necesita). Se elige el sábado:
+
+| Transporte | Costo (parte del valor) | Pasa algo |
+|---|---|---|
+| Avión | 12% | 1 de cada 100 (nunca se pierde todo) |
+| Flete por aplicación | 5% | 1 de cada 10 |
+| Un amigo con auto | 2% | 15 de cada 100 |
+
+  - Cuando pasa algo: el **90%** de las veces se pierde una **parte** (20-50%: roturas, mercadería sucia, "colaboraciones" en un control, una caja que "se olvidaron") y el **10%**, **todo** (robo del camión). Lo que no llega cuenta como **no entregado** en ese local.
+- **Reputación por local:** cada local tiene su barra de 0 a 100 y arranca en **0**. Crece por lo que vende y entrega (relativo a su mercado: un local chico crece igual de rápido que uno grande si cumple), y baja por lo que no llega, lo rechazado y los ataques. **La reputación del país es el promedio de los locales**: se gana con el promedio en 100 (99,5).
+  - **Más locales, más facilidades:** cada local abierto hace crecer un 3% más rápido a todos.
+  - **Publicidad de marca:** con 20 h por semana entre vos y los vendedores, todos los locales crecen un 25% más rápido (con menos horas, proporcional).
+  - Cartas del mazo, empresas, licitaciones y la abuela mueven la reputación de todos los locales, pero mucho menos que en la provincia (5%).
+- **Eventos de marca** (cada 6 a 8 semanas, casi todos con decisión): si los aprovechás, suman reputación a todos los locales y les dan un **impulso: crecen al triple** por unas semanas.
+
+| Evento | Si lo aprovechás | Si no |
+|---|---|---|
+| **El 10 de la Selección** apareció con una remera tuya | Campaña (20% de tu ganancia mensual): +3 y 4 semanas de impulso | +1 igual |
+| **Comedor comunitario** pide una donación | Donás stock (o plata) por el 10%: +2 y 3 semanas | Nada |
+| **Maratón solidaria** | Sponsor (15% y 6 h): +2,5 y 4 semanas | Nada |
+| **Streamer famosa** | Le pagás (25%): +2 y 6 semanas | Nada |
+| **Nota en la tele de la tarde** | 6 h y 5%: +2 y 3 semanas | Nada |
+
+- **Ofertas esporádicas** (en amarillo, cada 8 a 12 semanas, disponibles 2 domingos; salen bien **99 de cada 100** veces):
+  - **Campaña de lanzamiento** (30% de tu ganancia mensual): +20 de reputación en el local que elijas.
+  - **Publicidad nacional** (40%): todos los locales venden un 20% más durante 4 semanas.
+  - **Expansión inmediata** (gratis): el próximo local que abras en 4 semanas paga la mitad del armado.
+- **Si ganás el país:** sos la marca del país. Sudamérica llega en la próxima versión.
 
 ---
 
@@ -460,8 +545,11 @@ Se pagan cada 4 turnos, junto con el mes:
 | Tu casa | — | — | Hasta 2 | Desde el inicio |
 | Local chico | $60.000 | +$8.000 | Hasta 5 | Desde el inicio |
 | Local grande | $200.000 | +$20.000 | Hasta 12 | Desde la provincia |
+| Galpón | $600.000 | +$50.000 | Hasta 25 | Desde el país |
+| Planta industrial pequeña | $1.500.000 | +$120.000 | Hasta 50 | Desde el país, con 8 locales abiertos |
 
-- Lelo y la persona de seguridad no ocupan lugar. Para volver a un lugar más chico, primero hay que achicar el equipo.
+- "Pequeña" porque más adelante (Sudamérica) puede haber plantas más grandes.
+- Lelo, la persona de seguridad y los encargados de los locales no ocupan lugar. Para volver a un lugar más chico, primero hay que achicar el equipo.
 - En el tutorial, cuota de $22.000 + gastos de $30.000 = **$52.000 por mes** contra unos $120.000 de ganancia (ver 8.3): quedan unos $68.000 por mes para ahorrar.
 - Las ventas de verano del tutorial se ajustan en pruebas para que el arranque se sienta justo.
 
@@ -473,11 +561,12 @@ Se pagan cada 4 turnos, junto con el mes:
 | Meta lograda | Puesto del primo | Sueldo por mes | Qué aporta |
 |---|---|---|---|
 | Mejor de la ciudad | Empleado operativo | $40.000 | **+40 horas de producción por semana** (el doble que un operario común). Arranca con **experiencia 60/100** |
-| Mejor de la provincia | Gerente de operaciones | $150.000 | **Deja de producir**, pero baja un **20%** los errores de todo el taller y tu cansancio empieza a las **28 horas** en vez de 25 |
-| Mejor del país | Gerente comercial | $400.000 | Más demanda y más chances de conseguir clientes grandes |
+| Mejor de la provincia | **Gerente comercial de los locales** (durante el país) | $150.000 | No produce. Lo **asignás a un local**: ahí consigue un **40% más de clientes** y la reputación del local crece **el triple** (+200%). Lo podés cambiar de local **una vez por mes** |
+| Mejor del país | A definir con Sudamérica | — | — |
 | Mejor de Sudamérica | Socio comercial externo | % de las ganancias de las sucursales | Abre sucursales en otras regiones (ver 4.5) |
 
-- Si ganás la provincia sin Lelo en el equipo, no hay ascenso; si lo aceptás después, entra directamente como gerente.
+- Si ganás la provincia sin Lelo en el equipo, no hay ascenso; si lo aceptás después (en el país), entra directamente como gerente comercial.
+- *El puesto de "gerente de operaciones" (−20% de errores, cansancio desde las 28 h) quedó solo para partidas guardadas antes del país: al ganar la provincia ahora se pasa directo al país.*
 - **La experiencia de Lelo baja con el tiempo a la mitad del ritmo** con que baja la del jugador, salvo que lo capacites.
 
 **Tareas que puede hacer un empleado:** producción, ventas (atender redes y publicidad), ir a la feria por vos, repartir volantes (ver 8.4) y servicios especiales (envíos, ver 8.5). Más adelante: persona de seguridad (ver 2.4).
@@ -528,6 +617,16 @@ Se pagan cada 4 turnos, junto con el mes:
 
 - Los diseñadores **no producen**, ocupan lugar en el equipo y se consiguen desde la provincia (bolsa, Chuchu o anuncio).
 - **Diseños personalizados:** cada diseñador dedica **20 horas por semana** a los diseños personalizados de sus productos (el +50% de tiempo de esas unidades, ver 8.5). Si no le alcanzan las horas, el resto lo hacés vos. Sin diseñador de esa máquina, los pedidos personalizados siguen siendo el 10% y los hacés vos.
+
+**Empleados del país:**
+
+| Puesto | Sueldo | Qué hace |
+|---|---|---|
+| **Costurero** (aprendiz, operario, técnico) | Como los operarios ($25.000 / $40.000 / $70.000) | 20 h por semana, **solo en la estación de costura**: el corte y la costura de los combos |
+| **Bordador** (aprendiz, operario, técnico) | Como los operarios | 20 h por semana, **solo en la estación de bordado** |
+| **Recursos Humanos** | **8 veces un operario** ($320.000) | Ocupa un lugar y no produce. Cada uno atiende a **15 empleados**: les **baja a la mitad los rasgos malos** (el distraído se equivoca +25% en vez de +50%, el faltador falta la mitad, el quejoso pide aumento cada 12 meses) y te deja **ver el rasgo de los candidatos** (y de los encargados) antes de contratarlos |
+
+- **Recursos Humanos no asigna a nadie:** te dice en general, por ejemplo *"Recursos Humanos llega a 45 de tus 48 empleados: 3 quedan sin atender"*, y **cada mes se sortea** quiénes quedan afuera (no podés elegir dejar sin cubrir a los que no tienen contras). Con la planta llena, con 3 cubrís 45 y decidís si vale la pena un cuarto. En Sudamérica, con plantas más grandes, se revisa.
 
 **Rasgo al azar (el popurrí):** cada empleado viene con un rasgo, visible al contratarlo:
 
@@ -632,7 +731,7 @@ Se pagan cada 4 turnos, junto con el mes:
 
 - Al principio cuesta que te conozcan; con nombre, el boca a boca acelera.
 - **Cada producto tiene su propia demanda base y crece distinto con la reputación** (ver 8.3).
-- **Cada meta tiene su propio tamaño de mercado:** la provincia tiene el **doble** de pedidos posibles que la ciudad (el país y Sudamérica, a definir). **La provincia arranca donde terminó la ciudad** (x3,4) y con 100 de reputación llega al doble (x6,75); así la demanda no cae al cambiar de meta. Al subir de meta, el mercado crece; si Traicio te gana la provincia, el mercado **vuelve al tamaño de la ciudad** (única forma de que la demanda baje).
+- **Cada meta tiene su propio tamaño de mercado:** la provincia tiene el **doble** de pedidos posibles que la ciudad (el país y Sudamérica, a definir). **La provincia arranca donde terminó la ciudad** (x3,4) y con 100 de reputación llega al doble (x6,75); así la demanda no cae al cambiar de meta. **El país** arranca con 1,5 veces la provincia y crece abriendo locales hasta 4,5 veces (ver 5.5). Al subir de meta, el mercado crece; si Traicio te gana la provincia, el mercado **vuelve al tamaño de la ciudad** (única forma de que la demanda baje).
 
 ### 8.3 Demanda por producto (propuesta, a ajustar en pruebas)
 
@@ -796,8 +895,14 @@ Eventos esporádicos de gastos inoportunos y ganancias oportunas que, **sumados,
 - [ ] Rivales de Sudamérica: nombres paródicos y comportamiento.
 - [x] Contratación: bolsa del municipio, recomendado por Chuchu y anuncio (6.2).
 - [x] Lugar de trabajo: casa, local chico y local grande (6.1).
-- [ ] Tamaño del mercado del país y de Sudamérica.
-- [ ] Clubes de barrio y clientes empresa del país: precios, cantidades y frecuencia.
+- [x] Tamaño del mercado del país (1,5 + 3 mercados por locales, según población) (5.5).
+- [ ] Tamaño del mercado de Sudamérica.
+- [x] Clubes de barrio y clientes empresa del país, con tope de 3 pedidos por semana (5.3).
+- [x] Locales, encargados, traslado, reputación por local, eventos de marca y ofertas esporádicas (5.5).
+- [x] Topa, marcas que atacan locales, defensas, InfoArg, perder el país (5.4).
+- [x] Licitaciones de segunda, Niko y Ardidos (5.1).
+- [x] Estaciones de costura y bordado; costureros, bordadores y Recursos Humanos; galpón y planta industrial pequeña.
+- [x] Despedida y vuelta de Traicio (2.4). Provincia y municipio de origen (2).
 - [x] Tutorial: qué pasa en cada semana.
 - [ ] Ajuste fino de las ventas de verano (en pruebas).
 - [x] Mazo de eventos: 24 cartas, tamaños y decisiones (10.3).
@@ -813,7 +918,9 @@ Eventos esporádicos de gastos inoportunos y ganancias oportunas que, **sumados,
 - [x] Pantalla: cantidades, semana animada fija, colores de eventos y secciones contraíbles (1.1).
 - [x] Rebalanceo de la provincia (v0.19): Traicio arranca con 8; ~73% de victorias de primera en ~46-47 semanas.
 - [ ] Varias tercerizadoras con distinta calidad y precio.
-- [ ] Darle uso al 30% del diseñador deportivo (por ejemplo, pedidos de camisetas con diseño propio en el país).
+- [x] Darle uso al 30% del diseñador deportivo: clubes de barrio con diseño propio (5.3).
+- [ ] Encargados: más adelante, más variedad de rasgos según cómo se juegue.
+- [ ] Revisar el balance de la plata en el país (la simulación termina con mucha caja: sirve para Sudamérica).
 - [ ] Modo online: cantidad de jugadores, duración de la partida.
 
 ---
@@ -827,4 +934,4 @@ Eventos esporádicos de gastos inoportunos y ganancias oportunas que, **sumados,
 5. Agregar modo online.
 6. Arte y gráficos.
 
-**Estado del juego publicado (v0.19):** se juegan la ciudad y la provincia completas: Traicio con su ritmo (arranca con 8), sabotajes, robo de empleados y La Voz de Adentro; defensas y persona de seguridad; plancha 30x30, plancha 1x1 m y calandra; diseñadores con diseños personalizados; local grande; tercerización en bloque con falla del 15%; pedidos de empresas con cobro a 30 días; licitaciones del ascenso; la abuela pidiendo trabajo para Lelo (Lelo con 40 h, sin ocupar cupo) y Lelo gerente; perder la provincia y la revancha. En la pantalla: cantidades que se ajustan manteniendo apretado o escribiendo, semana animada fija con oportunidades en amarillo y desastres en rojo, y secciones contraíbles. Lo siguiente es la etapa del país.
+**Estado del juego publicado (v0.20):** se juegan la ciudad, la provincia y **el país**. Al arrancar elegís provincia y municipio. En el país: locales por provincia con encargados (aprendiz, junior, senior y diez rasgos), alquileres según la población, pedidos a 2 semanas con traslado (avión, flete o un amigo con auto, y pérdidas en el camino), reputación por local y promedio nacional, Lelo gerente comercial, publicidad de marca, Topa (99 a los 2 años y 4 meses, 100 a los 2 años y medio), cuatro marcas que atacan locales con sus defensas, InfoArg, eventos de marca con impulso, ofertas esporádicas, clubes de barrio y empresas con tope de 3 por semana, licitaciones de segunda con requisitos rotativos y especiales, Niko y Ardidos, estaciones de costura y bordado, costureros, bordadores, Recursos Humanos, galpón y planta industrial pequeña, la S.A. y perder el país (vuelve Traicio). **Simulación (v0.20, 40 partidas por modo):** aprovechando los eventos de marca, el país se gana en ~85 semanas (80-90); sin aprovecharlos, Topa gana siempre (a las 130 semanas el jugador va por 85 de reputación). Lo siguiente es Sudamérica.

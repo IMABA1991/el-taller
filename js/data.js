@@ -28,6 +28,9 @@ export const MAQUINAS = {
   plancha30: { nombre: 'Plancha 30x30', precio: 900000, luzExtra: 10000 },
   plancha1m: { nombre: 'Plancha 1x1 m', precio: 4000000, luzExtra: 20000 },
   calandra: { nombre: 'Calandra', precio: 10000000, luzExtra: 40000 },
+  // Estaciones del país (más caras que la calandra a propósito).
+  costura: { nombre: 'Estación de costura', precio: 15000000, luzExtra: 30000, desdePais: true },
+  bordado: { nombre: 'Estación de bordado', precio: 20000000, luzExtra: 40000, desdePais: true },
 };
 
 // sens = cuánto aprovecha el producto el multiplicador de reputación (1 alta, 0.7 media, 0.4 baja).
@@ -84,6 +87,40 @@ export const PRODUCTOS = {
     precio: 90000, costo: 30000, horas: 1.5, base: 0, sens: 0, soloPedido: true,
     temporada: {},
   },
+  // ---------- País ----------
+  // Camiseta para clubes de barrio (con la plancha, antes de tener la calandra): solo por pedido.
+  camisetaBarrio: {
+    nombre: 'Camiseta de club de barrio', corto: 'Camiseta barrio', singular: 'camiseta de club de barrio', plural: 'camisetas de club de barrio', maquina: 'plancha30',
+    precio: 28000, costo: 6000, horas: 1.6, base: 0, sens: 0, soloPedido: true,
+    temporada: {},
+  },
+  // Mantel full color para salones de eventos (plancha 1x1 m): solo por pedido.
+  mantel: {
+    nombre: 'Mantel full color', corto: 'Mantel', singular: 'mantel full color', plural: 'manteles full color', maquina: 'plancha1m',
+    precio: 40000, costo: 12000, horas: 2, base: 0, sens: 0, soloPedido: true,
+    temporada: {},
+  },
+  // Bordados (estación de bordado): multiplican el precio del producto común.
+  gorraBordada: {
+    nombre: 'Gorra bordada', corto: 'Gorra bordada', singular: 'gorra bordada', plural: 'gorras bordadas', maquina: 'bordado',
+    precio: 18000, costo: 3500, horas: 1.6, base: 1.2, sens: 0.7,
+    temporada: { verano: 1.6, invierno: 0.5 },
+  },
+  remeraBordada: {
+    nombre: 'Remera bordada', corto: 'Remera bordada', singular: 'remera bordada', plural: 'remeras bordadas', maquina: 'bordado',
+    precio: 30000, costo: 7000, horas: 1.8, base: 1.5, sens: 1,
+    temporada: { verano: 1.5, invierno: 0.6 },
+  },
+  chombaBordada: {
+    nombre: 'Chomba bordada', corto: 'Chomba', singular: 'chomba bordada', plural: 'chombas bordadas', maquina: 'bordado',
+    precio: 30000, costo: 8000, horas: 1.5, base: 0, sens: 0, soloPedido: true,
+    temporada: {},
+  },
+  camisetaEscudo: {
+    nombre: 'Camiseta con escudo bordado', corto: 'Camiseta escudo', singular: 'camiseta con escudo bordado', plural: 'camisetas con escudo bordado', maquina: 'bordado',
+    precio: 36400, costo: 8000, horas: 1.8, base: 0, sens: 0, soloPedido: true,
+    temporada: {},
+  },
 };
 
 // Fechas especiales. Los turnos van de domingo a domingo: el pico es el turno que termina el día
@@ -133,7 +170,7 @@ export const CONFIANZA = {
 };
 
 // Orden de las máquinas (las que todavía no están en el juego aparecen solo como aviso).
-export const ORDEN_MAQUINAS = ['tazas', 'gorras', 'plancha30', 'plancha1m', 'calandra'];
+export const ORDEN_MAQUINAS = ['tazas', 'gorras', 'plancha30', 'plancha1m', 'calandra', 'costura', 'bordado'];
 export const MAQUINAS_FUTURAS = {};
 
 // Dónde trabajás: en tu casa entran 2 empleados; para más, alquilás un local.
@@ -141,6 +178,8 @@ export const LOCALES = {
   casa: { nombre: 'Tu casa', alquiler: 0, luz: 0, cupo: 2 },
   chico: { nombre: 'Local chico', alquiler: 60000, luz: 8000, cupo: 5 },
   grande: { nombre: 'Local grande', alquiler: 200000, luz: 20000, cupo: 12, desdeProvincia: true },
+  galpon: { nombre: 'Galpón', alquiler: 600000, luz: 50000, cupo: 25, desdePais: true },
+  planta: { nombre: 'Planta industrial pequeña', alquiler: 1500000, luz: 120000, cupo: 50, desdePais: true, localesMin: 8 },
 };
 
 // Volantería: imprimís volantes y alguien los reparte por el barrio.
@@ -386,6 +425,42 @@ export const MAZO = {
         deja: { texto: 'No igualar', detalle: 'Decide él: si le pagás menos que la media del mercado, es más probable que se vaya.' },
       },
     },
+    // Eventos de marca del país
+    diez: {
+      pregunta: '¿Aprovechás la ola?',
+      opciones: {
+        aprovecha: { texto: 'Salir con todo', detalle: 'Campaña nacional (20% de tu ganancia mensual): +3 de reputación en todos los locales y crecen al triple durante 4 semanas.' },
+        nada: { texto: 'Dejar que pase solo', detalle: '+1 de reputación en todos los locales.' },
+      },
+    },
+    comedor: {
+      pregunta: '¿Donás?',
+      opciones: {
+        dona: { texto: 'Donar productos', detalle: 'Donás stock por el 10% de tu ganancia mensual (si no alcanza, ponés plata): +2 en todos los locales y crecen al triple 3 semanas.' },
+        no: { texto: 'Esta vez no', detalle: 'No pasa nada.' },
+      },
+    },
+    maraton: {
+      pregunta: '¿Sos sponsor?',
+      opciones: {
+        participa: { texto: 'Ser sponsor', detalle: 'Cuesta el 15% de tu ganancia mensual y 6 h tuyas: +2,5 en todos los locales y crecen al triple 4 semanas.' },
+        no: { texto: 'No', detalle: 'No pasa nada.' },
+      },
+    },
+    streamer: {
+      pregunta: '¿Le pagás?',
+      opciones: {
+        paga: { texto: 'Pagarle', detalle: 'El 25% de tu ganancia mensual: +2 en todos los locales y crecen al triple 6 semanas.' },
+        no: { texto: 'No', detalle: 'No pasa nada.' },
+      },
+    },
+    tele: {
+      pregunta: '¿Les abrís la puerta?',
+      opciones: {
+        nota: { texto: 'Hacer la nota', detalle: 'Te lleva 6 h y el 5% de tu ganancia mensual en ordenar todo: +2 en todos los locales y crecen al triple 3 semanas.' },
+        no: { texto: 'No', detalle: 'No pasa nada.' },
+      },
+    },
     quejoso: {
       pregunta: '¿Le contestás?',
       opciones: {
@@ -428,7 +503,37 @@ export const PUESTOS = {
     },
     rasgos: ['prolijo', 'creativo', 'distraido', 'faltador', 'quejoso'],
   },
+  // País: trabajan solo en su estación (mismos sueldos y variantes que los operarios).
+  costurero: {
+    nombre: 'Costurero', tarea: 'corte y costura de los combos', horas: 20, desdePais: true, estacion: 'costura',
+    variantes: {
+      aprendiz: { nombre: 'Aprendiz', sueldo: 25000, exp: 10, errores: 1.5, aprende: 2 },
+      operario: { nombre: 'Operario', sueldo: 40000, exp: 30, errores: 1, aprende: 1 },
+      tecnico: { nombre: 'Técnico', sueldo: 70000, exp: 60, errores: 0.7, aprende: 1 },
+    },
+    rasgos: ['prolijo', 'rapido', 'distraido', 'faltador', 'quejoso'],
+  },
+  bordador: {
+    nombre: 'Bordador', tarea: 'bordado', horas: 20, desdePais: true, estacion: 'bordado',
+    variantes: {
+      aprendiz: { nombre: 'Aprendiz', sueldo: 25000, exp: 10, errores: 1.5, aprende: 2 },
+      operario: { nombre: 'Operario', sueldo: 40000, exp: 30, errores: 1, aprende: 1 },
+      tecnico: { nombre: 'Técnico', sueldo: 70000, exp: 60, errores: 0.7, aprende: 1 },
+    },
+    rasgos: ['prolijo', 'rapido', 'creativo', 'distraido', 'faltador', 'quejoso'],
+  },
+  // Recursos Humanos: cobra 8 veces un operario, ocupa lugar, no produce. Cada uno atiende a 15 empleados:
+  // les baja a la mitad los rasgos malos y te muestra el rasgo de los candidatos antes de contratarlos.
+  rrhh: {
+    nombre: 'Recursos Humanos', tarea: 'cuidar al equipo', horas: 0, desdePais: true,
+    variantes: {
+      rrhh: { nombre: 'Recursos Humanos', sueldo: 320000, exp: 50 },
+    },
+    rasgos: ['prolijo', 'faltador', 'quejoso'],
+  },
 };
+// Recursos Humanos: a cuántos empleados atiende cada uno y cuánto les baja los rasgos malos.
+export const RRHH = { cubre: 15, distraido: 1.25, probFalta: 0.05, mesesQuejoso: 12 };
 // Sin diseñador textil, los productos de plancha tienen más errores.
 export const SIN_TEXTIL_ERRORES = 1.5;
 
@@ -570,6 +675,236 @@ export const VOZ_DE_ADENTRO = [
   'El intendente prometió arreglar el bache de la esquina. Es la promesa número 14.',
   'Chuchu armó una maqueta de trenes de 12 metros. Su suegra se mudó.',
 ];
+
+// =====================================================================
+// ---------- País ----------
+// =====================================================================
+
+// Provincias (y la Ciudad de Buenos Aires) con su población del Censo 2022, en miles.
+// El mercado de cada local se reparte según la población. El juego nunca muestra estos números:
+// solo da pistas ("mucha gente", "alquiler caro").
+export const PROVINCIAS_AR = {
+  buenosAires: { nombre: 'Buenos Aires', pob: 17523 },
+  caba: { nombre: 'Ciudad de Buenos Aires', pob: 3121 },
+  catamarca: { nombre: 'Catamarca', pob: 429 },
+  chaco: { nombre: 'Chaco', pob: 1129 },
+  chubut: { nombre: 'Chubut', pob: 603 },
+  cordoba: { nombre: 'Córdoba', pob: 3702 },
+  corrientes: { nombre: 'Corrientes', pob: 1212 },
+  entreRios: { nombre: 'Entre Ríos', pob: 1426 },
+  formosa: { nombre: 'Formosa', pob: 607 },
+  jujuy: { nombre: 'Jujuy', pob: 811 },
+  laPampa: { nombre: 'La Pampa', pob: 361 },
+  laRioja: { nombre: 'La Rioja', pob: 384 },
+  mendoza: { nombre: 'Mendoza', pob: 2043 },
+  misiones: { nombre: 'Misiones', pob: 1280 },
+  neuquen: { nombre: 'Neuquén', pob: 710 },
+  rioNegro: { nombre: 'Río Negro', pob: 762 },
+  salta: { nombre: 'Salta', pob: 1441 },
+  sanJuan: { nombre: 'San Juan', pob: 822 },
+  sanLuis: { nombre: 'San Luis', pob: 540 },
+  santaCruz: { nombre: 'Santa Cruz', pob: 337 },
+  santaFe: { nombre: 'Santa Fe', pob: 3557 },
+  santiago: { nombre: 'Santiago del Estero', pob: 1060 },
+  tierraDelFuego: { nombre: 'Tierra del Fuego', pob: 185 },
+  tucuman: { nombre: 'Tucumán', pob: 1731 },
+};
+
+export const PAIS = {
+  mercadoProvincia: 6.75, // un "mercado de provincia": lo que pide la provincia con 100 de reputación
+  mercadoBase: 1.5, // el país arranca con 1,5 mercados de provincia (en tu local de origen)
+  mercadoLocales: 3, // los 24 locales juntos suman 3 mercados más, repartidos por población
+  repMinima: 0.75, // con 0 de reputación un local vende el 75% de lo que podría; con 100, todo
+  armado: 2, // abrir un local: el alquiler del mes más 2 alquileres de armado y lanzamiento
+  alquiler: { parte: 0.4, minimo: 40000, repReferencia: 75 }, // parte de lo que factura un local por mes (deja un 10-20% de margen)
+  // Reputación: cada local crece por lo que vende (relativo a su mercado), y la reputación del país es el promedio.
+  repSemanal: 0.16, // lo que gana por semana un local que entrega todo lo que le piden
+  redPorLocal: 0.03, // cada local abierto hace crecer un 3% más rápido a todos (más locales, más facilidades)
+  marca: { horasCompletas: 20, extra: 0.25 }, // publicidad de marca desde el taller: hasta +25% de crecimiento
+  noEntregado: -2, // por unidad, en "unidades de reputación" del local
+  rechazado: -0.5,
+  factorGeneral: 0.05, // cartas, empresas y licitaciones mueven la reputación de todos los locales, pero mucho menos
+  ganar: 99.5, // promedio para ser el mejor del país
+  repAlPerder: 25, // si Topa te gana, volvés a la provincia con esto
+  repTraicioVuelve: 30,
+  ventaLocal: 0.5, // al perder vendés cada local por la mitad de lo que pagaste de armado
+  topeEspeciales: 3, // pedidos de clubes de barrio y empresas por semana, en todo el país
+  entregaSemanas: 2, // 1 para producir y 1 de traslado
+};
+
+// Encargados de los locales: indispensables. Sueldo de un empleado estándar (sigue la media del mercado).
+export const ENCARGADO = {
+  variantes: {
+    aprendiz: { nombre: 'Aprendiz', sueldo: 25000, rinde: 0.85, pierde: 0, pros: 0, contras: 2 },
+    junior: { nombre: 'Junior', sueldo: 40000, rinde: 1.1, pierde: 0.05, pros: 1, contras: 1 },
+    senior: { nombre: 'Senior', sueldo: 70000, rinde: 1.15, pierde: 0, pros: 2, contras: 0 },
+  },
+  rasgos: {
+    vendedorNato: { nombre: 'Vendedor nato', bueno: true, efecto: 'el local vende un 10% más' },
+    ahorrativo: { nombre: 'Ahorrativo', bueno: true, efecto: 'el alquiler del local sale un 15% menos' },
+    conocido: { nombre: 'Conocido en el pueblo', bueno: true, efecto: 'el local gana reputación un 30% más rápido' },
+    puntual: { nombre: 'Puntual con las empresas', bueno: true, efecto: 'las empresas de la zona te piden más seguido' },
+    proveedores: { nombre: 'Amigo de los proveedores', bueno: true, efecto: 'lo que vende ese local te cuesta un 10% menos de insumo' },
+    siestas: { nombre: 'Se toma siestas largas', bueno: false, efecto: 'el local vende un 10% menos' },
+    manosLargas: { nombre: 'Manos largas', bueno: false, efecto: 'se queda con un 5% de lo que cobra el local' },
+    peleador: { nombre: 'Peleador', bueno: false, efecto: 'se pelea con los clientes: el local pierde 1 de reputación por mes' },
+    futbol: { nombre: 'Fanático del fútbol', bueno: false, efecto: 'cierra los días de partido: el local vende un 8% menos' },
+    buchon: { nombre: 'Le cuenta todo a la competencia', bueno: false, efecto: 'las marcas atacan ese local tres veces más seguido' },
+  },
+  nombres: ['Ramón', 'Graciela', 'Osvaldo', 'Mirta', 'Cacho', 'Norma', 'Hugo', 'Susana', 'Rubén', 'Estela', 'Beto', 'Liliana', 'Toto', 'Silvia', 'Pocho', 'Marta'],
+};
+
+// Traslado de la mercadería del taller a los locales (el local de tu ciudad no necesita traslado).
+// "parte" es lo que cuesta, como parte del valor de lo que mandás. "falla": cuántas veces pasa algo.
+// Cuando pasa algo, el 90% de las veces se pierde una parte (20-50%) y el 10%, todo.
+export const TRANSPORTE = {
+  avion: { nombre: 'Avión', parte: 0.12, falla: 0.01, total: 0, detalle: 'Caro, pero llega casi siempre. Nunca se pierde todo.' },
+  flete: { nombre: 'Flete por aplicación', parte: 0.05, falla: 0.1, total: 0.1, detalle: 'Costo medio. Llega 9 de cada 10 veces.' },
+  amigo: { nombre: 'Un amigo con auto', parte: 0.02, falla: 0.15, total: 0.1, detalle: 'Barato. Pero es tu amigo, no un profesional.' },
+  parcial: { min: 0.2, max: 0.5 },
+  textosParcial: [
+    'En el camino a {local} se rompieron cajas: se perdió {u}.',
+    'El envío a {local} llegó mojado y sucio: se arruinó {u}.',
+    'Para dejar pasar el envío a {local} hubo que "colaborar" en un control: se quedaron con {u}.',
+    'Abrieron el envío a {local} en una parada: faltó {u}.',
+    'El chofer "se olvidó" una caja del envío a {local}: perdiste {u}.',
+  ],
+  textosTotal: [
+    'Robaron el envío completo a {local} en la ruta: no llegó nada.',
+    'El envío a {local} desapareció entero. El transporte dice que "nunca lo recibió".',
+    'Se robaron el camión con todo lo que iba a {local}.',
+  ],
+};
+
+// Lelo, gerente comercial: lo asignás a un local (lo podés cambiar una vez por mes).
+export const LELO_COMERCIAL = { sueldo: 150000, clientes: 0.4, rep: 3, cambioCada: 4 };
+
+// Marcas del país. Topa es la líder: su barra sube despacio; llega a 99, se queda ahí 2 meses
+// (InfoArg avisa) y, si no ganaste antes, llega a 100 y te gana el país (a los 2 años y medio).
+// Las otras cuatro atacan tus locales: cada ataque le baja un 10% de reputación a un local.
+export const TOPA = { nombre: 'Topa', llega99: 121, llega100: 130, ruido: 0.6 };
+export const MARCAS = {
+  gambeta: {
+    nombre: 'Gambeta Sport', demora: { min: 1, max: 1 },
+    anuncio: 'Gambeta Sport contrató influencers para "dar vuelta el mercado".',
+    ataque: 'Los influencers de Gambeta Sport se burlaron de tu local de {local}.',
+  },
+  penalazo: {
+    nombre: 'Penalazo', demora: { min: 2, max: 3 },
+    anuncio: 'Penalazo promete "sacar a los improvisados del fútbol".',
+    ataque: 'Penalazo le dijo a todos los clubes de {local} que tus camisetas se deshilachan.',
+  },
+  remeraFeliz: {
+    nombre: 'La Remera Feliz', demora: { min: 1, max: 3 },
+    anuncio: 'La Remera Feliz anuncia una liquidación "como nunca se vio".',
+    ataque: 'La Remera Feliz puso una liquidación justo enfrente de tu local de {local}: la gente compara y habla mal de tus precios.',
+  },
+  estampados: {
+    nombre: 'Estampados del Plata', demora: { min: 1, max: 3 },
+    anuncio: 'Estampados del Plata sale "a buscar a las empresas del interior".',
+    ataque: 'Estampados del Plata visitó a todos los comercios de {local} hablando pestes de tu marca.',
+  },
+};
+export const ATAQUES_PAIS = { cada: { min: 2, max: 4 }, dano: 0.1, conDefensa: 0.5, pesoBuchon: 3 };
+// Una defensa por marca (pago mensual, según tu ganancia). Cada una baja a la mitad el daño de su marca.
+export const DEFENSAS_PAIS = {
+  gambeta: { nombre: 'Community manager', detalle: 'Responde en las redes antes de que crezca la bola.', parte: 0.03, minimo: 60000 },
+  penalazo: { nombre: 'Abogado de marca', detalle: 'Manda cartas documento a cada difamación.', parte: 0.04, minimo: 80000 },
+  remeraFeliz: { nombre: 'Precio de batalla', detalle: 'Bajás un 5% los productos simples (tazas, gorras y remeras): no tiene costo fijo.', descuento: 0.05 },
+  estampados: { nombre: 'Ejecutivo de cuentas', detalle: 'Visita a las empresas antes que la competencia.', parte: 0.03, minimo: 60000 },
+};
+export const PRODUCTOS_SIMPLES = ['tazaCeramica', 'tazaPlastico', 'gorra', 'remera'];
+
+// Niko y Ardidos: las grandes marcas deportivas. En el país solo aparecen en las licitaciones (y siempre ganan).
+export const GRANDES = [
+  { nombre: 'Niko', logo: 'una pipa de fumar bien dibujada' },
+  { nombre: 'Ardidos', logo: 'tres llamitas' },
+];
+
+// InfoArg: el portal de noticias del país. Publica las jugadas de las marcas y una vez por mes cómo viene Topa.
+export const INFOARG = [
+  'Chuchu viajó de Retiro a Tucumán en tren solo para "escuchar cómo suena la vía".',
+  'Lelo dice que inventó el mate con hielo. Le explicaron que se llama tereré.',
+  'Un hombre en Chivilcoy asegura que su gallina pone huevos con forma de pelota.',
+  'Traicio Nero abrió un puesto de pastelitos en la terminal. Dice que "es de membrillo, en serio".',
+  'Récord nacional: 400 personas bailaron cuarteto en una estación de servicio.',
+  'Un perro se subió a un colectivo en Rosario y bajó en la parada correcta. Nadie sabe cómo.',
+  'Vecinos de Bahía Blanca denuncian que el viento se llevó una plaza entera.',
+  'Chuchu se hizo socio de un club de modelismo ferroviario de Alemania. No habla alemán.',
+  'El tío dice que "en su época" la sublimación se hacía con plancha de ropa y paciencia.',
+  'La abuela ganó un torneo de truco en el centro de jubilados. Acusan a Lelo de pasarle señas.',
+];
+
+// Eventos de marca (cada 6 a 8 semanas): casi todos te hacen decidir. Si los aprovechás, suman
+// reputación a todos los locales y te dan un impulso: los locales crecen al triple por unas semanas.
+export const EVENTOS_MARCA = {
+  cada: { min: 6, max: 8 },
+  impulso: 3,
+  lista: [
+    { id: 'diez', texto: '¡El 10 de la Selección apareció en una entrevista con una remera tuya! La gente pide tu marca en todos lados.' },
+    { id: 'comedor', texto: 'Un comedor comunitario te pide una donación para el Día del Niño.' },
+    { id: 'maraton', texto: 'Te invitan a ser sponsor de una maratón solidaria: las remeras de los corredores serían tuyas.' },
+    { id: 'streamer', texto: 'Una streamer famosa te ofrece mostrar tu marca en vivo durante una semana.' },
+    { id: 'tele', texto: 'Un programa de la tarde quiere hacer una nota en tu taller.' },
+  ],
+};
+
+// Clientes empresa y clubes de barrio del país (comparten el tope de 3 pedidos por semana).
+export const EMPRESAS_PAIS = {
+  belleza: {
+    nombres: ['Salón Divina', 'Peluquería Glamour', 'Estética Bella Vista', 'Uñas de Gata'],
+    cada: { min: 3, max: 5 }, plazo: 2, cobroSemanas: 4, descuento: 0,
+    items: [{ producto: 'remeraFC', min: 15, max: 25 }],
+  },
+  merchandising: {
+    nombres: ['Gaseosas Burbujín', 'Banco del Interior', 'Yerba La Tranquera', 'Seguros El Paraguas'],
+    cada: { min: 7, max: 9 }, plazo: 3, cobroSemanas: 8, descuento: 0.1,
+    items: [{ producto: 'tazaCeramica', min: 30, max: 50 }, { producto: 'gorra', min: 20, max: 40 }, { producto: 'remera', min: 30, max: 60 }],
+  },
+  eventos: {
+    nombres: ['Salón Los Aromos', 'Quinta La Escondida', 'Eventos Fiesta Total', 'Salón Cristal'],
+    cada: { min: 5, max: 7 }, plazo: 2, cobroSemanas: 4, descuento: 0,
+    items: [{ producto: 'mantel', min: 30, max: 50 }],
+  },
+  probPuntual: 0.1, // cada encargado puntual suma esta chance por semana de un pedido extra
+};
+export const CLUBES_BARRIO = {
+  probPorLocal: 0.25, // cada local, más o menos cada 4 semanas
+  min: 15, max: 20, plazo: 3, cobroSemanas: 4,
+  diseno: { prob: 0.1, recargo: 0.2 }, // con el diseñador deportivo, 30%
+  probEscudo: 0.4, // si tenés la estación de bordado, algunos piden el escudo bordado
+  nombres: ['Club Sportivo Pirulo', 'Atlético Los Pibes', 'Defensores de la Esquina', 'Club Social Las Moras', 'Juventud Unida del Bajo', 'Deportivo El Galpón', 'Club Unión y Progreso', 'Estrella del Sur'],
+};
+
+// Licitaciones de clubes de segunda división (desde el país).
+export const LICITACION_SEGUNDA = {
+  cada: { min: 11, max: 13 },
+  combos: 100, precioRef: 156000, costo: 40000, plazo: 4, sena: 0.25, multa: 3, cobroSemanas: 8,
+  rivales: { min: 2, max: 3, repMin: 50, repMax: 90, ofertaMin: 0.95, ofertaMax: 1.3, probAjustada: 0.5, ajustada: 0.945 },
+  requisitos: {
+    deportivo: 'Tener diseñador deportivo',
+    textil: 'Tener diseñador textil',
+    locales: 'Tener al menos 5 locales',
+    grandes: 'Tener locales en Buenos Aires, Córdoba y Santa Fe',
+    rep: 'Tener 30 de reputación nacional',
+    fijos: 'Tener 3 clientes empresa fijos',
+  },
+  cuantosRequisitos: 4,
+  especiales: {
+    ambas: { prob: 1 / 12, mult: 2, texto: 'corte especializado y escudos bordados', requiere: ['costura', 'bordado'] },
+    corte: { prob: 1 / 3, mult: 1.3, texto: 'corte especializado', requiere: ['costura'] },
+    bordado: { prob: 1 / 4, mult: 1.5, texto: 'escudos bordados', requiere: ['bordado'] },
+  },
+  probGrandes: 0.25, // Niko o Ardidos se presentan en 1 de cada 4 y siempre ganan
+  repGanada: 3, repIncompleta: -10,
+  clubes: ['Club Atlético Los Tilos del Oeste', 'Deportivo Villa Pirincho', 'Club Atlético Villa Malvón', 'Sportivo Las Calandrias', 'Atlético Cañada Brava', 'Club Defensores del Pantano'],
+};
+
+// Despedida y vuelta de Traicio.
+export const TRAICIO_TEXTOS = {
+  despedida: 'Traicio estaba armando bombas de humo y cohetes en su taller para tirártelos en la puerta durante la semana, pero tuvo un error y terminó prendiendo fuego su propio taller. Talleres Judas cerró.',
+  vuelta: 'Durante tu tiempo compitiendo por el país, Traicio volvió a juntar fondos vendiendo pastelitos y ahora volvió a montar su taller para competirte.',
+};
 
 // ---------- Chuchu: el amigo que siempre tiene un conocido ----------
 export const CHUCHU = {

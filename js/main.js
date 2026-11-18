@@ -15,6 +15,10 @@ import {
   subirSueldoSeguridad, mediaSeguridad, responderPedidoEmpresa, tercerizarPedidoEmpresa, unidadesEmpresa, porCobrar,
   abuelaPide, responderAbuela, tercerizarVarios, tercerizarTodo, tercerizarResto, LELO_EMPLEADO,
   ponerNombreTaller, nombreDelTaller, localesDisponibles, PROVINCIA, LELO_GERENTE, DEFENSAS, SEGURIDAD, EMPRESAS, LICITACION, TERCERIZAR,
+  enPais, despuesDeLaCiudad, PROVINCIAS_AR, ENCARGADO, TRANSPORTE, TOPA, DEFENSAS_PAIS, LELO_COMERCIAL, LICITACION_SEGUNDA, PAIS, GRANDES,
+  TRAICIO_TEXTOS, elegirOrigen, nombreCiudad, pistaProvincia, abrirLocal, cambiarEncargado, asignarLelo, cambiarDefensaPais, costoDefensaPais,
+  gastosLocalesDelMes, provinciasLibres, costoAbrirLocal, alquilerLocal, sueldoEncargado, ofertaPaisVigente, tomarOfertaPais, enCamino,
+  costoTraslado, cumpleRequisito, puedeOfertarLicitacion, coberturaRRHH, tieneRRHH, horasCostura,
 } from './engine.js';
 import { guardar, cargar, borrar } from './storage.js';
 import { imagen } from './arte.js';
@@ -32,6 +36,9 @@ let montoPrestamo = null; // monto que le pedís al tío (préstamo para la pró
 let ofertaLic = null; // precio por combo que ofertás en la licitación
 let temporizadores = [];
 let seleccionTerc = null; // pedidos marcados para tercerizar (null = sin modo selección)
+let origenForm = { provincia: '', municipio: '' }; // provincia y municipio al arrancar
+let localForm = { prov: null, variante: 'junior' }; // local que pensás abrir
+let cambioEnc = null; // local al que le estás cambiando el encargado
 const DIAS_LARGOS = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
 
 // ---------- Utilidades ----------
@@ -46,7 +53,7 @@ function planPublicidad() {
 function planProduccion() {
   const producir = {};
   for (const id of Object.keys(PRODUCTOS)) producir[id] = 0;
-  return { producir };
+  return { producir, transporte: partida?.pais?.transporte || 'flete' };
 }
 
 function prepararPlanes() {
@@ -81,7 +88,7 @@ function pantallaInicio() {
       return;
     }
     confirmarReinicio = false;
-    pantallaPrestamo();
+    pantallaOrigen();
   };
   if (guardada) {
     document.getElementById('continuar').onclick = () => {
@@ -90,6 +97,38 @@ function pantallaInicio() {
       siguientePantalla();
     };
   }
+}
+
+// ---------- Pantalla: de dónde sos ----------
+function opcionesProvincia(elegida) {
+  const ids = Object.keys(PROVINCIAS_AR).sort((a, b) => PROVINCIAS_AR[a].nombre.localeCompare(PROVINCIAS_AR[b].nombre, 'es'));
+  return `<option value="">Elegí tu provincia</option>${ids.map((id) => `<option value="${id}" ${elegida === id ? 'selected' : ''}>${PROVINCIAS_AR[id].nombre}</option>`).join('')}`;
+}
+
+function pantallaOrigen() {
+  window.scrollTo(0, 0);
+  app.innerHTML = `
+    <h1>¿De dónde sos?</h1>
+    <p class="suave">Ahí arranca tu taller. Cuando te toque pelear el país, tu primer local va a estar en tu provincia.</p>
+    <div class="tarjeta">
+      <label class="campo"><span>Provincia</span>
+        <select id="origenProv">${opcionesProvincia(origenForm.provincia)}</select>
+      </label>
+      <label class="campo"><span>Municipio o ciudad</span>
+        <input type="text" id="origenMuni" maxlength="40" placeholder="Por ejemplo: Río Cuarto" value="${origenForm.municipio}">
+      </label>
+      <p class="suave" id="origenError"></p>
+    </div>
+    <button class="boton" id="seguir">Seguir</button>
+    <button class="boton secundario" id="volver">Volver</button>
+  `;
+  document.getElementById('seguir').onclick = () => {
+    origenForm = { provincia: document.getElementById('origenProv').value, municipio: document.getElementById('origenMuni').value.trim() };
+    const err = !origenForm.provincia ? 'Elegí tu provincia.' : !origenForm.municipio ? 'Escribí tu municipio o ciudad.' : '';
+    if (err) { document.getElementById('origenError').textContent = err; return; }
+    pantallaPrestamo();
+  };
+  document.getElementById('volver').onclick = pantallaInicio;
 }
 
 // ---------- Pantalla: elegir préstamo ----------
@@ -122,14 +161,14 @@ function pantallaPrestamo() {
   app.querySelectorAll('[data-opcion]').forEach((b) => {
     b.onclick = () => {
       borrar();
-      partida = nuevaPartida(b.dataset.opcion);
+      partida = nuevaPartida(b.dataset.opcion, Date.now() >>> 0, origenForm);
       prepararPlanes();
       aviso = `Elegiste la opción ${b.dataset.opcion}. Compraste la máquina de tazas: te quedan ${plata(partida.plata)} para insumos.`;
       guardarPartida();
       pantallaSemana();
     };
   });
-  document.getElementById('volver').onclick = pantallaInicio;
+  document.getElementById('volver').onclick = pantallaOrigen;
 }
 
 // ---------- Bloques comunes ----------
@@ -138,7 +177,7 @@ function bloqueEncabezado(e, extra = '') {
   return `<div class="encabezado">
       <div class="fila">
         <span class="plata">${plata(e.plata)}</span>
-        <span class="fecha">Semana ${e.semana} · ${c.nombreMes} (${c.estacion})</span>
+        <span class="fecha">Semana ${e.semana} · ${c.nombreMes} (${c.estacion})${e.origen ? ` · ${nombreCiudad(e)}` : ''}</span>
         <button class="menu-boton" id="menuBoton" aria-label="Menú">⋮</button>
       </div>
       ${extra}
@@ -206,7 +245,11 @@ function bloqueEstado(e) {
   else estadoPrestamo = `Opción B · ${p.cuotasPagadas + p.cuotasPerdonadas}/${p.cuotas} cuotas de ${plata(p.cuota)}${p.atrasadas ? ` · ${p.atrasadas} atrasada(s)` : ''}`;
   // Rival: Lelo en la ciudad; en la provincia, Traicio Nero (lo que publicó La Voz de Adentro)
   let rival;
-  if (enProvincia(e)) {
+  if (enPais(e)) {
+    const t = e.pais.topa;
+    const valor = e.mejorDelPais ? 'Segundo' : t.visible === null ? 'Sin noticias todavía' : `${t.visible}/100`;
+    rival = `<div class="stat"><div class="etiqueta">${TOPA.nombre} (la marca de toda la vida)</div><div class="valor" style="font-size:${t.visible === null ? '.85rem' : '1.1rem'}">${valor}</div><div class="barra"><span style="width:${pct(e.mejorDelPais ? 0 : t.visible || 0)}"></span></div>${t.mesVisible && !e.mejorDelPais ? `<div class="detalle suave">Según InfoArg (${t.mesVisible.toLowerCase()})</div>` : ''}</div>`;
+  } else if (enProvincia(e)) {
     const t = e.traicio;
     const valor = e.mejorDeLaProvincia ? 'Cerró' : t?.visible === null || t?.visible === undefined ? 'Sin noticias todavía' : `${t.visible}/100`;
     rival = `<div class="stat"><div class="etiqueta">${TRAICIO.nombre} (${TRAICIO.empresa})</div><div class="valor" style="font-size:${t?.visible === null ? '.85rem' : '1.1rem'}">${valor}</div><div class="barra"><span style="width:${pct(e.mejorDeLaProvincia ? 0 : t?.visible || 0)}"></span></div>${t?.mesVisible && !e.mejorDeLaProvincia ? `<div class="detalle suave">Según La Voz de Adentro (${t.mesVisible.toLowerCase()})</div>` : ''}</div>`;
@@ -215,19 +258,20 @@ function bloqueEstado(e) {
   }
   return `<div class="tarjeta">
       <div class="stats">
-        <div class="stat"><div class="etiqueta">Reputación (${enProvincia(e) ? 'provincia' : 'ciudad'})</div><div class="valor">${Math.floor(e.rep)}/100</div><div class="barra"><span style="width:${pct(e.rep)}"></span></div></div>
+        <div class="stat"><div class="etiqueta">Reputación (${enPais(e) ? 'país: promedio de tus locales' : enProvincia(e) ? 'provincia' : 'ciudad'})</div><div class="valor">${Math.floor(e.rep)}/100</div><div class="barra"><span style="width:${pct(e.rep)}"></span></div></div>
         ${rival}
         <div class="stat"><div class="etiqueta">Experiencia</div><div class="valor">${Math.floor(e.exp)}/100</div><div class="barra"><span style="width:${pct(e.exp)}"></span></div></div>
         <div class="stat"><div class="etiqueta">Cansancio</div><div class="valor">${Math.round(e.cansancio)}/100</div><div class="barra cansancio"><span style="width:${pct(e.cansancio)}"></span></div></div>
         <div class="stat"><div class="etiqueta">Préstamo</div><div class="valor" style="font-size:.85rem">${estadoPrestamo}</div></div>
         <div class="stat"><div class="etiqueta">Confianza del tío</div><div class="valor">${confianzaTio(e)}/100</div></div>
         <div class="stat"><div class="etiqueta">Equipo · ${localActual(e).nombre.toLowerCase()}</div><div class="valor">${empleadosContratados(e)}/${cupoEquipo(e)}${e.equipo.empleados.some((x) => x.esLelo) ? ' + Lelo' : ''}</div></div>
+        ${enPais(e) ? `<div class="stat"><div class="etiqueta">Locales de venta</div><div class="valor">${e.pais.locales.length}/${Object.keys(PROVINCIAS_AR).length}</div></div><div class="stat"><div class="etiqueta">En camino a los locales</div><div class="valor">${enCamino(e)}</div></div>` : ''}
         <div class="stat"><div class="etiqueta">Sueldos por mes</div><div class="valor">${plata(e.equipo.empleados.reduce((t, x) => t + x.sueldo, 0))}</div></div>
       </div>
       <p class="suave" style="margin-top:8px">Stock: ${Object.keys(PRODUCTOS).filter((id) => e.maquinas[PRODUCTOS[id].maquina] && (!PRODUCTOS[id].soloPedido || e.stock[id])).map((id) => `${e.stock[id]} ${nombreUnidades(id, e.stock[id])}`).join(' · ')}</p>
       ${porCobrar(e) ? `<p class="suave">Por cobrar de empresas: ${plata(porCobrar(e))} (${e.cobros.map((c) => `${c.cliente} en ${c.semana - e.semana} sem.`).join(', ')}).</p>` : ''}
       ${e.retraso && Object.keys(e.retraso).some((m) => e.retraso[m] >= 1 && e.maquinas[m]) ? `<p class="suave">Todavía te estás acostumbrando a ${Object.keys(e.retraso).filter((m) => e.retraso[m] >= 1 && e.maquinas[m]).map((m) => `la ${MAQUINAS[m].nombre.toLowerCase()}`).join(' y ')}: ahí rendís menos hasta que le agarres la mano.</p>` : ''}
-      <p class="suave">Gastos fijos del mes: ${plata(gastosFijosDelMes(e))}${localActual(e).alquiler ? ` (incluye ${plata(localActual(e).alquiler)} de alquiler)` : ''}${e.equipo.empleados.length ? ' más sueldos' : ''} (se pagan en la última semana de ${c.nombreMes.toLowerCase()}${c.finDeMes ? ': ¡es esta!' : ''}).</p>
+      <p class="suave">Gastos fijos del mes: ${plata(gastosFijosDelMes(e))}${localActual(e).alquiler ? ` (incluye ${plata(localActual(e).alquiler)} de alquiler)` : ''}${e.equipo.empleados.length ? ' más sueldos' : ''}${enPais(e) ? (() => { const g = gastosLocalesDelMes(e); return `, más los locales: ${plata(g.alquileres)} de alquileres, ${plata(g.encargados)} de encargados${g.defensas ? ` y ${plata(g.defensas)} de defensas` : ''}`; })() : ''} (se pagan en la última semana de ${c.nombreMes.toLowerCase()}${c.finDeMes ? ': ¡es esta!' : ''}).</p>
     </div>`;
 }
 
@@ -297,25 +341,27 @@ function bloqueComprasYReinicio(e) {
   const local = localActual(e);
   return `<div class="tarjeta sec-finanzas">
       <h2>Comprar y pagar</h2>
-      ${Object.keys(MAQUINAS).filter((m) => !e.maquinas[m]).map((m) => `<button class="boton secundario" data-comprar="${m}">Comprar ${MAQUINAS[m].nombre.toLowerCase()} (${plata(MAQUINAS[m].precio)})</button>`).join('') || '<p class="suave">Ya tenés todas las máquinas.</p>'}
-      <p class="suave">${Object.keys(MAQUINAS).filter((m) => !e.maquinas[m]).length ? 'Plancha 30x30: remeras, mangas largas y buzos. Plancha 1x1 m: los mismos en full color, al doble de precio. Calandra: combos para las licitaciones de clubes.' : ''}</p>
+      ${Object.keys(MAQUINAS).filter((m) => !e.maquinas[m] && (!MAQUINAS[m].desdePais || enPais(e))).map((m) => `<button class="boton secundario" data-comprar="${m}">Comprar ${MAQUINAS[m].nombre.toLowerCase()} (${plata(MAQUINAS[m].precio)})</button>`).join('') || '<p class="suave">Ya tenés todas las máquinas.</p>'}
+      <p class="suave">${Object.keys(MAQUINAS).filter((m) => !e.maquinas[m] && !MAQUINAS[m].desdePais).length ? 'Plancha 30x30: remeras, mangas largas y buzos. Plancha 1x1 m: los mismos en full color, al doble de precio. Calandra: combos para las licitaciones de clubes.' : ''}</p>
+      ${enPais(e) && (!e.maquinas.costura || !e.maquinas.bordado) ? `<p class="suave">Estación de costura: con costureros, el corte y la costura de cada combo (${Math.round(horasCostura({ exp: 0 }) * 60)} min) ya no te toca a vos, y podés entrar a licitaciones que piden corte especializado. Estación de bordado: gorras y remeras bordadas (casi el doble de precio), chombas para empresas y escudos bordados para clubes; la manejan solo los bordadores (o vos).</p>` : ''}
       ${p.opcion === 'A' && !p.pagado ? `<button class="boton secundario" id="pagarTio">Pagarle al tío ahora (${plata(p.vencido ? p.deuda : costoPagoAnticipadoA(e.semana, p))})</button>` : ''}
       ${bloquePrestamoNuevo(e)}
       <div class="subtitulo">Dónde trabajás: ${local.nombre.toLowerCase()}</div>
       <p class="suave">Entran hasta ${local.cupo} empleados${local.alquiler ? `. Pagás ${plata(local.alquiler)} de alquiler y ${plata(local.luz)} más de luz por mes` : ''}.</p>
-      ${localesDisponibles(e).filter((id) => id !== 'casa' && id !== (e.local || 'casa')).map((id) => `<button class="boton secundario" data-local="${id}">Mudarte a un ${LOCALES[id].nombre.toLowerCase()}: hasta ${LOCALES[id].cupo} empleados, ${plata(LOCALES[id].alquiler)} + ${plata(LOCALES[id].luz)} de luz por mes</button>`).join('')}
+      ${localesDisponibles(e).filter((id) => id !== 'casa' && id !== (e.local || 'casa')).map((id) => `<button class="boton secundario" data-local="${id}">Mudarte a ${LOCALES[id].desdePais ? 'una' : 'un'} ${LOCALES[id].nombre.toLowerCase()}: hasta ${LOCALES[id].cupo} empleados, ${plata(LOCALES[id].alquiler)} + ${plata(LOCALES[id].luz)} de luz por mes${LOCALES[id].localesMin ? ` (con ${LOCALES[id].localesMin} locales de venta abiertos)` : ''}</button>`).join('').replace('a una galpón', 'a un galpón')}
       ${(e.local || 'casa') !== 'casa' ? '<button class="chico" id="dejarLocal">Devolver el local y volver a tu casa</button>' : ''}
-      ${!enProvincia(e) ? `<p class="suave">El ${LOCALES.grande.nombre.toLowerCase()} (hasta ${LOCALES.grande.cupo}) se consigue en la provincia.</p>` : ''}
+      ${!despuesDeLaCiudad(e) ? `<p class="suave">El ${LOCALES.grande.nombre.toLowerCase()} (hasta ${LOCALES.grande.cupo}) se consigue en la provincia.</p>` : !enPais(e) ? `<p class="suave">En el país vas a poder mudarte a un galpón (hasta ${LOCALES.galpon.cupo}) o a una planta industrial pequeña (hasta ${LOCALES.planta.cupo}).</p>` : ''}
     </div>`;
 }
 
 // ---------- Equipo ----------
 const semEquipoPub = () => ({ capacitacion: pub.capacitar, feriaVendedor: pub.feriaVendedor });
-const nombreVariante = (x) => (x.esLelo ? (partida?.leloGerente ? 'Gerente de operaciones' : 'Primo') : PUESTOS[x.puesto].variantes[x.variante].nombre);
-const puestosVisibles = (e) => Object.keys(PUESTOS).filter((id) => !PUESTOS[id].desdeProvincia || enProvincia(e));
+const nombreVariante = (x) => (x.esLelo ? (partida?.leloComercial ? 'Gerente comercial' : partida?.leloGerente ? 'Gerente de operaciones' : 'Primo') : PUESTOS[x.puesto].variantes[x.variante].nombre);
+const puestosVisibles = (e) => Object.keys(PUESTOS).filter((id) => (!PUESTOS[id].desdeProvincia || despuesDeLaCiudad(e)) && (!PUESTOS[id].desdePais || enPais(e)));
 const textoTarea = (c) => (c.puesto === 'disenador'
   ? `no produce: baja los errores de ${PUESTOS.disenador.variantes[c.variante].maquinas.map((m) => MAQUINAS[m].nombre.toLowerCase()).join(' y ')}`
-  : `${PUESTOS[c.puesto].horas} h por semana de ${PUESTOS[c.puesto].tarea}`);
+  : c.puesto === 'rrhh' ? 'no produce: atiende a 15 empleados (les baja a la mitad los rasgos malos) y te deja ver el rasgo de los candidatos'
+    : `${PUESTOS[c.puesto].horas} h por semana de ${PUESTOS[c.puesto].tarea}${PUESTOS[c.puesto].estacion ? ` (solo en la ${MAQUINAS[PUESTOS[c.puesto].estacion].nombre.toLowerCase()})` : ''}`);
 // "Operario · Senior", o solo "Operario" si la variante se llama igual que el puesto
 const tituloPuesto = (x) => {
   const p = PUESTOS[x.puesto].nombre;
@@ -367,29 +413,39 @@ function bloqueDecision(e) {
 }
 
 // ---------- Provincia: Traicio, licitación y defensas ----------
-function bloqueProvincia(e) {
-  if (!enProvincia(e)) return '';
-  let html = '';
-  const rumor = rumorTraicio(e);
-  if (rumor) html += `<div class="tarjeta rumor"><p>🗡️ ${rumor} Preparate: ${e.defensas.proteccion || e.defensas.seguro || e.seguridad ? 'tus defensas ayudan.' : 'todavía no tenés ninguna defensa.'}</p></div>`;
+function bloqueLicitacion(e) {
   const a = e.licitacion.abierta;
-  if (a && a.semana === e.semana) {
-    const L = LICITACION;
-    if (ofertaLic === null) ofertaLic = a.oferta ?? L.precioRef;
-    html += `<div class="tarjeta sec-trabajo">
-      <h2>🏟️ Licitación: ${a.club}</h2>
-      <p class="suave">${L.combos} combos (camiseta + short) en ${L.plazo} semanas. Precio de referencia ${plata(L.precioRef)} por combo; cada uno te cuesta ${plata(L.costo)}. Acá pesan mucho el precio que ofrecés y tu reputación; la calidad suma, pero menos (tu reputación hoy: ${Math.floor(e.rep)} · tu calidad: ${calidadLicitacion(e)}). Compiten ${a.rivales.length} taller${a.rivales.length > 1 ? 'es' : ''} más. El club adelanta el 50%; lo que no entregues paga 3 veces su costo de multa.</p>
-      ${!e.maquinas.calandra ? '<p><strong>Para participar necesitás la calandra.</strong></p>' : e.licitacion.contrato ? '<p class="suave">Todavía estás con otro contrato.</p>' : `
+  if (!a || a.semana !== e.semana) return '';
+  const segunda = a.tipo === 'segunda';
+  if (ofertaLic === null) ofertaLic = a.oferta ?? a.precioRef;
+  const puede = puedeOfertarLicitacion(e);
+  const reqs = segunda ? `<div class="subtitulo">Requisitos de esta licitación</div>${a.requisitos.map((id) => `<p class="requisito ${cumpleRequisito(e, id) ? 'si' : 'no'}">${LICITACION_SEGUNDA.requisitos[id]}</p>`).join('')}
+    ${a.especial ? `<p class="requisito ${LICITACION_SEGUNDA.especiales[a.especial].requiere.every((m) => e.maquinas[m]) ? 'si' : 'no'}">Pide ${LICITACION_SEGUNDA.especiales[a.especial].texto} (${LICITACION_SEGUNDA.especiales[a.especial].requiere.map((m) => MAQUINAS[m].nombre.toLowerCase()).join(' y ')}): paga más</p>` : ''}` : '';
+  const grande = a.grande ? `<p><strong>Se presenta ${a.grande}</strong> (${GRANDES.find((g) => g.nombre === a.grande)?.logo}). Es una de las grandes marcas deportivas: contra ellos, hoy no hay con qué.</p>` : '';
+  let pie;
+  if (!puede.ok) pie = `<p><strong>${puede.motivo}</strong></p>`;
+  else pie = `
       <div class="producto">
         <div class="info"><div class="nombre">Tu precio por combo</div><div class="detalle">${a.oferta ? `Ofertaste ${plata(a.oferta)}` : 'Todavía no ofertaste'}</div></div>
         <div class="paso"><button data-lic="-1" aria-label="Menos">−</button><span class="numero" style="min-width:86px">${plata(ofertaLic)}</span><button data-lic="1" aria-label="Más">+</button></div>
       </div>
-      <div class="alterna"><button class="chico" id="ofertar">${a.oferta ? 'Cambiar oferta' : 'Presentar oferta'}</button>${a.oferta ? '<button class="chico" id="noOfertar">Retirar oferta</button>' : ''}</div>`}
+      <div class="alterna"><button class="chico" id="ofertar">${a.oferta ? 'Cambiar oferta' : 'Presentar oferta'}</button>${a.oferta ? '<button class="chico" id="noOfertar">Retirar oferta</button>' : ''}</div>`;
+  return `<div class="tarjeta sec-trabajo">
+      <h2>🏟️ Licitación${segunda ? ' de segunda' : ''}: ${a.club}</h2>
+      <p class="suave">${a.combos} combos (camiseta + short) en ${a.plazo} semanas. Precio de referencia ${plata(a.precioRef)} por combo; cada uno te cuesta ${plata(a.costo)}. Acá pesan mucho el precio que ofrecés y tu reputación; la calidad suma, pero menos (tu reputación hoy: ${Math.floor(e.rep)} · tu calidad: ${calidadLicitacion(e)}). Compiten ${a.rivales.length} taller${a.rivales.length > 1 ? 'es' : ''} más${segunda ? ', y en la segunda hay quien ofrece apenas arriba del mínimo' : ''}. El club adelanta el ${Math.round(a.sena * 100)}%${a.cobroSemanas ? ` y el resto lo paga ${a.cobroSemanas} semanas después de entregar` : ''}; lo que no entregues paga ${a.multa} veces su costo de multa.</p>
+      ${grande}${reqs}${pie}
     </div>`;
-  }
+}
+
+function bloqueProvincia(e) {
+  if (!despuesDeLaCiudad(e)) return '';
+  let html = '';
+  const rumor = rumorTraicio(e);
+  if (rumor) html += `<div class="tarjeta rumor"><p>🗡️ ${rumor} Preparate: ${e.defensas.proteccion || e.defensas.seguro || e.seguridad ? 'tus defensas ayudan.' : 'todavía no tenés ninguna defensa.'}</p></div>`;
+  html += bloqueLicitacion(e);
   const c = e.licitacion.contrato;
   if (c) html += `<div class="tarjeta sec-trabajo"><p>🏟️ Contrato con <strong>${c.club}</strong>: ${c.combos} combos a ${plata(c.precio)}. Tenés ${e.stock.combo}. Vence en ${Math.max(0, c.vence - e.semana)} semana${c.vence - e.semana === 1 ? '' : 's'}: producilos el sábado.</p></div>`;
-  if (!e.mejorDeLaProvincia) {
+  if (enProvincia(e) && !e.mejorDeLaProvincia) {
     const seg = e.seguridad;
     html += `<div class="tarjeta sec-finanzas">
       <h2>Defensas contra ${TRAICIO.nombre}</h2>
@@ -405,6 +461,101 @@ function bloqueProvincia(e) {
     </div>`;
   }
   return html;
+}
+
+// ---------- País: locales, encargados, Lelo, defensas y ofertas ----------
+const nombreProv = (id) => PROVINCIAS_AR[id].nombre;
+function htmlRasgosEncargado(enc) {
+  if (!enc.visible) return '<div><span class="rasgo">Cómo es: lo vas a conocer trabajando</span></div>';
+  if (!enc.rasgos.length) return '<div class="detalle">Ni fu ni fa: nada para destacar.</div>';
+  return enc.rasgos.map((r) => { const x = ENCARGADO.rasgos[r]; return `<div><span class="rasgo ${x.bueno ? 'bueno' : 'malo'}">${x.nombre}</span> <span class="detalle">${x.efecto}</span></div>`; }).join('');
+}
+
+function bloquePais(e) {
+  if (!enPais(e)) return '';
+  const lel = e.pais.lelo;
+  const leloAca = (prov) => e.leloComercial && lel?.local === prov;
+  const puedeMoverLelo = e.leloComercial && (!lel.local || e.semana >= lel.cambio + LELO_COMERCIAL.cambioCada);
+  const locales = [...e.pais.locales].sort((a, b) => (b.origen ? 1 : 0) - (a.origen ? 1 : 0) || a.rep - b.rep);
+  let html = `<div class="tarjeta sec-trabajo">
+      <h2>Tus locales (${e.pais.locales.length})</h2>
+      <p class="suave">Venden ellos: juntan pedidos en la semana, el sábado producís y mandás, y llegan la semana siguiente. La reputación del país es el promedio de tus locales: un local nuevo arranca en 0. Cuantos más locales, más rápido crecen todos.</p>
+      ${locales.map((l) => {
+        const enc = l.encargado;
+        const v = ENCARGADO.variantes[enc.variante];
+        return `<div class="local">
+          <div class="cabeza-local"><strong>${nombreProv(l.prov)}${l.origen ? ' <span class="chip">tu ciudad</span>' : ''}${leloAca(l.prov) ? ' <span class="chip">Lelo</span>' : ''}</strong><span>${Math.floor(l.rep)}/100</span></div>
+          <div class="barra"><span style="width:${pct(l.rep)}"></span></div>
+          <div class="detalle">Encargado: ${enc.nombre} (${v.nombre.toLowerCase()}, ${plata(enc.sueldo)} por mes) · alquiler ${plata(alquilerLocal(e, l))}</div>
+          ${htmlRasgosEncargado(enc)}
+          <div class="alterna">
+            ${e.leloComercial && !leloAca(l.prov) && puedeMoverLelo ? `<button class="chico" data-lelo="${l.prov}">Mandar a Lelo acá</button>` : ''}
+            ${cambioEnc === l.prov ? Object.entries(ENCARGADO.variantes).map(([id, x]) => `<button class="chico" data-encargado="${l.prov}" data-variante="${id}">${x.nombre} (${plata(sueldoEncargado(e, id))})</button>`).join('') + '<button class="chico" id="cancelarEnc">Cancelar</button>'
+              : `<button class="chico" data-cambiar-enc="${l.prov}">Cambiar encargado</button>`}
+          </div>
+        </div>`;
+      }).join('')}
+      ${e.leloComercial && !puedeMoverLelo ? `<p class="suave">A Lelo lo podés cambiar de local una vez por mes (en ${lel.cambio + LELO_COMERCIAL.cambioCada - e.semana} semana${lel.cambio + LELO_COMERCIAL.cambioCada - e.semana === 1 ? '' : 's'}).</p>` : ''}
+      ${cambioEnc ? '<p class="suave">Cambiar de encargado cuesta medio sueldo del que se va, más lo trabajado en el mes.</p>' : ''}
+    </div>`;
+
+  // Abrir un local
+  const libres = provinciasLibres(e).sort((a, b) => nombreProv(a).localeCompare(nombreProv(b), 'es'));
+  if (libres.length) {
+    if (!localForm.prov || !libres.includes(localForm.prov)) localForm.prov = libres[0];
+    const c = costoAbrirLocal(e, localForm.prov);
+    html += `<div class="tarjeta sec-finanzas">
+      <h2>Abrir un local</h2>
+      <label class="campo"><span>Provincia</span><select class="selector" id="provLocal">${libres.map((id) => `<option value="${id}" ${id === localForm.prov ? 'selected' : ''}>${nombreProv(id)}</option>`).join('')}</select></label>
+      <p>${pistaProvincia(localForm.prov)}</p>
+      <p class="suave">Alquiler: ${plata(c.alquiler)} por mes. Para abrir pagás el primer mes y el armado y lanzamiento (${plata(c.armado)}${c.descuento ? ', a mitad de precio por la expansión inmediata' : ''}): <strong>${plata(c.total)}</strong>. Necesita un encargado, sí o sí:</p>
+      ${Object.entries(ENCARGADO.variantes).map(([id, x]) => `<label class="interruptor">
+        <span><strong>${x.nombre}</strong> · ${plata(sueldoEncargado(e, id))} por mes<br><span class="suave">${id === 'senior' ? 'Rinde más y trae solo virtudes.' : id === 'junior' ? 'Rinde bien, a veces pierde algún pedido, y trae una virtud y un defecto.' : 'Barato, pero rinde menos y trae dos defectos.'}</span></span>
+        <input type="radio" name="variante" value="${id}" ${localForm.variante === id ? 'checked' : ''}>
+      </label>`).join('')}
+      <button class="boton secundario" id="abrirLocal">Abrir el local de ${nombreProv(localForm.prov)} (${plata(c.total)})</button>
+    </div>`;
+  }
+
+  // Oferta esporádica
+  const o = ofertaPaisVigente(e);
+  if (o) {
+    html += `<div class="tarjeta oportunidad">
+      <p><strong>💡 ${o.nombre}</strong>${o.precio ? ` · ${plata(o.precio)}` : ''}</p>
+      <p>${o.detalle} Está disponible hasta ${o.hasta === e.semana ? 'hoy' : 'el domingo que viene'}.</p>
+      ${o.id === 'lanzamiento' ? `<select class="selector" id="ofertaLocal">${e.pais.locales.map((l) => `<option value="${l.prov}">${nombreProv(l.prov)} (${Math.floor(l.rep)})</option>`).join('')}</select>` : ''}
+      <button class="chico" id="tomarOferta" style="margin-top:8px">${o.id === 'expansion' ? 'Aprovecharla' : 'Contratarla'}</button>
+    </div>`;
+  }
+
+  // Defensas contra las marcas
+  if (!e.mejorDelPais) {
+    html += `<div class="tarjeta sec-finanzas">
+      <h2>Defensas contra las marcas</h2>
+      <p class="suave">${TOPA.nombre} no ataca: sube despacio y, si llega a 100, es la marca del país. Las otras cuatro atacan tus locales (cada ataque le saca un 10% de reputación a uno). Cada defensa frena la mitad del daño de su marca.</p>
+      ${Object.entries(DEFENSAS_PAIS).map(([m, d]) => `<label class="interruptor">
+        <span><strong>${d.nombre}</strong> · contra ${{ gambeta: 'Gambeta Sport', penalazo: 'Penalazo', remeraFeliz: 'La Remera Feliz', estampados: 'Estampados del Plata' }[m]}${d.descuento ? '' : ` · ${plata(costoDefensaPais(e, m))} por mes`}<br><span class="suave">${d.detalle}</span></span>
+        <input type="checkbox" data-defensa-pais="${m}" ${e.pais.defensas[m] ? 'checked' : ''}>
+      </label>`).join('')}
+    </div>`;
+  }
+  return html;
+}
+
+function conectarPais() {
+  app.querySelectorAll('[data-lelo]').forEach((b) => { b.onclick = () => accionCompra(asignarLelo(partida, b.dataset.lelo)); });
+  app.querySelectorAll('[data-cambiar-enc]').forEach((b) => { b.onclick = () => { cambioEnc = b.dataset.cambiarEnc; refrescar(); }; });
+  const ce = document.getElementById('cancelarEnc');
+  if (ce) ce.onclick = () => { cambioEnc = null; refrescar(); };
+  app.querySelectorAll('[data-encargado]').forEach((b) => { b.onclick = () => { cambioEnc = null; accionCompra(cambiarEncargado(partida, b.dataset.encargado, b.dataset.variante)); }; });
+  const pl = document.getElementById('provLocal');
+  if (pl) pl.onchange = () => { localForm.prov = pl.value; refrescar(); };
+  app.querySelectorAll('input[name="variante"]').forEach((r) => { r.onchange = () => { localForm.variante = r.value; refrescar(); }; });
+  const ab = document.getElementById('abrirLocal');
+  if (ab) ab.onclick = () => accionCompra(abrirLocal(partida, localForm.prov, localForm.variante));
+  const to = document.getElementById('tomarOferta');
+  if (to) to.onclick = () => accionCompra(tomarOfertaPais(partida, document.getElementById('ofertaLocal')?.value));
+  app.querySelectorAll('[data-defensa-pais]').forEach((i) => { i.onchange = (ev) => accionCompra(cambiarDefensaPais(partida, i.dataset.defensaPais, ev.target.checked)); });
 }
 
 function conectarProvincia() {
@@ -459,7 +610,7 @@ function htmlCandidato(c, origen, indice, extra = '') {
 
 function htmlEmpleado(e, x) {
   const h = horasEmpleado(e, x, semEquipoPub());
-  const tarea = x.esLelo ? (e.leloGerente ? `gerencia: −${Math.round((1 - LELO_GERENTE.errores) * 100)}% de errores en todo el taller y te cansás desde las ${LELO_GERENTE.umbralCansancio} h` : 'producción') : x.puesto === 'disenador' ? textoTarea(x) : PUESTOS[x.puesto].tarea;
+  const tarea = x.esLelo ? (e.leloComercial ? `gerente comercial${e.pais?.lelo?.local ? ` en el local de ${PROVINCIAS_AR[e.pais.lelo.local].nombre}` : ''}: ahí consigue un ${Math.round(LELO_COMERCIAL.clientes * 100)}% más de clientes y la reputación crece el triple` : e.leloGerente ? `gerencia: −${Math.round((1 - LELO_GERENTE.errores) * 100)}% de errores en todo el taller y te cansás desde las ${LELO_GERENTE.umbralCansancio} h` : 'producción') : ['disenador', 'rrhh'].includes(x.puesto) ? textoTarea(x) : PUESTOS[x.puesto].tarea;
   let acciones = '';
   if (x.pideAumento) {
     acciones += `<span class="detalle">Te pide un aumento a ${plata(x.pideAumento)}.</span>
@@ -550,7 +701,7 @@ function bloqueContratar(e) {
   }
 
   return `<div class="subtitulo">Contratar · ${empleadosContratados(e)}/${cupoEquipo(e)}</div>
-    <p class="suave">Los operarios producen por vos y los vendedores hacen redes y pueden ir a la feria. Cada uno trabaja medio día y cobra a fin de mes.${enProvincia(e) ? ' Los diseñadores no producen: bajan los errores de sus máquinas (sin diseñador textil, la plancha se equivoca más; para clubes de primera hace falta el deportivo).' : ''}</p>
+    <p class="suave">Los operarios producen por vos y los vendedores hacen ${enPais(e) ? 'publicidad de marca' : 'redes y pueden ir a la feria'}. Cada uno trabaja medio día y cobra a fin de mes.${despuesDeLaCiudad(e) ? ' Los diseñadores no producen: bajan los errores de sus máquinas (sin diseñador textil, la plancha se equivoca más; para clubes de primera hace falta el deportivo).' : ''}${enPais(e) ? ' Costureros y bordadores trabajan solo en su estación. Recursos Humanos cobra 8 veces un operario y ocupa un lugar.' : ''}${tieneRRHH(e) ? ' Con Recursos Humanos ves el rasgo de cada candidato.' : ''}</p>
     <div class="subtitulo" style="border-top:0;margin-top:4px">Bolsa de trabajo del municipio</div>${bolsa}
     <div class="subtitulo"><span class="con-avatar" style="align-items:center">${imagen('chuchu')} Llamar a Chuchu</span></div>${chuchu}
     <div class="subtitulo">Poner un anuncio</div>${anuncio}`;
@@ -558,9 +709,11 @@ function bloqueContratar(e) {
 
 function bloqueEquipo(e) {
   const emps = e.equipo.empleados;
+  const rr = coberturaRRHH(e);
   return `<div class="tarjeta sec-equipo">
       <h2>Tu equipo</h2>
       ${emps.length ? emps.map((x) => htmlEmpleado(e, x)).join('') : '<p class="suave">Por ahora trabajás solo. Si no te dan las horas o estás muy cansado, contratá a alguien.</p>'}
+      ${rr.personas ? `<p class="suave" style="margin-top:8px">Recursos Humanos llega a ${Math.min(rr.cupo, rr.empleados)} de tus ${rr.empleados} empleados${rr.sinAtender ? `: ${rr.sinAtender} ${rr.sinAtender === 1 ? 'queda' : 'quedan'} sin atender (cada mes se sortea a quiénes)` : ''}.</p>` : enPais(e) && rr.empleados > 15 ? '<p class="suave" style="margin-top:8px">Con tanta gente, Recursos Humanos ayuda: cada uno atiende a 15 empleados y les baja a la mitad los rasgos malos.</p>' : ''}
       ${bloqueCapacitar(e)}
       ${bloqueContratar(e)}
     </div>`;
@@ -641,9 +794,11 @@ function pantallaPublicidad() {
     ${fecha ? `<div class="tarjeta tio con-avatar">${imagen('calendario')}<p>${fecha}</p></div>` : ''}
     ${bloqueAbuela(e)}
     ${bloqueDecision(e)}
-    ${e.mejorDeLaProvincia ? `<div class="tarjeta"><p><strong>${nombreDelTaller(e)} es el mejor de la provincia.</strong> La pelea por el país llega en la próxima versión.</p></div>`
+    ${enPais(e) ? `<div class="tarjeta"><p>${e.mejorDelPais ? `<strong>${nombreDelTaller(e)} es la marca del país.</strong> La pelea por Sudamérica llega en la próxima versión: mientras tanto, podés seguir jugando.` : `<strong>Peleás el país contra ${TOPA.nombre}.</strong> Tu taller ya no vende: produce y hace publicidad de marca. Venden los locales, y la reputación del país es el promedio de todos. ${TOPA.nombre} sube despacio, pero no para: InfoArg te cuenta cómo viene una vez por mes.`}</p></div>`
+      : e.mejorDeLaProvincia ? `<div class="tarjeta"><p><strong>${nombreDelTaller(e)} es el mejor de la provincia.</strong></p></div>`
       : enProvincia(e) ? `<div class="tarjeta"><p><strong>Peleás la provincia contra ${TRAICIO.nombre}.</strong> ${leloDeViaje(e) ? 'Lelo anda de vacaciones por Santa Clara del Mar.' : ''} Cada venta suma menos reputación que en la ciudad, pero los pedidos de empresas y las licitaciones suman mucho.</p></div>`
       : e.reconquista ? `<div class="tarjeta"><p><strong>Perdiste la provincia.</strong> Volvé a ser el mejor de la ciudad para revancharte: Lelo te la está peleando.</p></div>` : ''}
+    ${bloquePais(e)}
     ${bloqueProvincia(e)}
     ${puedeHacerPromo(e) ? `<div class="tarjeta rumor">
       <div class="con-avatar">${imagen('lelo')}<p>${e.primo.rumor}</p></div>
@@ -661,8 +816,8 @@ function pantallaPublicidad() {
     </div>` : ''}
 
     <div class="tarjeta sec-publicidad">
-      <h2>Publicidad en redes</h2>
-      <p class="suave">Publicás en Instagram y Marketplace y respondés consultas: <strong>así te llegan los pedidos</strong>. Cuantas más horas, más pedidos, hasta que el mercado se agota. Al final de la semana te vas a enterar si te quedaste corto o si te pasaste.</p>
+      <h2>${enPais(e) ? 'Publicidad de marca' : 'Publicidad en redes'}</h2>
+      <p class="suave">${enPais(e) ? `Desde el taller hacés publicidad de la marca en todo el país (vos y tus vendedores). No trae pedidos: los traen los locales. Pero con ${PAIS.marca.horasCompletas} h por semana, entre todos, los locales ganan reputación un ${Math.round(PAIS.marca.extra * 100)}% más rápido (con menos, proporcional).` : 'Publicás en Instagram y Marketplace y respondés consultas: <strong>así te llegan los pedidos</strong>. Cuantas más horas, más pedidos, hasta que el mercado se agota. Al final de la semana te vas a enterar si te quedaste corto o si te pasaste.'}</p>
       <div class="producto">
         <div class="info"><div class="nombre">Tus horas de publicidad</div><div class="detalle">El resto de las horas te quedan para producir el sábado.</div></div>
         <div class="paso">
@@ -672,21 +827,21 @@ function pantallaPublicidad() {
         </div>
       </div>
       ${lineaVendedores(e)}
-      <label class="interruptor">
+      ${enPais(e) ? '' : `<label class="interruptor">
         <span><strong>Repartir volantes</strong><br><span class="suave">${plata(VOLANTES.costo)} de imprenta · ${VOLANTES.horas} h recorriendo el barrio. Te piden más esta semana y un poco más la que viene.</span></span>
         <input type="checkbox" id="volantes" ${pub.volantes ? 'checked' : ''}>
       </label>
-      ${opcionVolantesVendedor(e)}
+      ${opcionVolantesVendedor(e)}`}
     </div>
 
-    <div class="tarjeta sec-feria">
+    ${enPais(e) ? '' : `<div class="tarjeta sec-feria">
       <h2>Feria del domingo</h2>
       <label class="interruptor" style="border-top:0">
         <span><strong>Ir a la feria</strong><br><span class="suave">Mesa ${plata(VENTAS.feria.costoMesa)} · ${VENTAS.feria.horas} h · vendés lo que te sobró de stock (${stockTotal(e) ? `tenés ${stockTotal(e)}` : 'hoy no tenés nada'}). En la feria siempre pasa algo.</span></span>
         <input type="checkbox" id="feria" ${pub.feria ? 'checked' : ''} ${stockTotal(e) ? '' : 'disabled'}>
       </label>
       ${opcionFeriaVendedor(e)}
-    </div>
+    </div>`}
 
     <div class="tarjeta sec-estudio">
       <h2>Estudiar</h2>
@@ -713,13 +868,16 @@ function pantallaPublicidad() {
   if (promo) promo.onchange = (ev) => { pub.promo = ev.target.checked; refrescar(); };
   const cyber = document.getElementById('cyber');
   if (cyber) cyber.onchange = (ev) => { pub.cyber = ev.target.checked; refrescar(); };
-  document.getElementById('volantes').onchange = (ev) => { pub.volantes = ev.target.checked; if (!pub.volantes) pub.volantesVendedor = null; refrescar(); };
+  const vol = document.getElementById('volantes');
+  if (vol) vol.onchange = (ev) => { pub.volantes = ev.target.checked; if (!pub.volantes) pub.volantesVendedor = null; refrescar(); };
   const vv = document.getElementById('volantesVendedor');
   if (vv) vv.onchange = (ev) => { pub.volantesVendedor = ev.target.checked ? vv.dataset.id : null; refrescar(); };
   app.querySelectorAll('[data-decision]').forEach((b) => { b.onclick = () => accionCompra(resolverDecision(partida, b.dataset.decision)); });
   app.querySelectorAll('[data-abuela]').forEach((b) => { b.onclick = () => accionCompra(responderAbuela(partida, b.dataset.abuela === 'si')); });
   conectarProvincia();
-  document.getElementById('feria').onchange = (ev) => { pub.feria = ev.target.checked; if (!pub.feria) pub.feriaVendedor = null; refrescar(); };
+  conectarPais();
+  const fer = document.getElementById('feria');
+  if (fer) fer.onchange = (ev) => { pub.feria = ev.target.checked; if (!pub.feria) pub.feriaVendedor = null; refrescar(); };
   conectarEquipo();
   app.querySelectorAll('input[name="curso"]').forEach((r) => { r.onchange = () => { pub.curso = r.value; refrescar(); }; });
   const sinCurso = document.getElementById('sinCurso');
@@ -814,7 +972,8 @@ function pantallaPedidos() {
   const e = partida;
   const sem = e.semanaEnCurso;
   const pedidas = unidadesPedidas(sem);
-  const productos = Object.keys(PRODUCTOS).filter((id) => e.maquinas[PRODUCTOS[id].maquina] && (!PRODUCTOS[id].soloPedido || e.licitacion?.contrato || e.stock[id]));
+  const empresaU = unidadesEmpresa(e);
+  const productos = Object.keys(PRODUCTOS).filter((id) => e.maquinas[PRODUCTOS[id].maquina] && (!PRODUCTOS[id].soloPedido || (id === 'combo' && e.licitacion?.contrato) || e.stock[id] || empresaU[id]));
   const v = validarPlan(e, plan);
   const precio = (p) => precioPedido(p, sem);
   const costoTerc = (p) => Math.round(PRODUCTOS[p.producto].precio * p.cantidad * (p.factorTerc || TERCERIZAR.max));
@@ -829,7 +988,7 @@ function pantallaPedidos() {
 
     <div class="tarjeta sec-trabajo">
       <h2>Pedidos de la semana (${sem.pedidos.filter((p) => !p.rechazado).length})</h2>
-      ${sem.pedidos.length ? sem.pedidos.map((p) => `
+      ${enPais(e) ? htmlPedidosPais(e, sem, precio, costoTerc) : sem.pedidos.length ? sem.pedidos.map((p) => `
         <div class="pedido ${p.rechazado ? 'rechazado' : ''}">
           <div class="info">
             <div class="nombre">${p.cantidad} ${nombreUnidades(p.producto, p.cantidad)}</div>
@@ -847,6 +1006,7 @@ function pantallaPedidos() {
       <p class="suave" style="margin-top:8px">Si no entregás un pedido aceptado perdés reputación. Si sabés que no llegás, rechazalo: perdés mucho menos.${sem.pedidos.some((p) => p.envio || p.diseno) ? ' Los envíos los hace un operario con horas libres (si no, vos) y suman reputación; el diseño propio lo hace tu diseñador de esa máquina (si no tenés, o no le alcanzan las horas, vos).' : ''}</p>
     </div>
 
+    ${bloqueTransporte(e, sem)}
     ${bloqueEmpresas(e)}
 
     <div class="tarjeta sec-trabajo">
@@ -871,7 +1031,7 @@ function pantallaPedidos() {
       }).join('')}
       ${repartoTexto(e)}
       <p class="suave" style="margin-top:8px">Alguna puede salir mal en la prensa. Cuanta más experiencia tengas, menos errores vas a cometer: producir una de más te cubre.</p>
-      <p class="suave">Lo que te sobre queda en stock para llevar a la feria del domingo. Pero no acumules mucho: lo guardado siempre se termina rompiendo.</p>
+      <p class="suave">${enPais(e) ? 'Lo que te sobre queda en stock para la semana que viene. Pero no acumules mucho: lo guardado siempre se termina rompiendo.' : 'Lo que te sobre queda en stock para llevar a la feria del domingo. Pero no acumules mucho: lo guardado siempre se termina rompiendo.'}</p>
     </div>
 
     ${bloqueEstado(e)}
@@ -909,6 +1069,16 @@ function pantallaPedidos() {
       refrescar(!r.ok);
     };
   });
+  app.querySelectorAll('input[name="transporte"]').forEach((r) => { r.onchange = () => { plan.transporte = r.value; refrescar(); }; });
+  app.querySelectorAll('[data-rechazar-local]').forEach((b) => {
+    b.onclick = () => {
+      const lista = sem.pedidos.filter((x) => x.local === b.dataset.rechazarLocal);
+      const rechazar = !lista.every((x) => x.rechazado);
+      lista.forEach((x) => rechazarPedido(partida, x.id, rechazar));
+      guardarPartida();
+      refrescar();
+    };
+  });
   app.querySelectorAll('[data-mas]').forEach((b) => mantenerApretado(b, b.dataset.mas, 1));
   app.querySelectorAll('[data-menos]').forEach((b) => mantenerApretado(b, b.dataset.menos, -1));
   app.querySelectorAll('[data-cant]').forEach((i) => {
@@ -917,6 +1087,42 @@ function pantallaPedidos() {
     i.onchange = () => { plan.producir[i.dataset.cant] = Math.max(0, Math.floor(Number(i.value) || 0)); refrescar(); };
   });
   document.getElementById('terminar').onclick = terminarSemana;
+}
+
+// País: pedidos agrupados por local, y el traslado.
+function htmlPedidosPais(e, sem, precio, costoTerc) {
+  if (!sem.pedidos.length) return '<p class="suave">Los locales no juntaron pedidos esta semana.</p>';
+  const porLocal = {};
+  for (const p of sem.pedidos) (porLocal[p.local] = porLocal[p.local] || []).push(p);
+  return Object.entries(porLocal).map(([prov, ps]) => {
+    const l = e.pais.locales.find((x) => x.prov === prov);
+    const todos = ps.every((x) => x.rechazado);
+    return `<div class="grupo-local">Local de ${PROVINCIAS_AR[prov].nombre}${l?.origen ? ' (tu ciudad: no necesita traslado)' : ''} <button class="chico" data-rechazar-local="${prov}">${todos ? 'Aceptar todo' : 'Rechazar todo'}</button></div>
+      ${ps.map((p) => `<div class="pedido ${p.rechazado ? 'rechazado' : ''}">
+        <div class="info">
+          <div class="nombre">${p.cantidad} ${nombreUnidades(p.producto, p.cantidad)}</div>
+          <div class="detalle">${plata(precio(p))}${p.rechazado ? ' · rechazado' : ''}${p.tercerizado ? ` · <strong>tercerizado</strong> (${plata(costoTerc(p))})` : ''}</div>
+        </div>
+        <div class="acciones-pedido">
+          ${seleccionTerc && !p.rechazado ? `<label class="marcar"><input type="checkbox" data-marcar="${p.id}" ${seleccionTerc.has(p.id) ? 'checked' : ''}> ${plata(costoTerc(p))}</label>`
+            : p.tercerizado ? '' : `<button class="chico" data-rechazar="${p.id}">${p.rechazado ? 'Aceptar' : 'Rechazar'}</button>`}
+        </div>
+      </div>`).join('')}`;
+  }).join('');
+}
+
+function bloqueTransporte(e, sem) {
+  if (!enPais(e)) return '';
+  const aMandar = sem.pedidos.filter((p) => !p.rechazado && !e.pais.locales.find((l) => l.prov === p.local)?.origen);
+  const valor = (t) => aMandar.reduce((x, p) => x + costoTraslado(e, precioPedido(p, sem), p.local, t), 0);
+  return `<div class="tarjeta sec-trabajo">
+      <h2>Traslado a los locales</h2>
+      <p class="suave">Lo que entregás hoy viaja esta semana y llega a los locales el domingo que viene. En el camino puede pasar de todo: roturas, mercadería sucia, "colaboraciones" en un control, robos... Lo que no llega cuenta como no entregado en ese local.${aMandar.length ? '' : ' Esta semana no hay nada para mandar fuera de tu ciudad.'}</p>
+      ${Object.entries(TRANSPORTE).filter(([, t]) => t.nombre).map(([id, t]) => `<label class="interruptor">
+        <span><strong>${t.nombre}</strong>${aMandar.length ? ` · unos ${plata(valor(id))}` : ''}<br><span class="suave">${t.detalle}</span></span>
+        <input type="radio" name="transporte" value="${id}" ${plan.transporte === id ? 'checked' : ''}>
+      </label>`).join('')}
+    </div>`;
 }
 
 // Botón +/− que, si lo mantenés apretado, sigue sumando cada vez más rápido. La pantalla se actualiza al soltar.
@@ -1020,13 +1226,15 @@ function pantallaResumen(r) {
       ${r.eventos.length ? `<ul class="eventos">${r.eventos.map((ev) => `<li class="${ev.tipo}">${ev.texto}</li>`).join('')}</ul>` : ''}
     </div>
     <div class="barra-inferior"><div class="contenido">
-      <button class="boton" id="seguir">${r.hito === 'quiebra' ? 'Ver final' : ['mejorDeLaCiudad', 'mejorDeLaProvincia', 'perdisteProvincia', 'reconquista'].includes(r.hito) ? 'Seguir' : 'Siguiente semana'}</button>
+      <button class="boton" id="seguir">${r.hito === 'quiebra' ? 'Ver final' : ['mejorDeLaCiudad', 'mejorDeLaProvincia', 'perdisteProvincia', 'reconquista', 'mejorDelPais', 'perdistePais'].includes(r.hito) ? 'Seguir' : 'Siguiente semana'}</button>
     </div></div>
   `;
   document.getElementById('seguir').onclick = () => {
     const e = partida;
     if (r.hito === 'mejorDeLaCiudad') pantallaLogro();
-    else if (r.hito === 'mejorDeLaProvincia') pantallaHito('¡El mejor de la provincia! 🏆', [`${nombreDelTaller(e)} le ganó a ${TRAICIO.nombre}: Talleres Judas cerró.`, ...(r.leloAsciende ? [`Lelo asciende a gerente de operaciones (${plata(LELO_GERENTE.sueldo)} por mes): deja de producir, pero baja los errores de todo el taller y te cansás menos.`] : []), 'La pelea por el país llega en la próxima versión. Mientras tanto, podés seguir jugando.']);
+    else if (r.hito === 'mejorDeLaProvincia') pantallaPaisArranque(r);
+    else if (r.hito === 'mejorDelPais') pantallaHito('¡La marca del país! 🏆', [`${nombreDelTaller(e)} llegó a 100 en todo el país antes que ${TOPA.nombre}.`, 'La pelea por Sudamérica (contra las grandes marcas deportivas) llega en la próxima versión. Mientras tanto, podés seguir jugando.']);
+    else if (r.hito === 'perdistePais') pantallaHito(`${TOPA.nombre} te ganó el país 😖`, [`${TOPA.nombre} llegó a 100: es la marca del país. Tuviste que vender los locales (recuperaste ${plata(r.recupero || 0)}).`, `Volvés a pelear la provincia con ${PAIS.repAlPerder} de reputación. Conservás las máquinas, la plata y el equipo.`, TRAICIO_TEXTOS.vuelta, `Arranca con ${PAIS.repTraicioVuelve} de reputación.`], 'A revancharse');
     else if (r.hito === 'perdisteProvincia') pantallaHito('Traicio te ganó la provincia 😖', [`${TRAICIO.nombre} llegó primero a 100. Perdiste el título y volvés a la ciudad con ${PROVINCIA.repAlPerder} de reputación.`, 'Conservás todo (máquinas, plata y empleados), pero el mercado vuelve a ser el de la ciudad.', `${r.textoLelo || 'Lelo volvió a abrir su taller para competirte.'} Cuando llegues otra vez a 100, se rinde.`], 'A revancharse');
     else if (r.hito === 'reconquista') pantallaHito('¡Otra vez el mejor de la ciudad! 🏆', ['Lelo se rindió otra vez: cerró el taller y se fue un mes a Santa Clara del Mar.', `Arranca la revancha por la provincia: ${TRAICIO.nombre} te espera con ${PROVINCIA.repTraicioRevancha} de reputación.`]);
     else siguientePantalla();
@@ -1062,6 +1270,47 @@ function pantallaLogro() {
   };
 }
 
+// Ganaste la provincia: Traicio se va con humo y arranca el país. El taller pasa a ser una S.A.
+function pantallaPaisArranque(r = null) {
+  window.scrollTo(0, 0);
+  const e = partida;
+  const lelo = e.equipo.empleados.some((x) => x.esLelo);
+  const sinOrigen = !e.origen;
+  const base = (e.nombreTaller || '').replace(/\s*S\.A\.$/, '');
+  app.innerHTML = `
+    <h1>¡El mejor de la provincia! 🏆</h1>
+    <div class="tarjeta"><p>${TRAICIO_TEXTOS.despedida}</p></div>
+    <div class="tarjeta tio">
+      <p>Ahora arranca la pelea por el <strong>país</strong> contra ${TOPA.nombre}, la marca de toda la vida. Tu taller deja de vender: <strong>venden los locales</strong>, uno por provincia, y la reputación del país es el promedio de todos. El primero es el de tu ciudad.</p>
+      <p>Cada local tiene alquiler y un encargado. Lo que vendan lo producís vos el sábado y llega a cada local la semana siguiente (fuera de tu ciudad, con traslado). Gambeta Sport, Penalazo, La Remera Feliz y Estampados del Plata te van a atacar los locales; InfoArg te cuenta lo que traman.</p>
+      ${lelo ? `<p>Lelo pasa a ser <strong>gerente comercial</strong> (${plata(LELO_COMERCIAL.sueldo)} por mes): lo mandás al local que quieras y ahí consigue más clientes y hace crecer la reputación al triple.</p>` : ''}
+    </div>
+    <div class="tarjeta">
+      <h2>Tu taller pasa a ser una S.A.</h2>
+      ${sinOrigen ? `<label class="campo"><span>¿De qué provincia sos?</span><select id="origenProv">${opcionesProvincia('')}</select></label>
+      <label class="campo"><span>Municipio o ciudad</span><input type="text" id="origenMuni" maxlength="40" placeholder="Por ejemplo: Río Cuarto"></label>` : ''}
+      <label class="campo"><span>Nombre de la empresa</span><input type="text" id="nombreTaller" maxlength="40" placeholder="Por ejemplo: Talleres Iván" value="${base}"></label>
+      <p class="suave">Se va a llamar "<span id="vistaSA">${base || '…'}</span> S.A.".</p>
+      <p class="suave" id="arranqueError"></p>
+    </div>
+    <button class="boton" id="seguir">Arrancar el país</button>
+  `;
+  void r;
+  const input = document.getElementById('nombreTaller');
+  input.oninput = () => { document.getElementById('vistaSA').textContent = input.value.trim() || '…'; };
+  document.getElementById('seguir').onclick = () => {
+    const err = document.getElementById('arranqueError');
+    if (sinOrigen) {
+      const o = elegirOrigen(partida, document.getElementById('origenProv').value, document.getElementById('origenMuni').value);
+      if (!o.ok) { err.textContent = o.motivo; return; }
+    }
+    const res = ponerNombreTaller(partida, input.value, true);
+    if (!res.ok) { err.textContent = res.motivo; input.focus(); return; }
+    guardarPartida();
+    siguientePantalla();
+  };
+}
+
 function pantallaHito(titulo, parrafos, boton = 'Seguir jugando') {
   window.scrollTo(0, 0);
   app.innerHTML = `<h1>${titulo}</h1><div class="tarjeta">${parrafos.map((x) => `<p>${x}</p>`).join('')}</div><button class="boton" id="seguir">${boton}</button>`;
@@ -1083,6 +1332,7 @@ function pantallaQuiebra() {
 
 function siguientePantalla() {
   if (partida.fin === 'quiebra') pantallaQuiebra();
+  else if (partida.pedirNombreSA) pantallaPaisArranque();
   else { window.scrollTo(0, 0); pantallaSemana(); }
 }
 

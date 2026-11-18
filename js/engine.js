@@ -6,9 +6,11 @@ import {
   LELO_EMPLEADO, CHUCHU, NOMBRES_FEMENINOS, CYBER, CONFIANZA, ORDEN_MAQUINAS, MAQUINAS_FUTURAS, LOCALES, VOLANTES,
   SERVICIOS, LELO_VIAJE, TRAICIO, SIN_TEXTIL_ERRORES, PROVINCIA, LELO_GERENTE, DEFENSAS, SEGURIDAD, EMPRESAS,
   TERCERIZAR, LICITACION, VOZ_DE_ADENTRO, ABUELA,
+  RRHH, PROVINCIAS_AR, PAIS, ENCARGADO, TRANSPORTE, LELO_COMERCIAL, TOPA, MARCAS, ATAQUES_PAIS, DEFENSAS_PAIS, PRODUCTOS_SIMPLES,
+  GRANDES, INFOARG, EVENTOS_MARCA, EMPRESAS_PAIS, CLUBES_BARRIO, LICITACION_SEGUNDA, TRAICIO_TEXTOS,
 } from './data.js';
 
-export const VERSION_PARTIDA = 4;
+export const VERSION_PARTIDA = 5;
 
 // ---------- Azar con semilla (para poder guardar y reproducir partidas) ----------
 function siguienteAzar(estado) {
@@ -106,6 +108,32 @@ export function enProvincia(e) {
   return e.meta === 'provincia';
 }
 
+export function enPais(e) {
+  return e.meta === 'pais';
+}
+
+// Ya pasaste la ciudad (provincia o país): tercerización, defensas, empresas, diseñadores...
+export function despuesDeLaCiudad(e) {
+  return enProvincia(e) || enPais(e);
+}
+
+// Mueve la reputación. En el país, mueve la de todos los locales (más suave) y la del país es el promedio.
+export function sumarReputacion(e, d) {
+  if (!d) return;
+  if (enPais(e) && e.pais) {
+    for (const l of e.pais.locales) l.rep = limitar(redondear(l.rep + d * PAIS.factorGeneral, 3), 0, 100);
+    recalcularRepPais(e);
+    return;
+  }
+  e.rep = limitar(redondear(e.rep + d), 0, 100);
+}
+
+export function recalcularRepPais(e) {
+  const ls = e.pais?.locales || [];
+  e.rep = ls.length ? redondear(ls.reduce((t, l) => t + l.rep, 0) / ls.length) : 0;
+  return e.rep;
+}
+
 // Tamaño del mercado: en la ciudad crece escalonado; la provincia arranca en x3,4 y llega al doble.
 export function multiplicadorMercado(e) {
   if (enProvincia(e)) return PROVINCIA.mercadoInicial * (1 + limitar(e.rep, 0, 100) / 100);
@@ -176,6 +204,13 @@ export function migrarPartida(e) {
   if (!e.empresas) e.empresas = { clientes: {}, proximo: {} };
   if (!e.licitacion) e.licitacion = { proxima: null, abierta: null, contrato: null };
   if (e.mejorDeLaCiudad && e.meta === 'ciudad' && !e.reconquista) iniciarProvincia(e);
+  // Versión 5: el país
+  if (e.pais === undefined) e.pais = null;
+  if (e.origen === undefined) e.origen = null;
+  if (!e.equipo.rrhhCubre) e.equipo.rrhhCubre = [];
+  const ab = e.licitacion.abierta;
+  if (ab && ab.combos === undefined) Object.assign(ab, { tipo: 'ascenso', combos: LICITACION.combos, precioRef: LICITACION.precioRef, costo: LICITACION.costo, sena: LICITACION.sena, plazo: LICITACION.plazo, multa: LICITACION.multa, cobroSemanas: 0, requisitos: [], especial: null, grande: null, repGanada: LICITACION.repGanada, repIncompleta: LICITACION.repIncompleta });
+  if (e.mejorDeLaProvincia && e.meta === 'provincia') iniciarPais(e);
   if (e.mazo.cartas.some((c) => !c.clase)) e.mazo = { trimestre: -1, cartas: [] };
   e.tio.confianza = confianzaTio(e);
   e.version = VERSION_PARTIDA;
@@ -188,8 +223,19 @@ export function expEn(x, maquina) {
   return Math.max(0, x.exp - (x.retraso?.[maquina] || 0));
 }
 
+// Con la estación de costura, el combo lleva solo el calandrado (1 h): el corte y la costura (30 min)
+// los hacen los costureros (y si no les alcanzan las horas, vos).
+const PARTE_COSTURA = 1 / 3;
+function factorEstacion(e, idProducto) {
+  return idProducto === 'combo' && e?.maquinas?.costura ? 1 - PARTE_COSTURA : 1;
+}
+
 export function horasPorUnidad(e, idProducto) {
-  return PRODUCTOS[idProducto].horas * Math.max(0.35, 1 - expEn(e, PRODUCTOS[idProducto].maquina) * 0.016);
+  return PRODUCTOS[idProducto].horas * Math.max(0.35, 1 - expEn(e, PRODUCTOS[idProducto].maquina) * 0.016) * factorEstacion(e, idProducto);
+}
+
+export function horasCostura(x) {
+  return PRODUCTOS.combo.horas * PARTE_COSTURA * Math.max(0.35, 1 - expEn(x, 'costura') * 0.016);
 }
 
 // Curso de redes: cada punto hace que la publicidad rinda un 1% más.
@@ -206,7 +252,7 @@ export function probabilidadError(e, maquina = 'tazas') {
 
 export function probabilidadErrorEmpleado(emp, maquina = 'tazas', e = null) {
   const variante = emp.esLelo ? 1 : PUESTOS[emp.puesto].variantes[emp.variante].errores ?? 1;
-  const rasgo = emp.rasgo === 'prolijo' ? 0.5 : emp.rasgo === 'distraido' ? 1.5 : 1;
+  const rasgo = emp.rasgo === 'prolijo' ? 0.5 : emp.rasgo === 'distraido' ? (e && cubiertoPorRRHH(e, emp) ? RRHH.distraido : 1.5) : 1;
   const taller = e ? factorErroresTaller(e, maquina) : 1;
   return limitar(0.04 * (1 - expEn(emp, maquina) / 125) * variante * rasgo * taller, 0.005, 0.5);
 }
@@ -251,6 +297,7 @@ export function semanaVencimientoA(p) {
 
 // ---------- Confianza del tío: historial de pago (hasta 50) + reputación (hasta 50) ----------
 export function metasGanadas(e) {
+  if (enPais(e)) return e.mejorDelPais ? 3 : 2;
   if (enProvincia(e)) return e.mejorDeLaProvincia ? 2 : 1;
   return 0;
 }
@@ -271,6 +318,7 @@ function sumarHistorial(e, d) {
 export function proximaMaquina(e) {
   const id = ORDEN_MAQUINAS.find((m) => !e.maquinas[m]);
   if (!id) return null;
+  if (MAQUINAS[id]?.desdePais && !enPais(e)) return { id, ...MAQUINAS[id], disponible: false, enElPais: true };
   if (MAQUINAS[id]) return { id, ...MAQUINAS[id], disponible: true };
   return { id, ...MAQUINAS_FUTURAS[id], disponible: false };
 }
@@ -283,7 +331,7 @@ export function prestamoDisponible(e) {
   if (e.tio.enojado) return { ok: false, motivo: 'El tío está enojado: no te va a prestar más.' };
   const m = proximaMaquina(e);
   if (!m) return { ok: false, motivo: 'Ya tenés todas las máquinas.' };
-  if (!m.disponible) return { ok: false, motivo: `La próxima máquina es la ${m.nombre.toLowerCase()}: llega en la próxima versión del juego.` };
+  if (!m.disponible) return { ok: false, motivo: m.enElPais ? `La próxima es la ${m.nombre.toLowerCase()}: se consigue en el país.` : `La próxima máquina es la ${m.nombre.toLowerCase()}: llega en la próxima versión del juego.` };
   const conf = confianzaTio(e);
   const parte = PRESTAMO.tope.min + (PRESTAMO.tope.max - PRESTAMO.tope.min) * (conf / 100);
   const tope = Math.floor((m.precio * parte) / 1000) * 1000;
@@ -316,7 +364,7 @@ export function demandaEsperada(e, idProducto, semana = e.semana, conCyber = fal
   const c = calendario(semana);
   const temporada = p.temporada[c.estacion] ?? 1;
   const especial = multiplicadorFecha(semana, idProducto, conCyber);
-  const ml = e.rep >= VENTAS.reputacionMercadoLibre || enProvincia(e) ? 1 + VENTAS.extraMercadoLibre : 1;
+  const ml = e.rep >= VENTAS.reputacionMercadoLibre || despuesDeLaCiudad(e) ? 1 + VENTAS.extraMercadoLibre : 1;
   return p.base * (1 + (multiplicadorMercado(e) - 1) * p.sens) * temporada * especial * ml;
 }
 
@@ -348,7 +396,7 @@ export function cupoEquipo(e) {
 
 // Local: en tu casa entran 2 empleados; para más, alquilás un local (alquiler y luz por mes).
 export function localesDisponibles(e) {
-  return Object.keys(LOCALES).filter((id) => !LOCALES[id].desdeProvincia || enProvincia(e));
+  return Object.keys(LOCALES).filter((id) => (!LOCALES[id].desdeProvincia || despuesDeLaCiudad(e)) && (!LOCALES[id].desdePais || enPais(e)));
 }
 
 export function alquilarLocal(e, id = 'chico') {
@@ -356,7 +404,8 @@ export function alquilarLocal(e, id = 'chico') {
   const l = LOCALES[id];
   if (!l || id === 'casa') return { ok: false, motivo: 'Ese local no existe.' };
   if ((e.local || 'casa') === id) return { ok: false, motivo: 'Ya estás en ese local.' };
-  if (!localesDisponibles(e).includes(id)) return { ok: false, motivo: 'El local grande se consigue en la provincia.' };
+  if (!localesDisponibles(e).includes(id)) return { ok: false, motivo: l.desdePais ? `El ${l.nombre.toLowerCase()} se consigue en el país.` : 'El local grande se consigue en la provincia.' };
+  if (l.localesMin && (e.pais?.locales.length || 0) < l.localesMin) return { ok: false, motivo: `Para la ${l.nombre.toLowerCase()} necesitás ${l.localesMin} locales de venta abiertos.` };
   if (empleadosContratados(e) > l.cupo) return { ok: false, motivo: `En ${l.nombre.toLowerCase()} entran ${l.cupo} empleados: primero tenés que achicar el equipo.` };
   e.local = id;
   return { ok: true, mensaje: `Te mudaste a un ${l.nombre.toLowerCase()}: entran hasta ${l.cupo} empleados. Pagás ${plata$(l.alquiler)} de alquiler y ${plata$(l.luz)} más de luz por mes.` };
@@ -405,7 +454,7 @@ function crearCandidato(e, puesto, variante, { origen, sueldo, probMalo = 0.5, r
     sueldo: sueldo ?? mediaSueldo(e, puesto, variante),
     exp: limitar(Math.round(v.exp + entre(e, -5, 5)), 0, 100),
     rasgo: sortearRasgo(e, puesto, probMalo),
-    rasgoVisible,
+    rasgoVisible: rasgoVisible || tieneRRHH(e), // con Recursos Humanos ves el rasgo antes de contratar
   };
   if (puesto === 'vendedor') {
     const ids = mezclar(e, [...productosPosibles(e)]);
@@ -417,6 +466,7 @@ function crearCandidato(e, puesto, variante, { origen, sueldo, probMalo = 0.5, r
 
 function varianteAlAzar(e, puesto) {
   const ids = Object.keys(PUESTOS[puesto].variantes);
+  if (ids.length === 1) return ids[0];
   const t = siguienteAzar(e);
   return t < 0.5 ? ids[0] : t < 0.85 ? ids[1] : ids[2];
 }
@@ -426,7 +476,8 @@ export function irALaBolsa(e) {
   if (e.semanaEnCurso) return { ok: false, motivo: 'A la bolsa se va el domingo, antes de arrancar la semana.' };
   if (e.equipo.bolsa?.semana === e.semana) return { ok: true };
   const candidatos = [];
-  const puestos = mezclar(e, ['operario', 'vendedor', enProvincia(e) ? 'disenador' : siguienteAzar(e) < 0.6 ? 'operario' : 'vendedor']);
+  const extra = enPais(e) ? ['costurero', 'bordador', 'rrhh', 'disenador'][Math.floor(siguienteAzar(e) * 4)] : despuesDeLaCiudad(e) ? 'disenador' : siguienteAzar(e) < 0.6 ? 'operario' : 'vendedor';
+  const puestos = mezclar(e, ['operario', 'vendedor', extra]);
   for (const puesto of puestos) {
     const variante = varianteAlAzar(e, puesto);
     const sueldo = Math.round((mediaSueldo(e, puesto, variante) * (1 + EQUIPO.bolsa.recargo)) / 1000) * 1000;
@@ -447,7 +498,8 @@ export function llamarAChuchu(e, puesto) {
   if (!chuchuDisponible(e)) return { ok: false, motivo: `Chuchu no está: ${ch.excusa}. Vuelve en ${ch.afueraHasta - e.semana} semana(s).` };
   if (ch.llamadoSemana === e.semana) return { ok: false, motivo: 'Ya hablaste con Chuchu esta semana.' };
   if (!PUESTOS[puesto]) return { ok: false, motivo: 'Ese puesto no existe.' };
-  if (PUESTOS[puesto].desdeProvincia && !enProvincia(e)) return { ok: false, motivo: 'Los diseñadores se consiguen en la provincia.' };
+  if (PUESTOS[puesto].desdeProvincia && !despuesDeLaCiudad(e)) return { ok: false, motivo: 'Los diseñadores se consiguen en la provincia.' };
+  if (PUESTOS[puesto].desdePais && !enPais(e)) return { ok: false, motivo: `${PUESTOS[puesto].nombre}: se consigue en el país.` };
   const variante = varianteAlAzar(e, puesto);
   const sueldo = Math.round((mediaSueldo(e, puesto, variante) * (1 - EQUIPO.chuchu.descuento)) / 1000) * 1000;
   ch.candidato = crearCandidato(e, puesto, variante, { origen: 'chuchu', sueldo, rasgoVisible: false });
@@ -462,7 +514,8 @@ export function publicarAnuncio(e, puesto, sueldo) {
   if (e.semanaEnCurso) return { ok: false, motivo: 'El anuncio se publica el domingo.' };
   if (e.equipo.anuncio) return { ok: false, motivo: 'Ya tenés un anuncio publicado.' };
   if (!PUESTOS[puesto]) return { ok: false, motivo: 'Ese puesto no existe.' };
-  if (PUESTOS[puesto].desdeProvincia && !enProvincia(e)) return { ok: false, motivo: 'Los diseñadores se consiguen en la provincia.' };
+  if (PUESTOS[puesto].desdeProvincia && !despuesDeLaCiudad(e)) return { ok: false, motivo: 'Los diseñadores se consiguen en la provincia.' };
+  if (PUESTOS[puesto].desdePais && !enPais(e)) return { ok: false, motivo: `${PUESTOS[puesto].nombre}: se consigue en el país.` };
   if (!(sueldo > 0)) return { ok: false, motivo: 'Poné un sueldo.' };
   if (e.plata < EQUIPO.anuncio.costo) return { ok: false, motivo: `El anuncio cuesta $${fmt(EQUIPO.anuncio.costo)}.` };
   e.plata -= EQUIPO.anuncio.costo;
@@ -509,6 +562,7 @@ export function contratar(e, origen, indice = 0) {
   };
   delete emp.frase;
   e.equipo.empleados.push(emp);
+  if (tieneRRHH(e)) actualizarRRHH(e);
   let mensaje = `Contrataste a ${emp.nombre} (${PUESTOS[emp.puesto].variantes[emp.variante].nombre.toLowerCase()}, ${plata$(emp.sueldo)} por mes). Arranca esta semana.`;
   if (origen === 'bolsa') e.equipo.bolsa.candidatos.splice(indice, 1);
   if (origen === 'anuncio') e.equipo.anuncio = null;
@@ -543,6 +597,7 @@ export function despedir(e, id) {
   e.plata -= costo;
   e.finanzas.mesActual -= costo;
   e.equipo.empleados = e.equipo.empleados.filter((x) => x !== emp);
+  if (tieneRRHH(e) || emp.puesto === 'rrhh') actualizarRRHH(e);
   return { ok: true, mensaje: `Despediste a ${emp.nombre}. Entre lo trabajado y la indemnización pagaste ${plata$(costo)}.` };
 }
 
@@ -570,8 +625,8 @@ export function darAumento(e, id) {
 // Horas que pone cada empleado esta semana (0 si falta).
 export function horasEmpleado(e, emp, sem = e.semanaEnCurso) {
   if (emp.falta) return 0;
-  if (emp.esLelo && e.leloGerente) return 0;
-  if (emp.puesto === 'disenador') return 0;
+  if (emp.esLelo && (e.leloGerente || e.leloComercial)) return 0;
+  if (emp.puesto === 'disenador' || emp.puesto === 'rrhh') return 0;
   let h = emp.esLelo ? LELO_EMPLEADO.horas : PUESTOS[emp.puesto].horas;
   if (emp.rasgo === 'rapido') h *= 1.2;
   if (emp.rasgo === 'creativo') h *= 0.9;
@@ -586,8 +641,8 @@ export function presentes(e, puesto) {
   return e.equipo.empleados.filter((x) => !x.falta && (!puesto || x.puesto === puesto));
 }
 
-function horasPorUnidadEmp(emp, idProducto) {
-  return PRODUCTOS[idProducto].horas * Math.max(0.35, 1 - expEn(emp, PRODUCTOS[idProducto].maquina) * 0.016);
+function horasPorUnidadEmp(emp, idProducto, e) {
+  return PRODUCTOS[idProducto].horas * Math.max(0.35, 1 - expEn(emp, PRODUCTOS[idProducto].maquina) * 0.016) * factorEstacion(e, idProducto);
 }
 
 function horasPorVentaExp(exp, cursoRedes = 0) {
@@ -625,13 +680,17 @@ export function horasDisenador(e, emp) {
 // Después, los envíos los hace un operario con horas libres (si no, vos), y el diseño personalizado lo hace
 // el diseñador de esa máquina con sus horas (lo que no le entra, vos).
 export function repartirProduccion(e, producir, sem = e.semanaEnCurso) {
-  const operarios = presentes(e, 'operario').map((emp) => ({ emp, libres: horasEmpleado(e, emp, sem), unidades: {}, horas: 0, envios: 0 }));
-  const vos = { unidades: {}, horas: 0, envios: 0, horasDiseno: 0 };
+  const crear = (emp) => ({ emp, libres: horasEmpleado(e, emp, sem), unidades: {}, horas: 0, envios: 0 });
+  const operarios = presentes(e, 'operario').map(crear);
+  // Los bordadores solo trabajan en la estación de bordado (y los operarios no la tocan)
+  const bordadores = presentes(e, 'bordador').map(crear);
+  const vos = { unidades: {}, horas: 0, envios: 0, horasDiseno: 0, horasCostura: 0 };
   for (const [id, n] of Object.entries(producir || {})) {
+    const grupo = PRODUCTOS[id].maquina === 'bordado' ? bordadores : operarios;
     for (let i = 0; i < (n || 0); i++) {
-      const o = operarios.find((x) => x.libres + 1e-9 >= horasPorUnidadEmp(x.emp, id));
+      const o = grupo.find((x) => x.libres + 1e-9 >= horasPorUnidadEmp(x.emp, id, e));
       if (o) {
-        const h = horasPorUnidadEmp(o.emp, id);
+        const h = horasPorUnidadEmp(o.emp, id, e);
         o.libres -= h; o.horas += h; o.unidades[id] = (o.unidades[id] || 0) + 1;
       } else {
         vos.horas += horasPorUnidad(e, id);
@@ -654,11 +713,20 @@ export function repartirProduccion(e, producir, sem = e.semanaEnCurso) {
     vos.horasDiseno += falta;
   }
   vos.horas += vos.horasDiseno;
-  return { operarios, vos, disenadores };
+  // Corte y costura de los combos (con la estación): costureros primero, el resto vos
+  const costureros = presentes(e, 'costurero').map((emp) => ({ emp, libres: horasEmpleado(e, emp, sem), horas: 0, combos: 0 }));
+  if (e.maquinas?.costura) {
+    for (let i = 0; i < (producir?.combo || 0); i++) {
+      const c = costureros.find((x) => x.libres + 1e-9 >= horasCostura(x.emp));
+      if (c) { const h = horasCostura(c.emp); c.libres -= h; c.horas += h; c.combos++; } else vos.horasCostura += horasCostura(e);
+    }
+    vos.horas += vos.horasCostura;
+  }
+  return { operarios: [...operarios, ...bordadores], vos, disenadores, costureros };
 }
 
 export function capacidadEquipo(e, sem = e.semanaEnCurso) {
-  const produccion = presentes(e, 'operario').reduce((s, x) => s + horasEmpleado(e, x, sem), 0);
+  const produccion = [...presentes(e, 'operario'), ...presentes(e, 'bordador')].reduce((s, x) => s + horasEmpleado(e, x, sem), 0);
   const redes = presentes(e, 'vendedor').reduce((s, x) => s + horasEmpleado(e, x, sem), 0);
   return { produccion: redondear(produccion, 1), redes: redondear(redes, 1) };
 }
@@ -695,7 +763,7 @@ function capacitar(e, tipo, enDia) {
 // Al empezar cada semana: quién falta, si llegó el candidato del anuncio y si volvió Chuchu.
 function inicioDeSemana(e, evento) {
   for (const emp of e.equipo.empleados) {
-    emp.falta = emp.rasgo === 'faltador' && siguienteAzar(e) < EQUIPO.probFalta;
+    emp.falta = emp.rasgo === 'faltador' && siguienteAzar(e) < (cubiertoPorRRHH(e, emp) ? RRHH.probFalta : EQUIPO.probFalta);
     if (emp.falta) emp.motivoFalta = FALTAS[Math.floor(siguienteAzar(e) * FALTAS.length)];
   }
   const a = e.equipo.anuncio;
@@ -709,7 +777,11 @@ function inicioDeSemana(e, evento) {
     ch.excusa = null;
   }
   ch.candidato = ch.llamadoSemana === e.semana ? ch.candidato : null;
-  if (enProvincia(e) && e.licitacion?.proxima && e.semana >= e.licitacion.proxima && !e.licitacion.abierta) abrirLicitacion(e, evento);
+  if (despuesDeLaCiudad(e) && e.licitacion?.proxima && e.semana >= e.licitacion.proxima && !e.licitacion.abierta) abrirLicitacion(e, evento);
+  if (enPais(e) && e.licitacion?.proximaSegunda && e.semana >= e.licitacion.proximaSegunda) {
+    if (e.licitacion.abierta) e.licitacion.proximaSegunda = e.semana + 1;
+    else abrirLicitacion(e, evento, 'segunda');
+  }
   if (e.leloVuelve && e.semana >= e.leloVuelve && leloDeViaje(e)) {
     e.leloVuelve = null;
     e.abuela = { pidiendo: false, veces: 0, rechazos: 0, proxima: e.semana, fin: false, acepto: false };
@@ -735,7 +807,7 @@ export function responderAbuela(e, acepta) {
   if (e.semanaEnCurso) return { ok: false, motivo: 'Se decide el domingo.' };
   ab.pidiendo = false;
   const mover = (d) => {
-    e.rep = limitar(redondear(e.rep + d), 0, 100);
+    sumarReputacion(e, d);
     e.exp = limitar(redondear(e.exp + d), 0, 100);
     sumarHistorial(e, d);
   };
@@ -744,11 +816,16 @@ export function responderAbuela(e, acepta) {
     ab.fin = true;
     ab.acepto = true;
     sumarLelo(e);
-    if (e.mejorDeLaProvincia) {
+    if (enPais(e)) {
+      e.leloComercial = true;
+      e.equipo.empleados.find((x) => x.esLelo).sueldo = LELO_COMERCIAL.sueldo;
+      if (!e.pais.lelo.local) e.pais.lelo.local = e.pais.locales[0]?.prov || null;
+    } else if (e.mejorDeLaProvincia) {
       e.leloGerente = true;
       e.equipo.empleados.find((x) => x.esLelo).sueldo = LELO_GERENTE.sueldo;
     }
     mover(ABUELA.bonus);
+    if (e.leloComercial) return { ok: true, mensaje: `Le dijiste que sí. La abuela está chocha y Lelo arranca el lunes como gerente comercial de los locales: no te ocupa un lugar en el equipo y cobra ${plata$(LELO_COMERCIAL.sueldo)} por mes. +${numero(ABUELA.bonus)} de reputación, de experiencia y de confianza del tío.` };
     return { ok: true, mensaje: `Le dijiste que sí. La abuela está chocha y Lelo arranca el lunes: no te ocupa un lugar en el equipo, trabaja ${LELO_EMPLEADO.horas} h por semana y cobra ${plata$(e.leloGerente ? LELO_GERENTE.sueldo : LELO_EMPLEADO.sueldo)} por mes. +${numero(ABUELA.bonus)} de reputación, de experiencia y de confianza del tío.` };
   }
   ab.rechazos++;
@@ -791,10 +868,37 @@ function cierreEquipo(e, r, evento) {
     emp.capacitadoMes = false;
     if (emp.rasgo === 'quejoso' && !emp.pideAumento && e.semana >= emp.proximaQueja) {
       emp.pideAumento = Math.round((emp.sueldo * (1 + EQUIPO.aumentoQuejoso)) / 1000) * 1000;
-      emp.proximaQueja = e.semana + EQUIPO.mesesQuejoso * 4 + 2;
+      emp.proximaQueja = e.semana + (cubiertoPorRRHH(e, emp) ? RRHH.mesesQuejoso : EQUIPO.mesesQuejoso) * 4 + 2;
       evento(`${emp.nombre} te pide un aumento a ${plata$(emp.pideAumento)}. Respondele el domingo.`, 'mala');
     }
   }
+  actualizarRRHH(e, evento);
+}
+
+// ---------- Recursos Humanos ----------
+export function tieneRRHH(e) {
+  return e.equipo?.empleados.some((x) => x.puesto === 'rrhh') || false;
+}
+
+// Cada mes se sortea a quiénes atiende Recursos Humanos (cada uno, a 15).
+export function actualizarRRHH(e, evento) {
+  const n = e.equipo.empleados.filter((x) => x.puesto === 'rrhh').length;
+  const resto = e.equipo.empleados.filter((x) => x.puesto !== 'rrhh' && !x.esLelo);
+  if (!n) { e.equipo.rrhhCubre = []; return; }
+  const cupo = n * RRHH.cubre;
+  e.equipo.rrhhCubre = mezclar(e, resto.map((x) => x.id)).slice(0, cupo);
+  const sin = Math.max(0, resto.length - cupo);
+  if (sin && evento) evento(`Recursos Humanos llega a ${cupo} de tus ${resto.length} empleados: ${sin} ${sin === 1 ? 'queda' : 'quedan'} sin atender.`, 'info');
+}
+
+export function cubiertoPorRRHH(e, emp) {
+  return Boolean(e.equipo?.rrhhCubre?.includes(emp.id));
+}
+
+export function coberturaRRHH(e) {
+  const n = e.equipo.empleados.filter((x) => x.puesto === 'rrhh').length;
+  const resto = e.equipo.empleados.filter((x) => x.puesto !== 'rrhh' && !x.esLelo).length;
+  return { personas: n, cupo: n * RRHH.cubre, empleados: resto, sinAtender: Math.max(0, resto - n * RRHH.cubre) };
 }
 
 // "Prolijo" → "Prolija" si es mujer.
@@ -823,7 +927,7 @@ export function leloDeViaje(e) {
 }
 
 // ---------- Partida nueva ----------
-export function nuevaPartida(opcionPrestamo, semilla = Date.now() >>> 0) {
+export function nuevaPartida(opcionPrestamo, semilla = Date.now() >>> 0, origen = null) {
   if (!['A', 'B'].includes(opcionPrestamo)) throw new Error('Opción de préstamo inválida');
   const e = {
     version: VERSION_PARTIDA,
@@ -868,6 +972,10 @@ export function nuevaPartida(opcionPrestamo, semilla = Date.now() >>> 0) {
     licitacion: { proxima: null, abierta: null, contrato: null },
     volantesSemana: null,
     leloVuelve: null,
+    origen: origen && PROVINCIAS_AR[origen.provincia] ? { provincia: origen.provincia, municipio: String(origen.municipio || '').trim().slice(0, 40) || 'tu ciudad' } : null,
+    pais: null,
+    mejorDelPais: false,
+    leloComercial: false,
   };
   e.tio.confianza = confianzaTio(e);
   prepararMazo(e);
@@ -1003,7 +1111,7 @@ function aplicarCarta(e, carta, r, evento) {
     }
   } else if (carta.clase === 'reputacion') {
     const d = signo * MAZO.rep[carta.tamano];
-    e.rep = limitar(redondear(e.rep + d), 0, 100);
+    sumarReputacion(e, d);
     r.rep = e.rep;
     evento(`${carta.texto} (${formatoRep(d)} de reputación)`, tipoEv);
   }
@@ -1014,6 +1122,7 @@ export function comprarMaquina(e, id) {
   const m = MAQUINAS[id];
   if (!m) return { ok: false, motivo: 'Esa máquina no existe.' };
   if (e.maquinas[id]) return { ok: false, motivo: 'Ya tenés esa máquina.' };
+  if (m.desdePais && !enPais(e)) return { ok: false, motivo: `La ${m.nombre.toLowerCase()} se consigue en el país.` };
   if (e.plata < m.precio) return { ok: false, motivo: `Te faltan $${fmt(m.precio - e.plata)} para comprarla.` };
   e.plata -= m.precio;
   e.maquinas[id] = true;
@@ -1060,6 +1169,13 @@ export function resolverDecision(e, opcion) {
   if (!def?.opciones[opcion]) return { ok: false, motivo: 'Esa opción no existe.' };
   const gastar = (m) => { e.plata -= m; e.finanzas.mesActual -= m; };
   let mensaje = '';
+  if (EVENTOS_MARCA.lista.some((x) => x.id === d.id)) {
+    if (!e.pais) { e.decisiones.shift(); return { ok: true, mensaje: 'Eso ya no corre.' }; }
+    mensaje = resolverEventoMarca(e, d, opcion);
+    if (mensaje === null) return { ok: false, motivo: 'Esa opción no existe.' };
+    e.decisiones.shift();
+    return { ok: true, mensaje };
+  }
   switch (`${d.id}.${opcion}`) {
     case 'resistencia.tecnico': gastar(d.monto); mensaje = `Vino el técnico y la dejó como nueva (−${plata$(d.monto)}).`; break;
     case 'resistencia.vos': {
@@ -1078,14 +1194,14 @@ export function resolverDecision(e, opcion) {
     case 'gripe.descansa': e.horasPerdidas += 16; mensaje = 'Hacés reposo con té con miel: perdés 16 h esta semana.'; break;
     case 'lote.reclama': e.horasPerdidas += 4; mensaje = 'Reclamaste y te cambiaron el lote. Entre llamadas y viajes se te fueron 4 h.'; break;
     case 'lote.usa':
-      if (siguienteAzar(e) < 0.5) { e.rep = limitar(redondear(e.rep - 2), 0, 100); mensaje = 'Usaste el lote fallado y un cliente lo notó: −2 de reputación.'; }
+      if (siguienteAzar(e) < 0.5) { sumarReputacion(e, -2); mensaje = 'Usaste el lote fallado y un cliente lo notó: −2 de reputación.'; }
       else mensaje = 'Usaste el lote fallado y nadie se dio cuenta. Zafaste.';
       break;
-    case 'quejoso.contesta': e.horasPerdidas += 2; e.rep = limitar(redondear(e.rep - 1), 0, 100); mensaje = 'Le contestaste con buena onda: −1 de reputación y 2 h de esta semana.'; break;
-    case 'quejoso.ignora': e.rep = limitar(redondear(e.rep - 2), 0, 100); mensaje = 'Lo ignoraste y la queja juntó comentarios: −2 de reputación.'; break;
+    case 'quejoso.contesta': e.horasPerdidas += 2; sumarReputacion(e, -1); mensaje = 'Le contestaste con buena onda: −1 de reputación y 2 h de esta semana.'; break;
+    case 'quejoso.ignora': sumarReputacion(e, -2); mensaje = 'Lo ignoraste y la queja juntó comentarios: −2 de reputación.'; break;
     case 'tintura.limpia': case 'tintura.tira': mensaje = resolverTintura(e, d, opcion === 'limpia'); break;
-    case 'propaganda.desmiente': e.horasPerdidas += 3; e.rep = limitar(redondear(e.rep - 1 * d.factor), 0, 100); mensaje = `Lo desmentiste en todas las redes: −${formatoRep(d.factor).replace('+', '')} de reputación y 3 h de esta semana.`; break;
-    case 'propaganda.ignora': e.rep = limitar(redondear(e.rep - 2 * d.factor), 0, 100); mensaje = `Lo dejaste pasar y mucha gente se lo creyó: ${formatoRep(-2 * d.factor)} de reputación.`; break;
+    case 'propaganda.desmiente': e.horasPerdidas += 3; sumarReputacion(e, -1 * d.factor); mensaje = `Lo desmentiste en todas las redes: −${formatoRep(d.factor).replace('+', '')} de reputación y 3 h de esta semana.`; break;
+    case 'propaganda.ignora': sumarReputacion(e, -2 * d.factor); mensaje = `Lo dejaste pasar y mucha gente se lo creyó: ${formatoRep(-2 * d.factor)} de reputación.`; break;
     case 'roboEmpleado.iguala': case 'roboEmpleado.deja': mensaje = resolverRoboEmpleado(e, d, opcion === 'iguala'); break;
     default: return { ok: false, motivo: 'Esa opción no existe.' };
   }
@@ -1146,6 +1262,7 @@ export function validarPublicidad(e, pub) {
     if (!pub.volantes) errores.push('Para mandar a alguien a repartir volantes, marcá "Repartir volantes".');
     else if (!v || horasEmpleado(e, v, { capacitacion: pub.capacitar, feriaVendedor: pub.feriaVendedor }) < VOLANTES.horas) errores.push('Ese vendedor no tiene horas para repartir volantes esta semana.');
   }
+  if (enPais(e) && (pub.feria || pub.volantes || pub.promo)) errores.push('En el país no vas a la feria ni repartís volantes: venden los locales.');
   if (pub.feria && stockTotal(e) === 0) errores.push('No tenés stock para llevar a la feria.');
   if (pub.curso && !CURSOS[pub.curso]) errores.push('Ese curso no existe.');
   if (pub.curso && e.curso.semanasRestantes > 0) errores.push('Ya estás haciendo un curso.');
@@ -1293,6 +1410,21 @@ export function publicar(e, pub) {
     feria.textos.forEach((t) => enDia(0, t.texto, t.tipo));
   }
 
+  // País: los pedidos los juntan los locales; tus horas (y las de los vendedores) son publicidad de marca.
+  if (enPais(e)) {
+    const horasMarca = horas + horasVendedores;
+    const pedidosPais = pedidosDeLocales(e, { ...pub, horasMarca }, enDia, evento, diaAlAzar);
+    if (!e.mejorDelPais || true) ofertasEspecialesPais(e, enDia, evento);
+    const totalU = pedidosPais.reduce((t, p) => t + p.cantidad, 0);
+    enDia(6, totalU ? `📦 Los locales juntaron ${totalU} producto${totalU === 1 ? '' : 's'} para mandar. Se producen hoy y llegan la semana que viene.` : '📦 Los locales no juntaron pedidos esta semana.', 'cierre');
+    e.semanaEnCurso = {
+      semana: e.semana, horasRedes: horas, horasMarca: redondear(horasMarca, 1), promo: false, cyber: Boolean(pub.cyber), volantes: false, horasDomingo: horasDomingo(e, { ...pub, curso: null }),
+      pedidos: pedidosPais, pedidosLelo: 0, eventos, dias, feria: null, gastosDomingo, horasVendedores: redondear(horasVendedores, 1), ...semEquipo,
+      transporte: e.pais.transporte,
+    };
+    return { ok: true, semana: e.semanaEnCurso };
+  }
+
   // Lo que pide el mercado esta semana (el jugador no lo ve)
   const mercado = {};
   let totalMercado = 0;
@@ -1425,7 +1557,8 @@ function venderUnaDelStock(e) {
 }
 
 function describirUnidades(cuenta) {
-  return Object.keys(cuenta).filter((id) => cuenta[id]).map((id) => `${cuenta[id]} ${nombreUnidades(id, cuenta[id])}`).join(' y ');
+  const partes = Object.keys(cuenta).filter((id) => cuenta[id]).map((id) => `${cuenta[id]} ${nombreUnidades(id, cuenta[id])}`);
+  return partes.length > 1 ? `${partes.slice(0, -1).join(', ')} y ${partes[partes.length - 1]}` : partes.join('');
 }
 
 function hacerFeria(e, vendedor = null) {
@@ -1542,7 +1675,10 @@ export function cerrarSemana(e, plan) {
   const precioRedes = precioRedesSemana(sem);
   let deltaRep = 0;
   let repBruta = 0; // lo que ganás de reputación con tu trabajo (para medir tu ritmo)
-  const factorRep = enProvincia(e) ? PROVINCIA.factorRepVenta : 1;
+  const factorRep = enPais(e) ? 0.02 : enProvincia(e) ? PROVINCIA.factorRepVenta : 1;
+  const pais = enPais(e);
+  const transporte = pais ? (TRANSPORTE[plan.transporte]?.nombre ? plan.transporte : e.pais.transporte) : null;
+  if (pais) e.pais.transporte = transporte;
   const sumarRep = (x) => { deltaRep += x; repBruta += x; };
 
   // 1. Producción: cada uno hace su parte y cada uno tiene su probabilidad de error
@@ -1577,22 +1713,55 @@ export function cerrarSemana(e, plan) {
   let delEquipo = 0;
   for (const o of reparto.operarios) {
     const emp = o.emp;
-    const aprende = emp.esLelo ? 1 : PUESTOS.operario.variantes[emp.variante].aprende;
+    const aprende = emp.esLelo ? 1 : PUESTOS[emp.puesto].variantes[emp.variante].aprende;
     const res = fabricar(emp, o.unidades, (m) => probabilidadErrorEmpleado(emp, m, e), `${emp.nombre} arruinó`, aprende);
     delEquipo += res.hechas;
     emp.exp = limitar(redondear(emp.exp + res.intentos * 0.08 * aprende, 1), 0, 100);
     if (emp.rasgo === 'creativo') sumarRep(res.hechas * EQUIPO.repCreativo * factorRep);
+  }
+  for (const c of reparto.costureros || []) {
+    if (!c.combos) continue;
+    const ap = PUESTOS.costurero.variantes[c.emp.variante].aprende;
+    c.emp.exp = limitar(redondear(c.emp.exp + c.combos * 0.08 * ap, 1), 0, 100);
+    if (c.emp.retraso?.costura) c.emp.retraso.costura = Math.max(0, redondear(c.emp.retraso.costura - 0.08 * c.combos * ap, 2));
   }
   e.totales.producidas += producidas;
   if (producidas > 0 || Object.keys(plan.producir || {}).some((id) => plan.producir[id] > 0)) {
     linea(delEquipo ? `Se produjeron ${producidas} unidades (${delEquipo} las hizo tu equipo).` : `Produjiste ${producidas} unidades.`);
   }
 
-  // 2. Entrega de pedidos
+  // 2. Entrega de pedidos (en el país: primero llega lo que mandaste la semana pasada)
+  if (pais) llegadaEnvios(e, r, evento);
   let entregados = 0;
   let unidadesEntregadas = 0;
+  const noLlegan = {};
   for (const p of sem.pedidos) {
     const nombre = `${p.cantidad} ${nombreUnidades(p.producto, p.cantidad)}`;
+    if (p.pais) {
+      const l = e.pais.locales.find((x) => x.prov === p.local);
+      const gu = l ? repPorUnidadLocal(e, l) : 0;
+      if (p.rechazado) { if (l) moverRepLocal(e, l, gu * PAIS.rechazado * p.cantidad); continue; }
+      if (p.tercerizado || e.stock[p.producto] >= p.cantidad) {
+        if (p.tercerizado) {
+          if (siguienteAzar(e) < TERCERIZAR.falla) {
+            const insumo = PRODUCTOS[p.producto].costo * p.cantidad;
+            e.plata -= insumo; r.gastos += insumo;
+            if (l) moverRepLocal(e, l, gu * PAIS.noEntregado * p.cantidad);
+            evento(`🏭 La tercerizadora le erró a la calidad de ${nombre} para ${p.cliente}: perdiste el pedido y el insumo (−${plata$(insumo)}).`, 'desastre');
+            continue;
+          }
+          const costo = Math.round(PRODUCTOS[p.producto].precio * p.cantidad * (p.factorTerc || TERCERIZAR.max));
+          e.plata -= costo; r.gastos += costo;
+        } else e.stock[p.producto] -= p.cantidad;
+        enviarALocal(e, r, p, precioPedido(p, sem), transporte);
+        entregados++;
+        unidadesEntregadas += p.cantidad;
+      } else {
+        if (l) moverRepLocal(e, l, gu * PAIS.noEntregado * p.cantidad);
+        noLlegan[p.local] = (noLlegan[p.local] || 0) + p.cantidad;
+      }
+      continue;
+    }
     if (p.rechazado) {
       const d = p.cantidad * REPUTACION.porPedidoRechazado;
       deltaRep += d;
@@ -1641,7 +1810,11 @@ export function cerrarSemana(e, plan) {
   if (e.licitacion.abierta && e.licitacion.abierta.semana === e.semana) resolverLicitacion(e, r, evento);
   entregarLicitacion(e, r, evento, sumarRep);
   const activos = sem.pedidos.filter((p) => !p.rechazado).length;
-  if (activos) linea(`Entregaste ${entregados} de ${activos} pedidos (${unidadesEntregadas} productos).`);
+  if (pais) {
+    if (activos) linea(`Mandaste a los locales ${unidadesEntregadas} productos (${entregados} de ${activos} pedidos)${r.traslado ? ` en ${TRANSPORTE[transporte].nombre.toLowerCase()} (${plata$(r.traslado)} de traslado)` : ''}: llegan la semana que viene.`);
+    const faltaron = Object.entries(noLlegan);
+    if (faltaron.length) evento(`No te alcanzó para mandar todo: quedaron sin mercadería ${faltaron.map(([prov, n]) => `${PROVINCIAS_AR[prov].nombre} (${n})`).join(', ')}. Esos locales pierden reputación.`, 'mala');
+  } else if (activos) linea(`Entregaste ${entregados} de ${activos} pedidos (${unidadesEntregadas} productos).`);
   const serv = serviciosDeLaSemana(sem);
   if (serv.envios || serv.diseno.length) {
     const partes = [];
@@ -1649,7 +1822,7 @@ export function cerrarSemana(e, plan) {
     if (serv.diseno.length) partes.push(`${serv.diseno.length} diseño${serv.diseno.length === 1 ? '' : 's'} personalizado${serv.diseno.length === 1 ? '' : 's'}${reparto.disenadores.some((d) => d.horas > 0) ? (reparto.vos.horasDiseno > 0 ? ' (parte los hizo tu diseñador)' : ' (los hizo tu diseñador)') : ''}`);
     linea(`Servicios especiales: ${partes.join(' y ')}.`);
   }
-  else if (!sem.pedidos.length) linea('No llegaron pedidos esta semana.');
+  else if (!sem.pedidos.length && !pais) linea('No llegaron pedidos esta semana.');
 
   // 3. Lo del domingo: feria y curso
   const feria = sem.feria;
@@ -1664,7 +1837,7 @@ export function cerrarSemana(e, plan) {
 
   // 4. Reputación (el cansancio trae pedidos mal hechos)
   const vendidas = unidadesEntregadas + vendidasFeria;
-  e.totales.vendidas += vendidas;
+  if (!pais) e.totales.vendidas += vendidas;
   let malHechos = 0;
   if (e.cansancio > 60) for (let i = 0; i < vendidas; i++) if (siguienteAzar(e) < 0.05) malHechos++;
   if (malHechos > 0) {
@@ -1672,7 +1845,7 @@ export function cerrarSemana(e, plan) {
     deltaRep += d;
     evento(`Por el cansancio entregaste ${malHechos} producto${malHechos > 1 ? 's' : ''} mal hecho${malHechos > 1 ? 's' : ''}. Te reclamaron (${formatoRep(d)} de reputación).`, 'mala');
   }
-  e.rep = limitar(redondear(e.rep + deltaRep), 0, 100);
+  sumarReputacion(e, deltaRep);
   e.exp = limitar(e.exp + vendidas * 0.02, 0, 100);
 
   // 5. Cansancio y curso
@@ -1721,6 +1894,8 @@ export function cerrarSemana(e, plan) {
 
   // 7b. Traicio: avanza, sabotea y te quiere robar gente
   if (enProvincia(e) && !e.mejorDeLaProvincia && e.traicio) semanaDeTraicio(e, r, evento, repBruta);
+  // 7c. País: Topa, las marcas, InfoArg y los eventos de marca
+  if (pais) { semanaDelPais(e, r, evento); recalcularRepPais(e); }
 
   e.finanzas.mesActual += r.ingresos - r.gastos;
 
@@ -1745,8 +1920,11 @@ export function cerrarSemana(e, plan) {
   } else if (enProvincia(e) && !e.mejorDeLaProvincia && e.traicio) {
     if (e.rep >= REPUTACION.meta) ganarProvincia(e, r, evento);
     else if (e.traicio.rep >= REPUTACION.meta) perderProvincia(e, r, evento);
+  } else if (enPais(e) && !e.mejorDelPais && !e.fin) {
+    if (e.rep >= PAIS.ganar) ganarPais(e, r, evento);
+    else if (e.pais.topa.rep >= 100) perderPais(e, r, evento);
   }
-  if (repInicial < VENTAS.reputacionMercadoLibre && e.rep >= VENTAS.reputacionMercadoLibre) {
+  if (!despuesDeLaCiudad(e) && repInicial < VENTAS.reputacionMercadoLibre && e.rep >= VENTAS.reputacionMercadoLibre) {
     evento('Con tu reputación, Mercado Libre empieza a traerte pedidos en serio.', 'buena');
   }
 
@@ -1781,7 +1959,7 @@ export function jugarSemana(e, plan) {
   });
   if (!p.ok) return p;
   const producir = typeof plan.producir === 'function' ? plan.producir(e.semanaEnCurso) : (plan.producir || {});
-  const res = cerrarSemana(e, { producir });
+  const res = cerrarSemana(e, { producir, transporte: plan.transporte });
   if (!res.ok) e.semanaEnCurso = null;
   return res;
 }
@@ -1808,6 +1986,7 @@ function cierreDeMes(e, c, r, evento) {
     evento(`Pagaste ${plata$(e.seguridad.sueldo)} a la persona de seguridad.`);
   }
   if (enProvincia(e) && !e.mejorDeLaProvincia && e.traicio) vozDeAdentro(e, c, evento);
+  if (enPais(e)) cierreDeMesPais(e, c, r, evento);
 
   const p = e.prestamo;
   if (p.opcion === 'B' && !p.pagado && e.semana > p.inicio - 1) {
@@ -1894,7 +2073,8 @@ function finDeAnio(e, r, evento) {
   const tuyo = e.rep;
   const delPrimo = e.primo.rep;
   r.fiestas = { tuyo, delPrimo };
-  if (enProvincia(e)) evento(`Fiestas: el tío levanta la copa por ${nombreDelTaller(e)}. ${e.mejorDeLaProvincia ? 'El mejor de la provincia: nadie habla de otra cosa.' : `Todos te preguntan por ${TRAICIO.empresa}.`}`, 'buena');
+  if (enPais(e)) evento(`Fiestas: el tío levanta la copa por ${nombreDelTaller(e)} y sus ${e.pais.locales.length} local${e.pais.locales.length === 1 ? '' : 'es'}. ${e.mejorDelPais ? 'La marca del país: la abuela lo cuenta en todos lados.' : `Todos te preguntan si le vas a ganar a ${TOPA.nombre}.`}`, 'buena');
+  else if (enProvincia(e)) evento(`Fiestas: el tío levanta la copa por ${nombreDelTaller(e)}. ${e.mejorDeLaProvincia ? 'El mejor de la provincia: nadie habla de otra cosa.' : `Todos te preguntan por ${TRAICIO.empresa}.`}`, 'buena');
   else if (e.mejorDeLaCiudad && leloDeViaje(e)) evento('Fiestas: Lelo mandó un audio desde la playa para brindar. Todos te miran con respeto.', 'buena');
   else if (e.mejorDeLaCiudad && !e.reconquista && e.equipo.empleados.some((x) => x.esLelo)) evento('Fiestas: Lelo brinda por su jefe. Todos te miran con respeto.', 'buena');
   else if (tuyo >= delPrimo) evento(`Fiestas: el tío los compara delante de toda la familia. Tu reputación ${Math.round(tuyo)} contra ${Math.round(delPrimo)} de Lelo. "¡Este pibe va a llegar lejos!"`, 'buena');
@@ -1928,10 +2108,12 @@ export function nombreDelTaller(e) {
   return e.nombreTaller || 'tu taller';
 }
 
-export function ponerNombreTaller(e, nombre) {
-  const n = String(nombre || '').trim().slice(0, 40);
+export function ponerNombreTaller(e, nombre, sa = false) {
+  let n = String(nombre || '').trim().replace(/\s*S\.?\s*A\.?$/i, '').slice(0, 40);
   if (!n) return { ok: false, motivo: 'Escribí un nombre para tu taller.' };
+  if (sa) n = `${n} S.A.`;
   e.nombreTaller = n;
+  if (sa) e.pedirNombreSA = false;
   return { ok: true, mensaje: `Desde ahora competís como "${n}".` };
 }
 
@@ -1959,15 +2141,16 @@ function perderProvincia(e, r, evento) {
   evento(`${TRAICIO.empresa} llegó primero: ${TRAICIO.nombre} es el mejor de la provincia. Perdiste el título y volvés a pelear la ciudad. ${r.textoLelo}`, 'hito');
 }
 
+// Ganar la provincia: Traicio se prende fuego el taller y arranca la pelea por el país.
 function ganarProvincia(e, r, evento) {
   e.mejorDeLaProvincia = true;
-  e.rep = 100;
   if (e.traicio) e.traicio.sabotaje = null;
   const lelo = e.equipo.empleados.find((x) => x.esLelo);
-  if (lelo) { e.leloGerente = true; lelo.sueldo = LELO_GERENTE.sueldo; }
   r.hito = 'mejorDeLaProvincia';
   r.leloAsciende = Boolean(lelo);
-  evento(`¡${nombreDelTaller(e)} es el mejor de la provincia! ${TRAICIO.nombre} cerró Talleres Judas.${lelo ? ` Lelo asciende a gerente de operaciones: deja de producir, pero baja los errores de todo el taller y te cansás menos (${plata$(LELO_GERENTE.sueldo)} por mes).` : ''}`, 'hito');
+  evento(`¡${nombreDelTaller(e)} es el mejor de la provincia! ${TRAICIO_TEXTOS.despedida}`, 'hito');
+  iniciarPais(e);
+  evento(`Arranca la pelea por el país contra ${TOPA.nombre}. Tu taller deja de vender: ahora venden los locales, y el primero es el de tu ciudad.${lelo ? ` Lelo pasa a ser gerente comercial de los locales (${plata$(LELO_COMERCIAL.sueldo)} por mes).` : ''}`, 'hito');
 }
 
 // Volver a ganar la ciudad después de perder la provincia: Lelo se rinde y se va otra vez de viaje.
@@ -2169,14 +2352,17 @@ export function subirSueldoSeguridad(e) {
 }
 
 // ---------- Clientes empresa ----------
-function nuevaOfertaEmpresa(e, tipo, enDia, evento) {
-  const def = EMPRESAS[tipo];
-  e.empresas.proximo[tipo] = e.semana + enteroEntre(e, def.cada.min, def.cada.max);
+function nuevaOfertaEmpresa(e, tipo, enDia, evento, extra = false) {
+  const def = EMPRESAS[tipo] || EMPRESAS_PAIS[tipo];
+  if (!extra) {
+    if (EMPRESAS[tipo]) e.empresas.proximo[tipo] = e.semana + enteroEntre(e, def.cada.min, def.cada.max);
+    else e.pais.empresas[tipo] = e.semana + enteroEntre(e, def.cada.min, def.cada.max);
+  }
   const conocidos = Object.keys(e.empresas.clientes).filter((c) => e.empresas.clientes[c].tipo === tipo);
   const cliente = conocidos.length && siguienteAzar(e) < 0.7 ? conocidos[0] : def.nombres[Math.floor(siguienteAzar(e) * def.nombres.length)];
   const info = e.empresas.clientes[cliente];
   const dia = 1 + Math.floor(siguienteAzar(e) * 4);
-  if (!info?.fijo && siguienteAzar(e) < EMPRESAS.probTraicioSeLoLleva && !e.mejorDeLaProvincia) {
+  if (!info?.fijo && siguienteAzar(e) < EMPRESAS.probTraicioSeLoLleva && enProvincia(e) && !e.mejorDeLaProvincia) {
     enDia(dia, `🏢 ${cliente} pidió presupuesto... y se lo dio a ${TRAICIO.empresa}.`, 'mala');
     evento(`${cliente} le dio su pedido a ${TRAICIO.empresa}. Con 3 entregas a tiempo, un cliente se vuelve fijo y ya no te lo pelean.`, 'mala');
     return;
@@ -2186,7 +2372,7 @@ function nuevaOfertaEmpresa(e, tipo, enDia, evento) {
   const precio = Math.round(Object.entries(items).reduce((t, [id, n]) => t + n * PRODUCTOS[id].precio, 0) * (1 - def.descuento));
   const cobro = def.cobroLargo && siguienteAzar(e) < def.probCobroLargo ? def.cobroLargo : def.cobroSemanas;
   e.pedidosEmpresa.push({
-    id: `emp${e.semana}-${tipo}`, tipo, cliente, items, precio, vence: e.semana + def.plazo, cobro,
+    id: `emp${e.semana}-${tipo}${extra ? '-x' : ''}`, tipo, cliente, items, precio, vence: e.semana + def.plazo, cobro,
     estado: 'oferta', tercerizar: false, factorTerc: redondear(entre(e, TERCERIZAR.min, TERCERIZAR.max), 3), fijo: Boolean(info?.fijo),
   });
   enDia(dia, `🏢 ${cliente}${info?.fijo ? ' (cliente fijo)' : ''} te encargó ${describirUnidades(items)} para dentro de ${def.plazo} semanas.`, 'oportunidad');
@@ -2226,7 +2412,7 @@ function cerrarEmpresas(e, r, evento, sumarRep) {
         if (siguienteAzar(e) < TERCERIZAR.falla) {
           const insumo = Object.entries(p.items).reduce((t, [id, n]) => t + PRODUCTOS[id].costo * n, 0);
           e.plata -= insumo; r.gastos += insumo;
-          e.rep = limitar(redondear(e.rep + TERCERIZAR.repFalla), 0, 100);
+          sumarReputacion(e, TERCERIZAR.repFalla);
           evento(`🏭 La tercerizadora le erró a la calidad del pedido de ${p.cliente}: perdiste el pedido y el insumo (−${plata$(insumo)}, −0,02 de reputación).`, 'desastre');
           continue;
         }
@@ -2245,7 +2431,7 @@ function cerrarEmpresas(e, r, evento, sumarRep) {
       continue;
     }
     if (e.semana >= p.vence) {
-      e.rep = limitar(redondear(e.rep + EMPRESAS.repNoEntrega), 0, 100);
+      sumarReputacion(e, EMPRESAS.repNoEntrega);
       delete e.empresas.clientes[p.cliente];
       evento(`No llegaste con el pedido de ${p.cliente}: ${EMPRESAS.repNoEntrega} de reputación y no te pide más.`, 'mala');
       continue;
@@ -2266,20 +2452,43 @@ export function porCobrar(e) {
   return (e.cobros || []).reduce((t, c) => t + c.monto, 0);
 }
 
-// ---------- Licitaciones de clubes del ascenso ----------
-function abrirLicitacion(e, evento) {
-  const L = LICITACION;
-  e.licitacion.proxima = e.semana + enteroEntre(e, L.cada.min, L.cada.max);
+// ---------- Licitaciones de clubes (ascenso desde la provincia; segunda desde el país) ----------
+function abrirLicitacion(e, evento, tipo = 'ascenso') {
+  const segunda = tipo === 'segunda';
+  const L = segunda ? LICITACION_SEGUNDA : LICITACION;
+  if (segunda) e.licitacion.proximaSegunda = e.semana + enteroEntre(e, L.cada.min, L.cada.max);
+  else e.licitacion.proxima = e.semana + enteroEntre(e, L.cada.min, L.cada.max);
   if (e.licitacion.contrato) return;
-  const rivales = [{ nombre: TRAICIO.empresa, rep: e.mejorDeLaProvincia ? 0 : e.traicio.rep, calidad: 70, esTraicio: true }];
-  if (e.mejorDeLaProvincia) rivales.length = 0;
-  const talleres = mezclar(e, [...L.talleres]);
+  const rivales = [];
+  if (enProvincia(e) && !e.mejorDeLaProvincia && e.traicio) rivales.push({ nombre: TRAICIO.empresa, rep: e.traicio.rep, calidad: 70, esTraicio: true });
+  let especial = null;
+  let grande = null;
+  let mult = 1;
+  let requisitos = [];
+  if (segunda) {
+    const tirada = siguienteAzar(e);
+    let acum = 0;
+    for (const [id, x] of Object.entries(L.especiales)) { acum += x.prob; if (tirada < acum) { especial = id; mult = x.mult; break; } }
+    requisitos = mezclar(e, Object.keys(L.requisitos)).slice(0, L.cuantosRequisitos);
+    if (siguienteAzar(e) < L.probGrandes) grande = GRANDES[Math.floor(siguienteAzar(e) * GRANDES.length)].nombre;
+  }
+  const precioRef = Math.round((L.precioRef * mult) / 1000) * 1000;
+  const talleres = mezclar(e, [...LICITACION.talleres]);
   const n = enteroEntre(e, L.rivales.min, L.rivales.max);
-  for (let i = 0; i < n; i++) rivales.push({ nombre: talleres[i], rep: Math.round(entre(e, L.rivales.repMin, L.rivales.repMax)), calidad: Math.round(entre(e, 40, 80)) });
-  for (const x of rivales) x.oferta = Math.round((L.precioRef * entre(e, L.rivales.ofertaMin, L.rivales.ofertaMax)) / 1000) * 1000;
+  for (let i = 0; i < n; i++) rivales.push({ nombre: talleres[i % talleres.length], rep: Math.round(entre(e, L.rivales.repMin, L.rivales.repMax)), calidad: Math.round(entre(e, 40, 80)) });
+  for (const x of rivales) {
+    // En la segunda, a veces la competencia ofrece apenas un 5% arriba del mínimo
+    const parte = segunda && siguienteAzar(e) < L.rivales.probAjustada ? L.rivales.ajustada : entre(e, L.rivales.ofertaMin, L.rivales.ofertaMax);
+    x.oferta = Math.round((precioRef * parte) / 1000) * 1000;
+  }
   const club = L.clubes[Math.floor(siguienteAzar(e) * L.clubes.length)];
-  e.licitacion.abierta = { semana: e.semana, club, rivales, oferta: null };
-  evento?.(`🏟️ ${club} abrió una licitación: ${L.combos} combos para dentro de un mes. Se ofertan el domingo.`, 'oportunidad');
+  e.licitacion.abierta = {
+    semana: e.semana, tipo, club, rivales, oferta: null, combos: L.combos, precioRef, costo: L.costo, sena: L.sena, plazo: L.plazo, multa: L.multa,
+    cobroSemanas: L.cobroSemanas || 0, requisitos, especial, grande, repGanada: L.repGanada, repIncompleta: L.repIncompleta,
+  };
+  const extraTxt = especial ? ` Pide ${L.especiales[especial].texto} y paga más.` : '';
+  const grandeTxt = grande ? ` Se presenta ${grande}: contra esa marca no hay con qué.` : '';
+  evento?.(`🏟️ ${club} abrió una licitación${segunda ? ' de segunda división' : ''}: ${L.combos} combos para dentro de un mes.${extraTxt}${grandeTxt} Se ofertan el domingo.`, 'oportunidad');
 }
 
 export function calidadLicitacion(e) {
@@ -2291,8 +2500,9 @@ export function ofertarLicitacion(e, precio) {
   const a = e.licitacion.abierta;
   if (!a || a.semana !== e.semana) return { ok: false, motivo: 'No hay ninguna licitación abierta.' };
   if (e.semanaEnCurso) return { ok: false, motivo: 'Se oferta el domingo.' };
-  if (!e.maquinas.calandra) return { ok: false, motivo: 'Para participar necesitás la calandra.' };
   if (precio === null) { a.oferta = null; return { ok: true }; }
+  const puede = puedeOfertarLicitacion(e);
+  if (!puede.ok) return puede;
   if (!(precio >= 10000)) return { ok: false, motivo: 'Poné un precio por combo.' };
   a.oferta = Math.round(precio / 1000) * 1000;
   return { ok: true, mensaje: `Ofertaste ${plata$(a.oferta)} por combo. El resultado sale al cerrar la semana.` };
@@ -2301,6 +2511,7 @@ export function ofertarLicitacion(e, precio) {
 function resolverLicitacion(e, r, evento) {
   const a = e.licitacion.abierta;
   e.licitacion.abierta = null;
+  if (a.grande) { evento(`La licitación de ${a.club} se la llevó ${a.grande}. Ni miraron las otras ofertas.`, a.oferta ? 'mala' : 'info'); return; }
   if (!a.oferta) { evento(`La licitación de ${a.club} se la llevó otro taller.`, 'info'); return; }
   const L = LICITACION;
   const todos = [...a.rivales, { nombre: nombreDelTaller(e), rep: e.rep, calidad: calidadLicitacion(e), oferta: a.oferta, vos: true }];
@@ -2308,11 +2519,14 @@ function resolverLicitacion(e, r, evento) {
   for (const x of todos) x.puntaje = L.pesos.precio * 100 * (min / x.oferta) + L.pesos.rep * x.rep + L.pesos.calidad * x.calidad;
   const ganador = todos.sort((x, y) => y.puntaje - x.puntaje)[0];
   if (!ganador.vos) { evento(`La licitación de ${a.club} la ganó ${ganador.nombre} con ${plata$(ganador.oferta)} por combo.`, 'mala'); return; }
-  const total = a.oferta * L.combos;
-  const sena = Math.round(total * L.sena);
+  const total = a.oferta * a.combos;
+  const sena = Math.round(total * a.sena);
   e.plata += sena; r.ingresos += sena;
-  e.licitacion.contrato = { club: a.club, combos: L.combos, precio: a.oferta, sena, vence: e.semana + L.plazo };
-  evento(`🏆 ¡Ganaste la licitación de ${a.club}! ${L.combos} combos a ${plata$(a.oferta)} cada uno. Te adelantaron ${plata$(sena)} de seña. Plazo: ${L.plazo} semanas.`, 'buena');
+  e.licitacion.contrato = {
+    club: a.club, tipo: a.tipo, combos: a.combos, precio: a.oferta, sena, vence: e.semana + a.plazo, costo: a.costo, multa: a.multa,
+    cobroSemanas: a.cobroSemanas, repGanada: a.repGanada, repIncompleta: a.repIncompleta,
+  };
+  evento(`🏆 ¡Ganaste la licitación de ${a.club}! ${a.combos} combos a ${plata$(a.oferta)} cada uno. Te adelantaron ${plata$(sena)} de seña (${Math.round(a.sena * 100)}%). Plazo: ${a.plazo} semanas.${a.cobroSemanas ? ` El resto lo pagan ${a.cobroSemanas} semanas después de entregar.` : ''}`, 'buena');
 }
 
 // El contrato se entrega cuando tenés todos los combos o al vencer (con multa por lo que falte).
@@ -2320,22 +2534,36 @@ function entregarLicitacion(e, r, evento, sumarRep) {
   const c = e.licitacion.contrato;
   if (!c) return;
   if (e.stock.combo < c.combos && e.semana < c.vence) return;
-  const L = LICITACION;
+  const costoRef = c.costo ?? LICITACION.costo;
+  const multaVeces = c.multa ?? LICITACION.multa;
   const entregados = Math.min(e.stock.combo, c.combos);
   const faltan = c.combos - entregados;
   e.stock.combo -= entregados;
+  // Los combos de segunda llevan telas de primera: la diferencia de insumo se paga al entregar
+  const extraInsumo = Math.max(0, costoRef - PRODUCTOS.combo.costo) * entregados;
+  if (extraInsumo) { e.plata -= extraInsumo; r.gastos += extraInsumo; }
   const saldo = entregados * c.precio - c.sena;
-  const multa = faltan * L.costo * L.multa;
-  e.plata += saldo - multa;
-  if (saldo >= 0) r.ingresos += saldo; else r.gastos -= saldo;
+  const multa = faltan * costoRef * multaVeces;
+  e.plata -= multa;
   r.gastos += multa;
-  e.licitacion.contrato = null;
-  if (!faltan) {
-    sumarRep(L.repGanada);
-    evento(`Entregaste los ${c.combos} combos de ${c.club}: cobraste ${plata$(saldo)} más (+${L.repGanada} de reputación).`, 'buena');
+  let textoCobro;
+  if (saldo >= 0 && c.cobroSemanas) {
+    e.cobros.push({ semana: e.semana + c.cobroSemanas, monto: saldo, cliente: c.club });
+    textoCobro = `te pagan ${plata$(saldo)} más en ${c.cobroSemanas} semanas`;
   } else {
-    e.rep = limitar(redondear(e.rep + L.repIncompleta), 0, 100);
-    evento(`Al vencer el plazo entregaste ${entregados} de ${c.combos} combos a ${c.club}. ${saldo >= 0 ? `Cobraste ${plata$(saldo)}` : `Devolviste ${plata$(-saldo)} de seña`} y pagaste ${plata$(multa)} de multa (${L.repIncompleta} de reputación).`, 'mala');
+    e.plata += saldo;
+    if (saldo >= 0) r.ingresos += saldo; else r.gastos -= saldo;
+    textoCobro = saldo >= 0 ? `cobraste ${plata$(saldo)} más` : `devolviste ${plata$(-saldo)} de seña`;
+  }
+  e.licitacion.contrato = null;
+  const ganada = c.repGanada ?? LICITACION.repGanada;
+  const incompleta = c.repIncompleta ?? LICITACION.repIncompleta;
+  if (!faltan) {
+    sumarRep(ganada);
+    evento(`Entregaste los ${c.combos} combos de ${c.club}: ${textoCobro}${extraInsumo ? ` (telas de primera: ${plata$(extraInsumo)})` : ''} (+${ganada} de reputación).`, 'buena');
+  } else {
+    sumarReputacion(e, incompleta);
+    evento(`Al vencer el plazo entregaste ${entregados} de ${c.combos} combos a ${c.club}: ${textoCobro} y pagaste ${plata$(multa)} de multa (${incompleta} de reputación).`, 'mala');
   }
 }
 
@@ -2402,6 +2630,662 @@ function vozDeAdentro(e, c, evento) {
   }
 }
 
+// =====================================================================
+// ---------- País: locales, logística, marcas, Topa y licitaciones de segunda ----------
+// =====================================================================
+
+const POB_TOTAL = Object.values(PROVINCIAS_AR).reduce((t, p) => t + p.pob, 0);
+
+// Origen del jugador (provincia y municipio), elegido al arrancar la partida.
+export function elegirOrigen(e, provincia, municipio) {
+  if (!PROVINCIAS_AR[provincia]) return { ok: false, motivo: 'Elegí una provincia.' };
+  const muni = String(municipio || '').trim().slice(0, 40);
+  if (!muni) return { ok: false, motivo: 'Escribí tu municipio o ciudad.' };
+  const antes = e.origen?.provincia;
+  e.origen = { provincia, municipio: muni };
+  // Si ya estás en el país y el local de origen todavía no vendió nada, se muda a la provincia nueva
+  const l = e.pais?.locales.find((x) => x.origen);
+  if (l && antes !== provincia && !l.vendidas && !e.pais.locales.some((x) => x.prov === provincia && !x.origen)) l.prov = provincia;
+  return { ok: true };
+}
+
+export function nombreCiudad(e) {
+  return e.origen?.municipio || 'tu ciudad';
+}
+
+// Parte del mercado de cada local: el de origen suma la base (1,5) y su provincia; el resto, su provincia.
+export function parteMercado(prov, origen = false) {
+  return (origen ? PAIS.mercadoBase : 0) + (PAIS.mercadoLocales * PROVINCIAS_AR[prov].pob) / POB_TOTAL;
+}
+
+// Pistas sin números sobre una provincia.
+export function pistaProvincia(prov) {
+  const pob = PROVINCIAS_AR[prov].pob;
+  const gente = pob >= 3000 ? 'un mar de gente' : pob >= 1400 ? 'mucha gente' : pob >= 700 ? 'gente como para un buen local' : 'poca gente';
+  const alq = pob >= 3000 ? 'el alquiler te va a doler' : pob >= 1400 ? 'el alquiler es caro' : pob >= 700 ? 'el alquiler es razonable' : 'el alquiler es accesible';
+  return `Hay ${gente} y ${alq}.`;
+}
+
+function maquinasDeReferencia() {
+  return Object.fromEntries(Object.keys(MAQUINAS).map((m) => [m, !MAQUINAS[m].desdePais]));
+}
+
+// Lo que pide un local por semana de un producto (sin azar).
+export function demandaLocal(e, l, idProducto, semana = e.semana, opciones = {}) {
+  const p = PRODUCTOS[idProducto];
+  const maquinas = opciones.maquinas || e.maquinas;
+  if (!maquinas[p.maquina] || p.soloPedido || !p.base) return 0;
+  const c = calendario(semana);
+  const temporada = p.temporada[c.estacion] ?? 1;
+  const especial = opciones.sinFecha ? 1 : multiplicadorFecha(semana, idProducto, Boolean(opciones.cyber));
+  const nacional = p.base * (1 + (PAIS.mercadoProvincia - 1) * p.sens) * (1 + VENTAS.extraMercadoLibre);
+  const rep = opciones.rep ?? l.rep;
+  const porRep = PAIS.repMinima + (1 - PAIS.repMinima) * (rep / 100);
+  return nacional * parteMercado(l.prov, l.origen) * porRep * temporada * especial * (opciones.sinEncargado ? 1 : factorVentaLocal(e, l));
+}
+
+// Lo que rinde el local según su encargado, Lelo y la publicidad nacional.
+export function factorVentaLocal(e, l) {
+  const enc = l.encargado;
+  if (!enc) return 0;
+  let f = ENCARGADO.variantes[enc.variante].rinde;
+  for (const r of enc.rasgos) {
+    if (r === 'vendedorNato') f *= 1.1;
+    if (r === 'siestas') f *= 0.9;
+    if (r === 'futbol') f *= 0.92;
+  }
+  if (e.leloComercial && e.pais?.lelo?.local === l.prov && e.equipo.empleados.some((x) => x.esLelo)) f *= 1 + LELO_COMERCIAL.clientes;
+  if (e.pais?.publicidadNacional && e.semana <= e.pais.publicidadNacional) f *= 1.2;
+  return f;
+}
+
+export function unidadesEsperadasLocal(e, l, opciones = {}) {
+  return Object.keys(PRODUCTOS).reduce((t, id) => t + demandaLocal(e, l, id, e.semana, { ...opciones, sinFecha: true }), 0);
+}
+
+// Alquiler: una parte de lo que factura el local por mes con 75 de reputación (con las máquinas de la provincia).
+export function alquilerProvincia(prov, origen = false) {
+  const l = { prov, origen, rep: PAIS.alquiler.repReferencia };
+  const fake = { maquinas: maquinasDeReferencia(), semana: 20 };
+  let semanal = 0;
+  for (const id of Object.keys(PRODUCTOS)) {
+    const p = PRODUCTOS[id];
+    if (p.soloPedido || !p.base || !fake.maquinas[p.maquina]) continue;
+    const nacional = p.base * (1 + (PAIS.mercadoProvincia - 1) * p.sens) * (1 + VENTAS.extraMercadoLibre);
+    const porRep = PAIS.repMinima + (1 - PAIS.repMinima) * (l.rep / 100);
+    semanal += nacional * parteMercado(prov, origen) * porRep * p.precio;
+  }
+  const mensual = semanal * 4.33;
+  return Math.max(PAIS.alquiler.minimo, Math.round((mensual * PAIS.alquiler.parte) / 10000) * 10000);
+}
+
+export function alquilerLocal(e, l) {
+  const base = alquilerProvincia(l.prov); // el de origen paga el alquiler de su provincia, aunque venda más
+  return l.encargado?.rasgos.includes('ahorrativo') ? Math.round((base * 0.85) / 1000) * 1000 : base;
+}
+
+export function costoAbrirLocal(e, prov) {
+  const alq = alquilerProvincia(prov);
+  const armado = alq * PAIS.armado;
+  const descuento = e.pais?.expansion && e.semana <= e.pais.expansion ? 0.5 : 1;
+  return { alquiler: alq, armado: Math.round(armado * descuento), total: Math.round(alq + armado * descuento), descuento: descuento < 1 };
+}
+
+export function provinciasLibres(e) {
+  const abiertas = new Set((e.pais?.locales || []).map((l) => l.prov));
+  return Object.keys(PROVINCIAS_AR).filter((p) => !abiertas.has(p));
+}
+
+export function sueldoEncargado(e, variante) {
+  return Math.round((ENCARGADO.variantes[variante].sueldo * e.equipo.mercado) / 1000) * 1000;
+}
+
+function crearEncargado(e, variante) {
+  const v = ENCARGADO.variantes[variante];
+  const buenos = mezclar(e, Object.keys(ENCARGADO.rasgos).filter((r) => ENCARGADO.rasgos[r].bueno)).slice(0, v.pros);
+  const malos = mezclar(e, Object.keys(ENCARGADO.rasgos).filter((r) => !ENCARGADO.rasgos[r].bueno)).slice(0, v.contras);
+  const usados = new Set((e.pais?.locales || []).map((l) => l.encargado?.nombre));
+  const libres = ENCARGADO.nombres.filter((n) => !usados.has(n));
+  const lista = libres.length ? libres : ENCARGADO.nombres;
+  return {
+    nombre: lista[Math.floor(siguienteAzar(e) * lista.length)], variante, rasgos: [...buenos, ...malos],
+    visible: tieneRRHH(e), sueldo: sueldoEncargado(e, variante), semanasMes: 0, desde: e.semana,
+  };
+}
+
+export function abrirLocal(e, prov, variante = 'junior') {
+  if (!enPais(e)) return { ok: false, motivo: 'Los locales se abren en el país.' };
+  if (e.semanaEnCurso) return { ok: false, motivo: 'Los locales se abren el domingo.' };
+  if (!PROVINCIAS_AR[prov]) return { ok: false, motivo: 'Esa provincia no existe.' };
+  if (!provinciasLibres(e).includes(prov)) return { ok: false, motivo: 'Ya tenés un local ahí.' };
+  if (!ENCARGADO.variantes[variante]) return { ok: false, motivo: 'Elegí un encargado.' };
+  const c = costoAbrirLocal(e, prov);
+  if (e.plata < c.total) return { ok: false, motivo: `Abrir el local cuesta ${plata$(c.total)} y tenés ${plata$(e.plata)}.` };
+  e.plata -= c.total;
+  e.finanzas.mesActual -= c.total;
+  let falla = false;
+  if (c.descuento && siguienteAzar(e) < 0.01) falla = true; // 1 de cada 100, la expansión inmediata sale mal
+  if (c.descuento) e.pais.expansion = null;
+  const l = { prov, rep: 0, abierto: e.semana, armado: c.armado, encargado: crearEncargado(e, variante), vendidas: 0, origen: false, semanasMes: 0 };
+  e.pais.locales.push(l);
+  recalcularRepPais(e);
+  const enc = l.encargado;
+  let mensaje = `¡Abriste el local de ${PROVINCIAS_AR[prov].nombre}! Pagaste ${plata$(c.total)} (alquiler del mes y armado). Queda a cargo ${enc.nombre} (${ENCARGADO.variantes[variante].nombre.toLowerCase()}, ${plata$(enc.sueldo)} por mes).`;
+  if (falla) {
+    const extra = Math.round(c.armado);
+    e.plata -= extra; e.finanzas.mesActual -= extra;
+    mensaje += ` Mala suerte: la empresa de la expansión inmediata se borró y hubo que pagar el armado completo (−${plata$(extra)}).`;
+  }
+  mensaje += enc.visible ? ` Recursos Humanos ya lo conoce: ${enc.rasgos.map((r) => ENCARGADO.rasgos[r].nombre.toLowerCase()).join(' y ') || 'sin nada para destacar'}.` : ' Cómo es lo vas a ver trabajando.';
+  return { ok: true, mensaje };
+}
+
+export function cambiarEncargado(e, prov, variante) {
+  const l = e.pais?.locales.find((x) => x.prov === prov);
+  if (!l) return { ok: false, motivo: 'No tenés local ahí.' };
+  if (e.semanaEnCurso) return { ok: false, motivo: 'Se cambia el domingo.' };
+  if (!ENCARGADO.variantes[variante]) return { ok: false, motivo: 'Elegí un encargado.' };
+  const viejo = l.encargado;
+  const costo = viejo ? Math.round(viejo.sueldo * EQUIPO.despido + (viejo.sueldo * viejo.semanasMes) / semanasDelMes(e.semana)) : 0;
+  e.plata -= costo; e.finanzas.mesActual -= costo;
+  l.encargado = crearEncargado(e, variante);
+  return { ok: true, mensaje: `${viejo ? `Despediste a ${viejo.nombre} (${plata$(costo)}). ` : ''}Ahora el local de ${PROVINCIAS_AR[prov].nombre} lo lleva ${l.encargado.nombre} (${ENCARGADO.variantes[variante].nombre.toLowerCase()}, ${plata$(l.encargado.sueldo)} por mes).` };
+}
+
+export function asignarLelo(e, prov) {
+  if (!e.leloComercial || !e.equipo.empleados.some((x) => x.esLelo)) return { ok: false, motivo: 'Lelo no trabaja con vos como gerente comercial.' };
+  if (!e.pais.locales.some((l) => l.prov === prov)) return { ok: false, motivo: 'No tenés local ahí.' };
+  if (e.semanaEnCurso) return { ok: false, motivo: 'Se decide el domingo.' };
+  const lel = e.pais.lelo;
+  if (lel.local === prov) return { ok: true };
+  if (lel.local && e.semana < lel.cambio + LELO_COMERCIAL.cambioCada) return { ok: false, motivo: `A Lelo lo podés cambiar de local una vez por mes (en ${lel.cambio + LELO_COMERCIAL.cambioCada - e.semana} semana(s)).` };
+  lel.local = prov;
+  lel.cambio = e.semana;
+  return { ok: true, mensaje: `Lelo se fue al local de ${PROVINCIAS_AR[prov].nombre}: ahí consigue un ${Math.round(LELO_COMERCIAL.clientes * 100)}% más de clientes y la reputación crece el triple.` };
+}
+
+export function elegirTransporte(e, id) {
+  if (!TRANSPORTE[id]?.nombre) return { ok: false, motivo: 'Ese transporte no existe.' };
+  e.pais.transporte = id;
+  return { ok: true };
+}
+
+export function cambiarDefensaPais(e, marca, activa) {
+  if (!enPais(e) || !DEFENSAS_PAIS[marca]) return { ok: false, motivo: 'Esa defensa no existe.' };
+  e.pais.defensas[marca] = Boolean(activa);
+  const d = DEFENSAS_PAIS[marca];
+  return { ok: true, mensaje: activa ? `Activaste ${d.nombre.toLowerCase()}${d.descuento ? '' : `: ${plata$(costoDefensaPais(e, marca))} por mes`}.` : `Diste de baja ${d.nombre.toLowerCase()}.` };
+}
+
+export function costoDefensaPais(e, marca) {
+  const d = DEFENSAS_PAIS[marca];
+  if (d.descuento) return 0;
+  return Math.max(d.minimo, Math.round((baseMazo(e) * d.parte) / 1000) * 1000);
+}
+
+function costoDefensasPais(e) {
+  return Object.keys(DEFENSAS_PAIS).filter((m) => e.pais.defensas[m]).reduce((t, m) => t + costoDefensaPais(e, m), 0);
+}
+
+export function gastosLocalesDelMes(e) {
+  if (!enPais(e) || !e.pais) return { alquileres: 0, encargados: 0, defensas: 0 };
+  return {
+    alquileres: e.pais.locales.reduce((t, l) => t + alquilerLocal(e, l), 0),
+    encargados: e.pais.locales.reduce((t, l) => t + (l.encargado?.sueldo || 0), 0),
+    defensas: costoDefensasPais(e),
+  };
+}
+
+// ---------- Arrancar el país ----------
+export function iniciarPais(e) {
+  e.meta = 'pais';
+  e.reconquista = false;
+  const prov = e.origen?.provincia && PROVINCIAS_AR[e.origen.provincia] ? e.origen.provincia : 'buenosAires';
+  e.pais = {
+    inicio: e.semana,
+    locales: [],
+    transporte: 'flete',
+    envios: [],
+    lelo: { local: prov, cambio: -99 },
+    topa: { rep: 0, visible: null, mesVisible: null, aviso99: false, aviso2: false },
+    ataque: null,
+    defensas: Object.fromEntries(Object.keys(DEFENSAS_PAIS).map((m) => [m, false])),
+    eventoProximo: e.semana + enteroEntre(e, EVENTOS_MARCA.cada.min, EVENTOS_MARCA.cada.max),
+    impulso: null, // { factor, hasta }
+    ofertaProxima: e.semana + enteroEntre(e, 6, 10),
+    oferta: null, // { id, hasta, precio }
+    publicidadNacional: null, expansion: null,
+    empresas: { belleza: e.semana + enteroEntre(e, 1, 3), merchandising: e.semana + enteroEntre(e, 3, 6), eventos: e.semana + enteroEntre(e, 2, 5) },
+    marcaFactor: 1,
+  };
+  const enc = crearEncargado(e, 'junior');
+  e.pais.locales.push({ prov, rep: 0, abierto: e.semana, armado: 0, encargado: enc, vendidas: 0, origen: true, semanasMes: 0 });
+  recalcularRepPais(e);
+  // Lelo pasa a ser gerente comercial de los locales
+  e.leloGerente = false;
+  const lelo = e.equipo.empleados.find((x) => x.esLelo);
+  e.leloComercial = Boolean(lelo);
+  if (lelo) lelo.sueldo = LELO_COMERCIAL.sueldo;
+  if (e.traicio) { e.traicio.sabotaje = null; e.traicio.robo = null; e.traicio.malDemanda = null; }
+  e.defensas = { proteccion: false, seguro: false };
+  e.licitacion.proximaSegunda = e.semana + enteroEntre(e, 3, 6);
+  if (!e.licitacion.proxima) e.licitacion.proxima = e.semana + enteroEntre(e, LICITACION.cada.min, LICITACION.cada.max);
+  planearAtaque(e);
+  e.pedirNombreSA = true;
+}
+
+// Si Topa te gana el país: vendés los locales y volvés a la provincia con 25. Vuelve Traicio.
+function perderPais(e, r, evento) {
+  let recupero = 0;
+  for (const l of e.pais.locales) recupero += Math.round((l.armado || alquilerProvincia(l.prov)) * PAIS.ventaLocal);
+  e.plata += recupero; r.ingresos += recupero;
+  const lelo = e.equipo.empleados.find((x) => x.esLelo);
+  if (lelo) lelo.sueldo = LELO_EMPLEADO.sueldo;
+  e.leloComercial = false;
+  e.leloGerente = false;
+  e.pais = null;
+  e.mejorDeLaProvincia = false;
+  e.pedidosEmpresa = e.pedidosEmpresa.filter((p) => EMPRESAS[p.tipo]);
+  e.licitacion.abierta = null;
+  e.licitacion.proximaSegunda = null;
+  iniciarProvincia(e, true);
+  e.rep = PAIS.repAlPerder;
+  e.traicio.rep = PAIS.repTraicioVuelve;
+  r.hito = 'perdistePais';
+  r.recupero = recupero;
+  evento(`${TOPA.nombre} llegó a 100: es la marca del país. Tuviste que vender los locales (recuperaste ${plata$(recupero)}) y volvés a pelear la provincia con ${PAIS.repAlPerder} de reputación.`, 'hito');
+  evento(`🗡️ ${TRAICIO_TEXTOS.vuelta}`, 'desastre');
+}
+
+function ganarPais(e, r, evento) {
+  e.mejorDelPais = true;
+  e.rep = 100;
+  for (const l of e.pais.locales) l.rep = 100;
+  e.pais.ataque = null;
+  r.hito = 'mejorDelPais';
+  evento(`¡${nombreDelTaller(e)} es la marca del país! ${TOPA.nombre} tuvo que conformarse con el segundo puesto.`, 'hito');
+}
+
+// ---------- Pedidos de los locales (domingo a sábado) ----------
+// Cada local junta pedidos durante la semana: se producen el sábado y se mandan; llegan la semana que viene.
+function pedidosDeLocales(e, pub, enDia, evento, diaAlAzar) {
+  const pedidos = [];
+  let n = 0;
+  const horasMarca = pub.horasMarca || 0;
+  e.pais.marcaFactor = 1 + PAIS.marca.extra * Math.min(1, horasMarca / PAIS.marca.horasCompletas);
+  const ids = Object.keys(PRODUCTOS);
+  for (const l of e.pais.locales) {
+    if (!l.encargado) continue;
+    const enc = l.encargado;
+    const pierde = ENCARGADO.variantes[enc.variante].pierde;
+    const resumen = {};
+    let perdidos = 0;
+    for (const id of ids) {
+      const esperado = demandaLocal(e, l, id, e.semana, { cyber: Boolean(pub.cyber) });
+      if (!esperado) continue;
+      let cant = Math.max(0, Math.round(esperado * entre(e, 0.85, 1.15)));
+      if (pierde && cant > 0) {
+        const p = Math.round(cant * pierde * entre(e, 0, 2));
+        perdidos += p;
+        cant -= p;
+      }
+      if (cant <= 0) continue;
+      resumen[id] = cant;
+      pedidos.push({ id: `p${e.semana}-${++n}`, producto: id, cantidad: cant, cliente: `el local de ${PROVINCIAS_AR[l.prov].nombre}`, local: l.prov, rechazado: false, dia: 6, pais: true });
+    }
+    const total = Object.values(resumen).reduce((a, b) => a + b, 0);
+    const dia = diaAlAzar();
+    if (total) enDia(dia, `🏪 Local de ${PROVINCIAS_AR[l.prov].nombre}: ${total} pedido${total === 1 ? '' : 's'} (${describirUnidades(resumen)}).`, 'pedido');
+    else enDia(dia, `🏪 Local de ${PROVINCIAS_AR[l.prov].nombre}: semana flojita, sin pedidos.`, 'info');
+    if (perdidos) enDia(Math.min(6, dia + 1), `🤦 ${enc.nombre}, del local de ${PROVINCIAS_AR[l.prov].nombre}, perdió ${perdidos} pedido${perdidos === 1 ? '' : 's'} (anotados en una servilleta).`, 'mala');
+  }
+  if (horasMarca > 0) enDia(0, `📣 Publicidad de marca desde el taller: ${String(redondear(horasMarca, 1)).replace('.', ',')} h. Ayuda a que los locales ganen reputación más rápido.`, 'buena');
+  else evento('Sin publicidad de marca: los locales crecen más despacio.', 'info');
+  return pedidos;
+}
+
+// Ofertas especiales de la semana: clubes de barrio y empresas, con un tope de 3 en todo el país.
+function ofertasEspecialesPais(e, enDia, evento) {
+  const candidatos = [];
+  for (const tipo of ['catering', 'colectivos']) if (e.empresas.proximo[tipo] && e.semana >= e.empresas.proximo[tipo]) candidatos.push({ tipo });
+  for (const tipo of ['belleza', 'merchandising', 'eventos']) if (e.pais.empresas[tipo] && e.semana >= e.pais.empresas[tipo]) candidatos.push({ tipo });
+  for (const l of e.pais.locales) {
+    if (l.encargado && siguienteAzar(e) < CLUBES_BARRIO.probPorLocal) candidatos.push({ tipo: 'club', local: l.prov });
+    if (l.encargado?.rasgos.includes('puntual') && siguienteAzar(e) < EMPRESAS_PAIS.probPuntual) {
+      const t = ['belleza', 'merchandising', 'eventos'][Math.floor(siguienteAzar(e) * 3)];
+      candidatos.push({ tipo: t, extra: true });
+    }
+  }
+  const elegidos = mezclar(e, candidatos).slice(0, PAIS.topeEspeciales);
+  for (const c of elegidos) {
+    if (c.tipo === 'club') nuevaOfertaClub(e, c.local, enDia);
+    else nuevaOfertaEmpresa(e, c.tipo, enDia, evento, c.extra);
+  }
+}
+
+function nuevaOfertaClub(e, prov, enDia) {
+  const C = CLUBES_BARRIO;
+  const deportivo = presentes(e, 'disenador').some((x) => x.variante === 'deportivo');
+  const nombre = `${C.nombres[Math.floor(siguienteAzar(e) * C.nombres.length)]} (${PROVINCIAS_AR[prov].nombre})`;
+  const escudo = e.maquinas.bordado && siguienteAzar(e) < C.probEscudo;
+  const producto = escudo ? 'camisetaEscudo' : 'camisetaBarrio';
+  const cant = enteroEntre(e, C.min, C.max);
+  const diseno = siguienteAzar(e) < (deportivo ? PUESTOS.disenador.variantes.deportivo.probDiseno : C.diseno.prob);
+  const precio = Math.round(cant * PRODUCTOS[producto].precio * (diseno ? 1 + C.diseno.recargo : 1));
+  e.pedidosEmpresa.push({
+    id: `club${e.semana}-${prov}`, tipo: 'club', cliente: nombre, items: { [producto]: cant }, precio, vence: e.semana + C.plazo, cobro: C.cobroSemanas,
+    estado: 'oferta', tercerizar: false, factorTerc: redondear(entre(e, TERCERIZAR.min, TERCERIZAR.max), 3), fijo: false, diseno, local: prov,
+  });
+  enDia(1 + Math.floor(siguienteAzar(e) * 4), `⚽ ${nombre} te encargó ${cant} ${nombreUnidades(producto, cant)}${diseno ? ' con su escudo y diseño propio 🎨' : ''} para dentro de ${C.plazo} semanas.`, 'oportunidad');
+}
+
+// ---------- Traslado y llegada a los locales ----------
+export function costoTraslado(e, valor, prov, transporte = e.pais?.transporte) {
+  const l = e.pais.locales.find((x) => x.prov === prov);
+  if (!l || l.origen) return 0;
+  return Math.round(valor * TRANSPORTE[transporte].parte);
+}
+
+// Reputación que suma cada unidad entregada en un local: lo que gana por semana, repartido en lo que vende.
+export function repPorUnidadLocal(e, l) {
+  const esperadas = Math.max(1, unidadesEsperadasLocal(e, l));
+  const red = 1 + PAIS.redPorLocal * (e.pais.locales.length - 1);
+  const impulso = e.pais.impulso && e.semana <= e.pais.impulso.hasta ? e.pais.impulso.factor : 1;
+  const lelo = e.leloComercial && e.pais.lelo?.local === l.prov && e.equipo.empleados.some((x) => x.esLelo) ? LELO_COMERCIAL.rep : 1;
+  const conocido = l.encargado?.rasgos.includes('conocido') ? 1.3 : 1;
+  return (PAIS.repSemanal * red * (e.pais.marcaFactor || 1) * impulso * lelo * conocido) / esperadas;
+}
+
+function moverRepLocal(e, l, d) {
+  l.rep = limitar(redondear(l.rep + d, 3), 0, 100);
+}
+
+// Mandás lo que entregás esta semana: llega a cada local la semana que viene.
+function enviarALocal(e, r, p, precio, transporte) {
+  const l = e.pais.locales.find((x) => x.prov === p.local);
+  if (!l) return;
+  const costo = costoTraslado(e, precio, p.local, transporte);
+  if (costo) { e.plata -= costo; r.gastos += costo; r.traslado = (r.traslado || 0) + costo; }
+  // Amigo de los proveedores: el insumo de lo que vende ese local sale un 10% menos
+  if (l.encargado?.rasgos.includes('proveedores')) {
+    const ahorro = Math.round(PRODUCTOS[p.producto].costo * p.cantidad * 0.1);
+    e.plata += ahorro; r.gastos -= ahorro;
+  }
+  let envio = e.pais.envios.find((x) => x.local === p.local && x.llega === e.semana + 1);
+  if (!envio) { envio = { local: p.local, llega: e.semana + 1, items: {}, valor: 0, transporte: l.origen ? null : transporte }; e.pais.envios.push(envio); }
+  envio.items[p.producto] = (envio.items[p.producto] || 0) + p.cantidad;
+  envio.valor += precio;
+}
+
+function llegadaEnvios(e, r, evento) {
+  const llegan = e.pais.envios.filter((x) => x.llega <= e.semana);
+  e.pais.envios = e.pais.envios.filter((x) => x.llega > e.semana);
+  let cobrado = 0;
+  let perdidasTotales = 0;
+  for (const env of llegan) {
+    const l = e.pais.locales.find((x) => x.prov === env.local);
+    if (!l) continue;
+    const nombre = PROVINCIAS_AR[env.local].nombre;
+    let parte = 1; // lo que llega
+    if (env.transporte) {
+      const t = TRANSPORTE[env.transporte];
+      if (siguienteAzar(e) < t.falla) {
+        const total = siguienteAzar(e) < t.total;
+        parte = total ? 0 : 1 - entre(e, TRANSPORTE.parcial.min, TRANSPORTE.parcial.max);
+      }
+    }
+    const unidades = Object.values(env.items).reduce((a, b) => a + b, 0);
+    const llegaron = {};
+    const perdidas = {};
+    if (parte < 1) {
+      // Se pierden unidades al azar de lo que iba
+      const lista = [];
+      for (const [id, n] of Object.entries(env.items)) for (let i = 0; i < n; i++) lista.push(id);
+      mezclar(e, lista);
+      const pierde = parte === 0 ? lista.length : Math.max(1, Math.round(lista.length * (1 - parte)));
+      lista.forEach((id, i) => { if (i < pierde) perdidas[id] = (perdidas[id] || 0) + 1; else llegaron[id] = (llegaron[id] || 0) + 1; });
+    } else Object.assign(llegaron, env.items);
+    const nLlegaron = Object.values(llegaron).reduce((a, b) => a + b, 0);
+    const nPerdidas = unidades - nLlegaron;
+    // Se cobra lo que llegó (proporcional al valor), con la defensa "precio de batalla" para los simples
+    let ingreso = Math.round(env.valor * (nLlegaron / Math.max(1, unidades)));
+    if (e.pais.defensas.remeraFeliz) {
+      const simples = PRODUCTOS_SIMPLES.reduce((t, id) => t + (llegaron[id] || 0) * PRODUCTOS[id].precio, 0);
+      ingreso -= Math.round(simples * DEFENSAS_PAIS.remeraFeliz.descuento);
+    }
+    if (l.encargado?.rasgos.includes('manosLargas')) {
+      const robo = Math.round(ingreso * 0.05);
+      ingreso -= robo;
+      r.manosLargas = (r.manosLargas || 0) + robo;
+    }
+    e.plata += ingreso; r.ingresos += ingreso; cobrado += ingreso;
+    l.vendidas += nLlegaron;
+    e.totales.vendidas += nLlegaron;
+    const gu = repPorUnidadLocal(e, l);
+    moverRepLocal(e, l, gu * nLlegaron + gu * PAIS.noEntregado * nPerdidas);
+    if (nPerdidas) {
+      perdidasTotales += nPerdidas;
+      const plantilla = parte === 0
+        ? TRANSPORTE.textosTotal[Math.floor(siguienteAzar(e) * TRANSPORTE.textosTotal.length)]
+        : TRANSPORTE.textosParcial[Math.floor(siguienteAzar(e) * TRANSPORTE.textosParcial.length)];
+      evento(`🚚 ${plantilla.replace('{local}', nombre).replace('{u}', describirUnidades(perdidas))} Lo que no llegó cuenta como no entregado en ese local.`, parte === 0 ? 'desastre' : 'mala');
+    }
+  }
+  if (cobrado) r.lineas.push(`Los locales cobraron ${plata$(cobrado)} por lo que llegó esta semana.`);
+  if (r.manosLargas) evento(`Al hacer la caja de los locales faltaron ${plata$(r.manosLargas)}. Alguien tiene manos largas...`, 'mala');
+  return perdidasTotales;
+}
+
+// Mercadería en camino (para mostrar).
+export function enCamino(e) {
+  return (e.pais?.envios || []).reduce((t, x) => t + Object.values(x.items).reduce((a, b) => a + b, 0), 0);
+}
+
+// ---------- Topa, las marcas e InfoArg ----------
+function semanasEnPais(e) {
+  return e.semana - e.pais.inicio + 1;
+}
+
+function avanzarTopa(e, evento) {
+  const t = e.pais.topa;
+  const s = semanasEnPais(e);
+  let objetivo;
+  if (s >= TOPA.llega100) objetivo = 100;
+  else if (s >= TOPA.llega99) objetivo = 99;
+  else objetivo = Math.min(98.9, (99 * s) / TOPA.llega99 + TOPA.ruido * (siguienteAzar(e) * 2 - 1));
+  t.rep = redondear(Math.max(t.rep, objetivo), 1);
+  if (t.rep >= 99 && !t.aviso99) {
+    t.aviso99 = true;
+    t.visible = 99;
+    evento(`📰 InfoArg, en tapa: "${TOPA.nombre} ya huele el título: tiene 99 puntos y en dos meses sería la marca del país."`, 'desastre');
+  } else if (t.aviso99 && !t.aviso2 && s >= TOPA.llega99 + 4) {
+    t.aviso2 = true;
+    evento(`📰 InfoArg: "A ${TOPA.nombre} le falta nada: un mes y es la marca del país."`, 'desastre');
+  }
+}
+
+function planearAtaque(e, desde = e.semana) {
+  const marcas = Object.keys(MARCAS);
+  const marca = marcas[Math.floor(siguienteAzar(e) * marcas.length)];
+  const anuncio = desde + enteroEntre(e, ATAQUES_PAIS.cada.min, ATAQUES_PAIS.cada.max);
+  const d = MARCAS[marca].demora;
+  e.pais.ataque = { marca, anuncio, semana: anuncio + enteroEntre(e, d.min, d.max), anunciado: false };
+}
+
+function ejecutarAtaque(e, evento) {
+  const a = e.pais.ataque;
+  const m = MARCAS[a.marca];
+  const objetivos = e.pais.locales.filter((l) => l.rep > 0);
+  planearAtaque(e);
+  if (!objetivos.length) return;
+  const pesos = objetivos.map((l) => (l.encargado?.rasgos.includes('buchon') ? ATAQUES_PAIS.pesoBuchon : 1));
+  let tirada = siguienteAzar(e) * pesos.reduce((x, y) => x + y, 0);
+  let l = objetivos[0];
+  for (let i = 0; i < objetivos.length; i++) { tirada -= pesos[i]; if (tirada <= 0) { l = objetivos[i]; break; } }
+  const defensa = e.pais.defensas[a.marca];
+  const parte = ATAQUES_PAIS.dano * (defensa ? ATAQUES_PAIS.conDefensa : 1);
+  const d = -l.rep * parte;
+  moverRepLocal(e, l, d);
+  const texto = m.ataque.replace('{local}', PROVINCIAS_AR[l.prov].nombre);
+  evento(`💥 ${texto} El local perdió ${String(Math.abs(redondear(d, 1))).replace('.', ',')} de reputación${defensa ? ` (tu ${DEFENSAS_PAIS[a.marca].nombre.toLowerCase()} frenó la mitad)` : ''}.`, 'desastre');
+}
+
+function infoArgMensual(e, c, evento) {
+  const t = e.pais.topa;
+  t.visible = Math.round(Math.min(t.rep, 99));
+  t.mesVisible = c.nombreMes;
+  const chisme = INFOARG[Math.floor(siguienteAzar(e) * INFOARG.length)];
+  evento(`📰 InfoArg: "${TOPA.nombre} ya tiene ${t.visible} de reputación en el país." Además: ${chisme}`, 'info');
+}
+
+// ---------- Eventos de marca y ofertas esporádicas ----------
+function sacarEventoMarca(e, evento) {
+  const ev = EVENTOS_MARCA.lista[Math.floor(siguienteAzar(e) * EVENTOS_MARCA.lista.length)];
+  e.pais.eventoProximo = e.semana + enteroEntre(e, EVENTOS_MARCA.cada.min, EVENTOS_MARCA.cada.max);
+  e.decisiones.push({ id: ev.id, texto: ev.texto, monto: baseMazo(e) });
+  evento(`🌟 ${ev.texto} Lo decidís el domingo.`, 'oportunidad');
+}
+
+function impulsar(e, semanas) {
+  const hasta = e.semana + semanas - 1;
+  e.pais.impulso = { factor: EVENTOS_MARCA.impulso, hasta: Math.max(hasta, e.pais.impulso?.hasta || 0) };
+}
+
+// Resuelve un evento de marca (lo llama resolverDecision).
+function resolverEventoMarca(e, d, opcion) {
+  const gastar = (m) => { m = Math.round(m / 1000) * 1000; e.plata -= m; e.finanzas.mesActual -= m; return m; };
+  const todos = (x) => { for (const l of e.pais.locales) moverRepLocal(e, l, x); recalcularRepPais(e); };
+  const base = d.monto || baseMazo(e);
+  switch (`${d.id}.${opcion}`) {
+    case 'diez.aprovecha': { const m = gastar(base * 0.2); todos(3); impulsar(e, 4); return `Saliste con todo: campaña nacional (−${plata$(m)}). +3 de reputación en todos los locales y van a crecer al triple 4 semanas.`; }
+    case 'diez.nada': todos(1); return 'Dejaste que pase solo: igual sumaste +1 en todos los locales.';
+    case 'comedor.dona': {
+      const meta = base * 0.1;
+      let valor = 0;
+      const donado = {};
+      while (valor < meta) { const id = venderUnaDelStock(e); if (!id) break; valor += PRODUCTOS[id].costo; donado[id] = (donado[id] || 0) + 1; }
+      const plataPuesta = valor < meta ? gastar(meta - valor) : 0;
+      todos(2); impulsar(e, 3);
+      return `Donaste ${describirUnidades(donado) || 'productos'}${plataPuesta ? ` y pusiste ${plata$(plataPuesta)}` : ''}. Los chicos felices: +2 en todos los locales y crecen al triple 3 semanas.`;
+    }
+    case 'maraton.participa': { const m = gastar(base * 0.15); e.horasPerdidas += 6; todos(2.5); impulsar(e, 4); return `Fuiste sponsor de la maratón (−${plata$(m)} y 6 h): +2,5 en todos los locales y crecen al triple 4 semanas.`; }
+    case 'streamer.paga': { const m = gastar(base * 0.25); todos(2); impulsar(e, 6); return `La streamer mostró tu marca toda la semana (−${plata$(m)}): +2 en todos los locales y crecen al triple 6 semanas.`; }
+    case 'tele.nota': { const m = gastar(base * 0.05); e.horasPerdidas += 6; todos(2); impulsar(e, 3); return `Saliste en la tele (−${plata$(m)} y 6 h ordenando todo): +2 en todos los locales y crecen al triple 3 semanas.`; }
+    case 'comedor.no': case 'maraton.no': case 'streamer.no': case 'tele.no': return 'Lo dejaste pasar.';
+    default: return null;
+  }
+}
+
+// Ofertas esporádicas (en amarillo): campaña de lanzamiento, publicidad nacional y expansión inmediata.
+const OFERTAS_PAIS = {
+  lanzamiento: { nombre: 'Campaña de lanzamiento', detalle: '+20 de reputación de golpe en el local que elijas.', parte: 0.3 },
+  publicidad: { nombre: 'Publicidad nacional', detalle: 'Todos los locales venden un 20% más durante 4 semanas.', parte: 0.4 },
+  expansion: { nombre: 'Expansión inmediata', detalle: 'El próximo local que abras en las próximas 4 semanas paga la mitad del armado.', parte: 0 },
+};
+export { OFERTAS_PAIS };
+
+function sacarOfertaPais(e, evento) {
+  const ids = Object.keys(OFERTAS_PAIS);
+  const id = ids[Math.floor(siguienteAzar(e) * ids.length)];
+  e.pais.ofertaProxima = e.semana + enteroEntre(e, 8, 12);
+  const precio = Math.max(100000, Math.round((baseMazo(e) * OFERTAS_PAIS[id].parte) / 10000) * 10000);
+  e.pais.oferta = { id, hasta: e.semana + 2, precio: id === 'expansion' ? 0 : precio };
+  evento(`💡 Te ofrecen: ${OFERTAS_PAIS[id].nombre}. ${OFERTAS_PAIS[id].detalle} Está disponible 2 domingos.`, 'oportunidad');
+}
+
+export function ofertaPaisVigente(e) {
+  const o = e.pais?.oferta;
+  return o && e.semana <= o.hasta ? { ...o, ...OFERTAS_PAIS[o.id] } : null;
+}
+
+export function tomarOfertaPais(e, prov) {
+  const o = ofertaPaisVigente(e);
+  if (!o) return { ok: false, motivo: 'No hay ninguna oferta vigente.' };
+  if (e.semanaEnCurso) return { ok: false, motivo: 'Se decide el domingo.' };
+  if (o.precio > e.plata) return { ok: false, motivo: `Cuesta ${plata$(o.precio)} y tenés ${plata$(e.plata)}.` };
+  const l = o.id === 'lanzamiento' ? e.pais.locales.find((x) => x.prov === prov) : null;
+  if (o.id === 'lanzamiento' && !l) return { ok: false, motivo: 'Elegí el local.' };
+  e.plata -= o.precio; e.finanzas.mesActual -= o.precio;
+  e.pais.oferta = null;
+  if (o.id !== 'expansion' && siguienteAzar(e) < 0.01) return { ok: true, mensaje: `Pagaste ${plata$(o.precio)}... y la agencia desapareció con la plata. Una vez en cien pasa.` };
+  if (o.id === 'lanzamiento') { moverRepLocal(e, l, 20); recalcularRepPais(e); return { ok: true, mensaje: `Campaña de lanzamiento en ${PROVINCIAS_AR[l.prov].nombre} (${plata$(o.precio)}): +20 de reputación en ese local.` }; }
+  if (o.id === 'publicidad') { e.pais.publicidadNacional = e.semana + 3; return { ok: true, mensaje: `Publicidad nacional (${plata$(o.precio)}): todos los locales venden un 20% más durante 4 semanas.` }; }
+  e.pais.expansion = e.semana + 3;
+  return { ok: true, mensaje: 'Expansión inmediata: el próximo local que abras en 4 semanas paga la mitad del armado.' };
+}
+
+// ---------- La semana del país (al cerrar) ----------
+function semanaDelPais(e, r, evento) {
+  if (e.mejorDelPais) return;
+  avanzarTopa(e, evento);
+  const a = e.pais.ataque;
+  if (a && !a.anunciado && e.semana >= a.anuncio) {
+    a.anunciado = true;
+    evento(`📰 InfoArg: "${MARCAS[a.marca].anuncio}"`, 'rumor');
+  }
+  if (a && e.semana >= a.semana) ejecutarAtaque(e, evento);
+  if (e.semana >= e.pais.eventoProximo) sacarEventoMarca(e, evento);
+  if (e.semana >= e.pais.ofertaProxima && !ofertaPaisVigente(e)) sacarOfertaPais(e, evento);
+  // Encargados: se les conoce el carácter después de una semana
+  for (const l of e.pais.locales) {
+    const enc = l.encargado;
+    if (!enc) continue;
+    enc.semanasMes++;
+    if (!enc.visible && e.semana > enc.desde) {
+      enc.visible = true;
+      const rs = enc.rasgos.map((x) => ENCARGADO.rasgos[x]);
+      evento(`Ya conocés a ${enc.nombre}, del local de ${PROVINCIAS_AR[l.prov].nombre}: ${rs.length ? rs.map((x) => `${x.nombre.toLowerCase()} (${x.efecto})`).join('; ') : 'ni fu ni fa'}.`, rs.some((x) => !x.bueno) ? 'mala' : 'buena');
+    }
+  }
+}
+
+function cierreDeMesPais(e, c, r, evento) {
+  const g = gastosLocalesDelMes(e);
+  const total = g.alquileres + g.encargados + g.defensas;
+  e.plata -= total; r.gastos += total; e.finanzas.mesActual -= total;
+  evento(`Locales: pagaste ${plata$(g.alquileres)} de alquileres y ${plata$(g.encargados)} de encargados${g.defensas ? `, más ${plata$(g.defensas)} de defensas` : ''}.`);
+  for (const l of e.pais.locales) {
+    if (l.encargado) l.encargado.semanasMes = 0;
+    if (l.encargado?.rasgos.includes('peleador')) {
+      moverRepLocal(e, l, -1);
+      if (l.encargado.visible) evento(`${l.encargado.nombre} se volvió a pelear con un cliente en ${PROVINCIAS_AR[l.prov].nombre}: −1 de reputación en ese local.`, 'mala');
+    }
+  }
+  recalcularRepPais(e);
+  if (!e.mejorDelPais) infoArgMensual(e, c, evento);
+}
+
+// ---------- Licitación de segunda: requisitos ----------
+export function cumpleRequisito(e, id) {
+  const tiene = (v) => presentes(e, 'disenador').some((x) => x.variante === v) || e.equipo.empleados.some((x) => x.puesto === 'disenador' && x.variante === v);
+  const provs = new Set((e.pais?.locales || []).map((l) => l.prov));
+  switch (id) {
+    case 'deportivo': return tiene('deportivo');
+    case 'textil': return tiene('textil');
+    case 'locales': return provs.size >= 5;
+    case 'grandes': return ['buenosAires', 'cordoba', 'santaFe'].every((p) => provs.has(p));
+    case 'rep': return e.rep >= 30;
+    case 'fijos': return Object.values(e.empresas.clientes).filter((x) => x.fijo).length >= 3;
+    default: return false;
+  }
+}
+
+export function puedeOfertarLicitacion(e) {
+  const a = e.licitacion.abierta;
+  if (!a) return { ok: false, motivo: 'No hay ninguna licitación abierta.' };
+  if (!e.maquinas.calandra) return { ok: false, motivo: 'Para participar necesitás la calandra.' };
+  if (e.licitacion.contrato) return { ok: false, motivo: 'Todavía estás con otro contrato.' };
+  if (a.tipo === 'segunda') {
+    const faltan = a.requisitos.filter((id) => !cumpleRequisito(e, id));
+    if (faltan.length) return { ok: false, motivo: `Te falta: ${faltan.map((id) => LICITACION_SEGUNDA.requisitos[id].toLowerCase()).join('; ')}.` };
+    if (a.especial) {
+      const sin = LICITACION_SEGUNDA.especiales[a.especial].requiere.filter((m) => !e.maquinas[m]);
+      if (sin.length) return { ok: false, motivo: `Pide ${LICITACION_SEGUNDA.especiales[a.especial].texto}: necesitás la ${sin.map((m) => MAQUINAS[m].nombre.toLowerCase()).join(' y la ')}.` };
+    }
+  }
+  return { ok: true };
+}
+
 export function fmt(n) {
   return Math.round(n).toLocaleString('es-AR');
 }
@@ -2409,5 +3293,6 @@ export function fmt(n) {
 export {
   HORAS_POR_SEMANA, PRODUCTOS, MAQUINAS, CURSOS, VENTAS, PRESTAMO, TUTORIAL, PROMO, CANSANCIO, PUESTOS, RASGOS, EQUIPO, CAPACITACION,
   MAZO, LOCALES, VOLANTES, SERVICIOS, CYBER, TRAICIO, LELO_VIAJE, PROVINCIA, LELO_GERENTE, DEFENSAS, SEGURIDAD, EMPRESAS, LICITACION, TERCERIZAR,
-  LELO_EMPLEADO, ABUELA,
+  LELO_EMPLEADO, ABUELA, RRHH, PROVINCIAS_AR, PAIS, ENCARGADO, TRANSPORTE, LELO_COMERCIAL, TOPA, MARCAS, DEFENSAS_PAIS, GRANDES,
+  EMPRESAS_PAIS, CLUBES_BARRIO, LICITACION_SEGUNDA, EVENTOS_MARCA, TRAICIO_TEXTOS,
 };

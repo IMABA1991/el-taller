@@ -14,6 +14,12 @@ export const IMAGENES = {
   gorra: { archivo: '', emoji: '🧢', texto: 'Gorra' },
   feria: { archivo: '', emoji: '🛍️', texto: 'Feria' },
   calendario: { archivo: '', emoji: '📅', texto: 'Fecha especial' },
+  disenador: { archivo: '', emoji: '🎨', texto: 'Diseñador' },
+  costurero: { archivo: '', emoji: '🧵', texto: 'Costurero' },
+  bordador: { archivo: '', emoji: '🪡', texto: 'Bordador' },
+  rrhh: { archivo: '', emoji: '🗂️', texto: 'Recursos Humanos' },
+  encargado: { archivo: '', emoji: '🏪', texto: 'Encargado de local' },
+  infoarg: { archivo: '', emoji: '📰', texto: 'InfoArg' },
 };
 
 const CARPETA = 'assets/img/';

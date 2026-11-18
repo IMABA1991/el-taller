@@ -222,3 +222,16 @@ button.chico.peligro { color: var(--mal); border-color: #efc2bc; }
 /* Elegir qué pedidos tercerizar */
 .marcar { display: flex; align-items: center; gap: 6px; font-size: 0.85rem; white-space: nowrap; }
 .marcar input { width: 22px; height: 22px; }
+
+/* ---------- País ---------- */
+.campo { display: block; margin: 8px 0; }
+.campo > span { display: block; font-weight: 700; margin-bottom: 4px; }
+.campo select, .campo input[type="text"], select.selector { width: 100%; padding: 10px; font-size: 1rem; border-radius: 10px; border: 1px solid var(--borde); background: var(--tarjeta); color: var(--texto); }
+.local { padding: 10px 0; border-top: 1px solid var(--borde); }
+.local:first-of-type { border-top: 0; }
+.local .cabeza-local { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.local .barra { margin: 6px 0 4px; }
+.requisito { margin: 2px 0; }
+.requisito.si::before { content: '✔ '; color: var(--bien); }
+.requisito.no::before { content: '✖ '; color: var(--mal); }
+.grupo-local { font-weight: 700; margin: 10px 0 2px; font-size: 0.9rem; color: var(--suave); }
