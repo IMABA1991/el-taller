@@ -14,7 +14,7 @@ export const IMAGENES = {
   tazaCeramica: { archivo: 'taza-ceramica.png', emoji: '☕', texto: 'Taza de cerámica' },
   tazaPlastico: { archivo: 'taza-plastico.png', emoji: '🥤', texto: 'Taza de plástico' },
   gorra: { archivo: 'gorra.png', emoji: '🧢', texto: 'Gorra' },
-  feria: { archivo: '', emoji: '🛍️', texto: 'Feria' },
+  feria: { archivo: 'feria.png', emoji: '🛍️', texto: 'Feria' },
   calendario: { archivo: 'calendario.png', emoji: '📅', texto: 'Fecha especial' },
   disenador: { archivo: 'disenador.png', emoji: '🎨', texto: 'Diseñador' },
   costurero: { archivo: 'costurero.png', emoji: '🧵', texto: 'Costurero' },

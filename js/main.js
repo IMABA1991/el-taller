@@ -864,7 +864,7 @@ function pantallaPublicidad() {
     </div>
 
     ${enPais(e) ? '' : `<div class="tarjeta sec-feria">
-      <h2>Feria del domingo</h2>
+      <div class="con-avatar" style="align-items:center">${imagen('feria', 'avatar mini')}<h2 style="margin:0">Feria del domingo</h2></div>
       <label class="interruptor" style="border-top:0">
         <span><strong>Ir a la feria</strong><br><span class="suave">Mesa ${plata(VENTAS.feria.costoMesa)} · ${VENTAS.feria.horas} h · vendés lo que te sobró de stock (${stockTotal(e) ? `tenés ${stockTotal(e)}` : 'hoy no tenés nada'}). En la feria siempre pasa algo.</span></span>
         <input type="checkbox" id="feria" ${pub.feria ? 'checked' : ''} ${stockTotal(e) ? '' : 'disabled'}>
