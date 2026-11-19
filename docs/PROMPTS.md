@@ -7,48 +7,6 @@ Todos piden **fondo blanco liso**: se recorta mejor que el cuadriculado "transpa
 
 ---
 
-## A · Caricatura plana: la otra versión de cada puesto (hombre o mujer)
-
-Las imágenes que ya están (operario, vendedor, diseñador, Recursos Humanos y encargado son hombres; costurera y bordadora son mujeres) se muestran según el empleado. Mientras falte la otra versión, al empleado del otro género se le muestra un emoji.
-Pedirlas en la **misma conversación de Gemini** donde se hicieron los personajes, para que salgan parejas.
-
-**1 · Operaria**
-```
-Ilustración vectorial plana estilo caricatura, colores vivos y planos, contornos suaves sin línea negra gruesa, sombras simples de un solo tono, personajes cabezones y expresivos con humor de barrio argentino, un solo elemento centrado, fondo blanco liso, sin texto ni letras. Mujer joven con delantal y guantes térmicos, el pelo atado, sosteniendo una taza recién sublimada, sonriente.
-```
-
-**2 · Vendedora**
-```
-Ilustración vectorial plana estilo caricatura, colores vivos y planos, contornos suaves sin línea negra gruesa, sombras simples de un solo tono, personajes cabezones y expresivos con humor de barrio argentino, un solo elemento centrado, fondo blanco liso, sin texto ni letras. Mujer joven entusiasta con el celular en una mano y una bolsa de compras en la otra.
-```
-
-**3 · Diseñadora**
-```
-Ilustración vectorial plana estilo caricatura, colores vivos y planos, contornos suaves sin línea negra gruesa, sombras simples de un solo tono, personajes cabezones y expresivos con humor de barrio argentino, un solo elemento centrado, fondo blanco liso, sin texto ni letras. Mujer joven con tableta gráfica y lápiz, auriculares al cuello y remera estampada.
-```
-
-**4 · Recursos Humanos (mujer)**
-```
-Ilustración vectorial plana estilo caricatura, colores vivos y planos, contornos suaves sin línea negra gruesa, sombras simples de un solo tono, personajes cabezones y expresivos con humor de barrio argentino, un solo elemento centrado, fondo blanco liso, sin texto ni letras. Mujer de unos 40 años con camisa, una carpeta de legajos bajo el brazo y una taza de café, cara de "a ver, contame".
-```
-
-**5 · Encargada de local**
-```
-Ilustración vectorial plana estilo caricatura, colores vivos y planos, contornos suaves sin línea negra gruesa, sombras simples de un solo tono, personajes cabezones y expresivos con humor de barrio argentino, un solo elemento centrado, fondo blanco liso, sin texto ni letras. Mujer de unos 55 años detrás de un mostrador, con chaleco de comercio y un llavero enorme, sonrisa de vendedora.
-```
-
-**6 · Costurero**
-```
-Ilustración vectorial plana estilo caricatura, colores vivos y planos, contornos suaves sin línea negra gruesa, sombras simples de un solo tono, personajes cabezones y expresivos con humor de barrio argentino, un solo elemento centrado, fondo blanco liso, sin texto ni letras. Hombre joven con cinta métrica al cuello, alfileres en la manga y una tijera en la mano.
-```
-
-**7 · Bordador**
-```
-Ilustración vectorial plana estilo caricatura, colores vivos y planos, contornos suaves sin línea negra gruesa, sombras simples de un solo tono, personajes cabezones y expresivos con humor de barrio argentino, un solo elemento centrado, fondo blanco liso, sin texto ni letras. Hombre joven sosteniendo un bastidor redondo con un escudo inventado a medio bordar (una estrella), sin letras.
-```
-
----
-
 ## B · Isométrico: el taller
 
 Pedirlas en la **misma conversación de Gemini** donde se hizo la pieza (ya está en el juego como fuente). Siempre el mismo ángulo: la esquina que mira hacia vos, abajo a la izquierda. Si alguna viene girada, descartala.
