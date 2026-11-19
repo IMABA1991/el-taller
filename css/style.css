@@ -330,16 +330,16 @@ details.detalle-semana summary { cursor: pointer; font-weight: 700; padding: 6px
 .panel-titulo { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 8px; margin: 8px 0; font-weight: 800; font-size: 1.05rem; }
 .panel-titulo .suave { flex-basis: 100%; }
 
-/* Reputación arriba, al lado de la plata (mismo tamaño) */
-.encabezado .fila.principal { align-items: flex-start; margin-bottom: 2px; }
+/* Reputación debajo de la plata */
+.encabezado .fila.principal { align-items: center; }
 .encabezado .fila.principal .plata { font-size: 1.5rem; }
-.encabezado .rep-cabecera { display: flex; flex-direction: column; align-items: flex-end; min-width: 120px; }
-.encabezado .rep-num { font-size: 1.5rem; font-weight: 800; color: #f5c518; white-space: nowrap; line-height: 1.1; }
+.encabezado .rep-cabecera { display: flex; align-items: center; gap: 8px; margin: 2px 0 4px; }
+.encabezado .rep-num { font-size: 1.25rem; font-weight: 800; color: #f5c518; white-space: nowrap; }
 .encabezado .rep-num b { color: #fff; }
 .encabezado .rep-num small { font-size: .8rem; opacity: .8; color: #fff; font-weight: 600; }
-.encabezado .rep-meta { font-size: .68rem; text-transform: uppercase; letter-spacing: .05em; opacity: .8; font-weight: 600; }
-.encabezado .rep-barra { width: 100%; height: 5px; border-radius: 3px; background: rgba(255, 255, 255, .25); overflow: hidden; margin-top: 3px; }
+.encabezado .rep-barra { flex: 1; height: 8px; border-radius: 4px; background: rgba(255, 255, 255, .25); overflow: hidden; min-width: 60px; }
 .encabezado .rep-barra > span { display: block; height: 100%; background: #f5c518; }
+.encabezado .rep-meta { font-size: .72rem; text-transform: uppercase; letter-spacing: .04em; opacity: .8; font-weight: 600; white-space: nowrap; }
 .encabezado .botones-cabecera { display: flex; gap: 4px; flex-shrink: 0; }
 /* Stock en grilla */
 .grilla-stock { display: grid; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); gap: 8px; margin: 8px 0; }

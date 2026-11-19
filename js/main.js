@@ -201,15 +201,23 @@ function pantallaPrestamo() {
 // ---------- Bloques comunes ----------
 function bloqueEncabezado(e, extra = '') {
   const c = calendario(e.semana);
+  const ciudad = e.origen ? nombreCiudad(e) : '';
+  // La localidad va al lado del día ("Domingo · Publicidad · Villa María")
+  const conDia = ciudad && extra.includes('paso-semana');
+  if (conDia) extra = extra.replace(/<\/div>/, ` · ${ciudad}</div>`);
+  const fecha = `${c.semanaDelMes}° sem. de ${c.nombreMes.toLowerCase()}${c.anio > 1 ? ` · año ${c.anio}` : ''}${ciudad && !conDia ? ` · ${ciudad}` : ''}`;
+  const lugarMeta = e.meta === 'pais' ? 'país' : e.meta === 'provincia' ? 'provincia' : 'ciudad';
   return `<div class="encabezado">
       <div class="fila principal">
         <span class="plata">${plata(e.plata)}</span>
-        <span class="rep-cabecera" title="Reputación: llegá a 100 para ser el mejor de ${e.meta === 'pais' ? 'el país' : e.meta === 'provincia' ? 'la provincia' : 'la ciudad'}"><span class="rep-num">⭐ <b>${Math.floor(e.rep)}</b><small>/100</small></span><span class="rep-meta">Reputación · ${e.meta === 'pais' ? 'país' : e.meta === 'provincia' ? 'provincia' : 'ciudad'}</span><span class="rep-barra"><span style="width:${pct(e.rep)}"></span></span></span>
-      </div>
-      <div class="fila">
-        <span class="fecha">Semana ${e.semana} · ${c.nombreMes} (${c.estacion})${e.origen ? ` · ${nombreCiudad(e)}` : ''}</span>
         <span class="botones-cabecera"><button class="sonido-boton" id="sonidoBoton" aria-label="${sonidoActivo() ? 'Silenciar' : 'Activar sonido'}">${sonidoActivo() ? '🔊' : '🔇'}</button><button class="menu-boton" id="menuBoton" aria-label="Menú">⋮</button></span>
       </div>
+      <div class="rep-cabecera" title="Reputación: llegá a 100 para ser el mejor de ${e.meta === 'pais' ? 'el país' : e.meta === 'provincia' ? 'la provincia' : 'la ciudad'}">
+        <span class="rep-num">⭐ <b>${Math.floor(e.rep)}</b><small>/100</small></span>
+        <span class="rep-barra"><span style="width:${pct(e.rep)}"></span></span>
+        <span class="rep-meta">reputación ${lugarMeta}</span>
+      </div>
+      <div class="fecha">${fecha}</div>
       ${extra}
       ${menuAbierto ? `<div class="menu">
         <button id="menuInicio">Volver al inicio</button>

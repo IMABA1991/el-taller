@@ -1,6 +1,6 @@
 # El Taller — Documento de diseño del juego
 
-> Versión 0.24 · Reglas en definición
+> Versión 0.25 · Reglas en definición
 > Juego web por turnos, para jugar solo, contra bots o online.
 
 ---
@@ -47,7 +47,7 @@ Simulador de emprendedor de sublimación con humor argentino. Arrancás sin nada
   - **Puerta:** locales del país, feria del domingo y mudarte de lugar.
   - **Cajas:** el stock y el traslado a los locales.
   - **Vos:** estudiar y cómo vas (finanzas, reputación, rivales). **Equipo** (cualquier persona): contratar, despedir, capacitar; el sábado, cuántas horas tiene tu equipo.
-  - **Reputación arriba (v0.24):** la reputación de la meta actual (ciudad, provincia o país) se ve en el encabezado, al lado de la plata y del mismo tamaño, con su barra.
+  - **Encabezado (v0.25):** arriba la plata; debajo, la reputación de la meta actual (⭐ 8/100, con barra y "reputación ciudad/provincia/país"); después la fecha como "3° sem. de diciembre" (y "año 2" desde el segundo año), sin estación; y el día con la localidad ("Sábado · Pedidos y producción · Villa María").
   - **Ubicación (v0.24):** máquinas en grilla de a 3, separadas para que se vean los ❗; vos, en la esquina de la derecha, quieto y un poco más grande ("controlando todo"); corcho y puerta más grandes. Las **cajas** muestran el stock en grilla: un casillero por producto con su foto y la cantidad.
   - **Escena isométrica (v0.23):** el taller se ve como una maqueta (pieza, local chico, local grande, galpón o planta) con las máquinas en fila contra la pared, la PC con el celular al lado, el corcho colgado, la puerta y las cajas (más grandes cuanto más stock). Se toca directamente el dibujo (ya no hay botones abajo); arriba del panel dice qué elegiste. De las máquinas que no tenés se ven en gris solo las **dos próximas**; las demás se compran desde **Vos** (Comprar y pagar) o en la lista.
   - Lo que pide atención lleva un **❗** que late (una decisión pendiente, una licitación sin ofertar, pedidos sin cubrir); al entrar se abre solo el primero (el sábado, primero las máquinas). El botón **Ver todo en lista** muestra la pantalla entera como antes, y el juego recuerda cuál elegiste.
