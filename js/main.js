@@ -22,6 +22,7 @@ import {
   inflacionActual, clientesDeLaSemana, rechazarCliente,
 } from './engine.js';
 import { guardar, cargar, borrar } from './storage.js';
+import { iniciarNube, alCambiar, estadoNube, entrarConGoogle, salir, bajarPartida, subirPartida } from './nube.js';
 import { imagen } from './arte.js';
 import { sonido, sonidoDeEvento, alternarSonido, sonidoActivo, flotar, contar } from './efectos.js';
 import { escenaTaller, maquinasDeLaEscena } from './escena.js';
@@ -101,11 +102,136 @@ function prepararPlanes() {
 
 function guardarPartida() {
   if (!guardar(partida)) aviso = 'No se pudo guardar la partida en este navegador.';
+  programarSubida();
+}
+
+// ---------- Nube: cuenta de Google ----------
+// La partida se guarda siempre en el navegador; con cuenta, además se sube a la nube (como mucho cada 15 segundos,
+// y enseguida al cerrar o esconder la página). Antes de subir nada se compara con lo que ya hay en la nube.
+let pantallaActual = 'inicio';
+let nubeLista = false; // ya se comparó la nube con este dispositivo: se puede subir
+let uidSincronizado = null;
+let subidaPendiente = null;
+let avisoNube = '';
+let conflicto = null; // { local, nube } cuando no está claro cuál seguir
+
+function programarSubida() {
+  if (!nubeLista || !partida) return;
+  clearTimeout(subidaPendiente);
+  subidaPendiente = setTimeout(subirAhora, 15000);
+}
+function subirAhora() {
+  clearTimeout(subidaPendiente);
+  subidaPendiente = null;
+  if (!nubeLista || !partida) return;
+  subirPartida(partida).catch(() => { avisoNube = 'No se pudo subir la partida a la nube. Se reintenta en el próximo guardado.'; });
+}
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden' && subidaPendiente) subirAhora(); });
+window.addEventListener('pagehide', () => { if (subidaPendiente) subirAhora(); });
+
+const resumenPartida = (p) => `semana ${p.semana}${p.meta ? ` · meta: ${p.meta}` : ''} · $${Math.round(p.plata || 0).toLocaleString('es-AR')}`;
+const fechaGuardado = (t) => (t ? new Date(t).toLocaleString('es-AR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : 'sin fecha');
+
+async function sincronizarNube() {
+  const { usuario } = estadoNube();
+  if (!usuario) { nubeLista = false; uidSincronizado = null; return; }
+  if (uidSincronizado === usuario.uid) return;
+  uidSincronizado = usuario.uid;
+  let enNube = null;
+  try {
+    enNube = await bajarPartida();
+  } catch {
+    avisoNube = 'No se pudo leer la partida de la nube. Por ahora se guarda solo en este navegador.';
+    uidSincronizado = null;
+    return;
+  }
+  const local = partida || cargar();
+  const tLocal = local?._guardado || 0;
+  const tNube = enNube?.actualizado || 0;
+  if (!enNube) {
+    nubeLista = true;
+    if (local) subirPartida(local).catch(() => {});
+  } else if (!local || tNube === tLocal) {
+    // Solo hay partida en la nube (o es la misma): se trae
+    if (!local) guardar(enNube.partida, { marcar: false });
+    nubeLista = true;
+  } else {
+    const nubeMasNueva = tNube > tLocal;
+    const masNuevaAvanza = nubeMasNueva ? enNube.partida.semana >= local.semana : local.semana >= enNube.partida.semana;
+    if (masNuevaAvanza && !(nubeMasNueva && partida)) {
+      // La más nueva también es la más avanzada: se sigue esa sin preguntar
+      if (nubeMasNueva) guardar(enNube.partida, { marcar: false });
+      else subirPartida(local).catch(() => {});
+      nubeLista = true;
+    } else {
+      conflicto = { local, nube: enNube.partida };
+    }
+  }
+  if (conflicto) pantallaConflicto();
+  else if (pantallaActual === 'inicio') pantallaInicio();
+}
+
+// Dos partidas distintas (este dispositivo y la nube): elige el jugador
+function pantallaConflicto() {
+  pantallaActual = 'conflicto';
+  const { local, nube } = conflicto;
+  window.scrollTo(0, 0);
+  app.innerHTML = `
+    <h1>Tenés dos partidas</h1>
+    <p class="suave">La de este dispositivo y la de tu cuenta no coinciden. ¿Con cuál seguís? La otra se pierde.</p>
+    <div class="tarjeta"><h3>📱 En este dispositivo</h3><p>${resumenPartida(local)}</p><p class="suave">Guardada: ${fechaGuardado(local._guardado)}</p>
+      <button class="boton" id="usarLocal">Seguir con esta</button></div>
+    <div class="tarjeta"><h3>☁️ En tu cuenta</h3><p>${resumenPartida(nube)}</p><p class="suave">Guardada: ${fechaGuardado(nube._guardado)}</p>
+      <button class="boton" id="usarNube">Seguir con esta</button></div>
+  `;
+  document.getElementById('usarLocal').onclick = () => {
+    conflicto = null;
+    nubeLista = true;
+    subirPartida(local).catch(() => {});
+    if (partida) siguientePantalla(); else pantallaInicio();
+  };
+  document.getElementById('usarNube').onclick = () => {
+    conflicto = null;
+    guardar(nube, { marcar: false });
+    nubeLista = true;
+    partida = null;
+    pantallaInicio();
+  };
+}
+
+alCambiar(() => {
+  if (estadoNube().usuario) sincronizarNube();
+  else { nubeLista = false; uidSincronizado = null; }
+  if (pantallaActual === 'inicio' && !conflicto) pantallaInicio();
+});
+
+function bloqueCuenta() {
+  const { listo, usuario, fallo } = estadoNube();
+  if (!listo) return '<p class="suave">☁️ Conectando con la nube…</p>';
+  if (usuario) return `<div class="tarjeta cuenta"><p style="margin:0">☁️ Tu partida se guarda en tu cuenta de Google${usuario.email ? ` (<strong>${usuario.email}</strong>)` : ''}: podés seguirla desde otro celular o la PC.</p><div class="alterna" style="margin-top:8px"><button type="button" class="chico" id="salirCuenta">Salir de la cuenta</button></div></div>`;
+  return `<div class="tarjeta cuenta"><p style="margin:0">Entrá con tu cuenta de Google para guardar la partida en la nube y seguirla desde otro dispositivo. Sin cuenta también se puede jugar: se guarda solo en este navegador.</p>
+    <button type="button" class="boton secundario" id="entrarGoogle" style="margin-top:10px">Entrar con Google</button>${fallo ? `<p class="suave">${fallo}</p>` : ''}</div>`;
+}
+function conectarCuenta() {
+  const entrar = document.getElementById('entrarGoogle');
+  if (entrar) entrar.onclick = async () => {
+    entrar.disabled = true;
+    entrar.textContent = 'Abriendo Google…';
+    const r = await entrarConGoogle();
+    if (!r.ok) { avisoNube = r.motivo; pantallaInicio(); }
+  };
+  const salirB = document.getElementById('salirCuenta');
+  if (salirB) salirB.onclick = async () => {
+    if (subidaPendiente) subirAhora();
+    await salir();
+  };
 }
 
 // ---------- Pantalla: inicio ----------
 function pantallaInicio() {
+  pantallaActual = 'inicio';
   const guardada = cargar();
+  const esperando = !estadoNube().listo;
   app.innerHTML = `
     ${imagen('logo', 'logo')}
     <h1>El Taller</h1>
@@ -114,10 +240,13 @@ function pantallaInicio() {
       <p>Terminaste el secundario en diciembre y no sabés qué hacer. En las fiestas tu tío, que conoce el rubro, te cuenta que la sublimación puede ser un buen negocio y te ofrece prestarte la plata para arrancar.</p>
       <p>Pero el tío es justo: <strong>le presta lo mismo a tu primo Lelo</strong>, que va a arrancar con lo mismo en tu ciudad.</p>
     </div>
-    ${guardada ? `<button class="boton" id="continuar">Continuar partida (semana ${guardada.semana})</button>` : ''}
-    <button class="boton ${guardada ? 'secundario' : ''}" id="nueva">Nueva partida</button>
-    <p class="suave">Versión mínima · la partida se guarda en este navegador.</p>
+    ${guardada ? `<button class="boton" id="continuar" ${esperando ? 'disabled' : ''}>Continuar partida (semana ${guardada.semana})</button>` : ''}
+    <button class="boton ${guardada ? 'secundario' : ''}" id="nueva" ${esperando ? 'disabled' : ''}>Nueva partida</button>
+    ${avisoNube ? `<div class="tarjeta tio"><p>${avisoNube}</p></div>` : ''}
+    ${bloqueCuenta()}
   `;
+  avisoNube = '';
+  conectarCuenta();
   document.getElementById('nueva').onclick = () => {
     if (guardada && !confirmarReinicio) {
       confirmarReinicio = true;
@@ -126,10 +255,12 @@ function pantallaInicio() {
       return;
     }
     confirmarReinicio = false;
+    pantallaActual = 'juego';
     pantallaOrigen();
   };
   if (guardada) {
     document.getElementById('continuar').onclick = () => {
+      pantallaActual = 'juego';
       partida = migrarPartida(guardada);
       prepararPlanes();
       siguientePantalla();
@@ -1660,3 +1791,4 @@ function siguientePantalla() {
 
 // ---------- Arranque ----------
 pantallaInicio();
+iniciarNube();

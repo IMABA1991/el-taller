@@ -1,8 +1,9 @@
-// Guardado de la partida. Por ahora en el navegador (localStorage).
-// En el próximo paso se reemplaza por Firebase (cuenta de usuario) sin tocar el resto del juego.
+// Guardado de la partida en el navegador (localStorage). Si hay cuenta de Google, main.js además la sube a la nube (nube.js).
+// _guardado: cuándo se guardó por última vez (sirve para saber qué copia es la más nueva).
 const CLAVE = 'elTaller.partida.v1';
 
-export function guardar(partida) {
+export function guardar(partida, { marcar = true } = {}) {
+  if (marcar && partida) partida._guardado = Date.now();
   try {
     localStorage.setItem(CLAVE, JSON.stringify(partida));
     return true;
