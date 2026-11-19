@@ -104,3 +104,43 @@ export async function borrarPartidaNube() {
   const { doc, deleteDoc } = fb.fs;
   await deleteDoc(doc(fb.db, 'partidas', usuario.uid));
 }
+
+// ---------- Ranking (ranking/{uid}): público para leer, cada uno escribe solo el suyo ----------
+// Guarda la MEJOR marca del jugador en cada ranking (aunque haya empezado otra partida).
+export async function leerMiRanking() {
+  if (!fb || !usuario) return null;
+  const { doc, getDoc } = fb.fs;
+  const s = await getDoc(doc(fb.db, 'ranking', usuario.uid));
+  return s.exists() ? s.data() : null;
+}
+
+export async function guardarMiRanking(datos) {
+  if (!fb || !usuario) return false;
+  const { doc, setDoc } = fb.fs;
+  await setDoc(doc(fb.db, 'ranking', usuario.uid), datos);
+  return true;
+}
+
+export async function borrarMiRanking() {
+  if (!fb || !usuario) return;
+  const { doc, deleteDoc } = fb.fs;
+  await deleteDoc(doc(fb.db, 'ranking', usuario.uid));
+}
+
+// Los primeros n de un ranking: [{ uid, ...datos }]
+export async function topRanking(campo, menorPrimero = false, n = 50) {
+  if (!fb) return null;
+  const { collection, query, orderBy, limit, getDocs } = fb.fs;
+  const q = query(collection(fb.db, 'ranking'), orderBy(campo, menorPrimero ? 'asc' : 'desc'), limit(n));
+  const r = await getDocs(q);
+  return r.docs.map((d) => ({ uid: d.id, ...d.data() }));
+}
+
+// Tu puesto: cuántos tienen una marca mejor que la tuya, más uno
+export async function puestoEnRanking(campo, valor, menorPrimero = false) {
+  if (!fb || valor == null) return null;
+  const { collection, query, where, getCountFromServer } = fb.fs;
+  const q = query(collection(fb.db, 'ranking'), where(campo, menorPrimero ? '<' : '>', valor));
+  const r = await getCountFromServer(q);
+  return r.data().count + 1;
+}

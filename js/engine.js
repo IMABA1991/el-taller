@@ -10,7 +10,7 @@ import {
   REGIONES, diaRegion, GRANDES, INFOARG, EVENTOS_MARCA, EMPRESAS_PAIS, CLUBES_BARRIO, LICITACION_SEGUNDA, TRAICIO_TEXTOS, INFLACION, SUELDOS_ETAPA,
 } from './data.js';
 
-export const VERSION_PARTIDA = 7;
+export const VERSION_PARTIDA = 8;
 
 // ---------- Azar con semilla (para poder guardar y reproducir partidas) ----------
 function siguienteAzar(estado) {
@@ -224,6 +224,8 @@ export function migrarPartida(e) {
   if (e.mazo.cartas.some((c) => !c.clase)) e.mazo = { trimestre: -1, cartas: [] };
   e.tio.confianza = confianzaTio(e);
   if (e.avisoEtapaSueldos) { subirSueldosDeEtapa(e, e.avisoEtapaSueldos, (t) => { e.avisoPendiente = t; }); delete e.avisoEtapaSueldos; }
+  // v8: marcas para el ranking (se cuentan desde ahora; las etapas ya ganadas quedan sin semana)
+  if (!e.marcas) e.marcas = marcasVacias(e.semana);
   e.version = VERSION_PARTIDA;
   aplicarIndices(e);
   return e;
@@ -264,6 +266,33 @@ function escalarCapacitacion(base, f) {
   const out = {};
   for (const [k, v] of Object.entries(base)) out[k] = typeof v === 'number' && /costo|buffet|precio|porEmpleado/i.test(k) ? redondeo(v * f) : (v && typeof v === 'object' ? escalarCapacitacion(v, f) : v);
   return out;
+}
+
+// ---------- Marcas para el ranking ----------
+// Lo que facturaste y ganaste en toda la partida, en pesos de enero del año 1 (descontada la inflación),
+// y en qué semana ganaste cada etapa. "desde": semana en que se empezó a contar (las partidas de antes de la v0.33 no lo tenían).
+function marcasVacias(desde = 1) {
+  return { facturacion: 0, ganancia: 0, ciudad: null, provincia: null, pais: null, desde };
+}
+function registrarMarcas(e, r) {
+  const idx = e.indices?.costos || 1;
+  const m = (e.marcas ||= marcasVacias(e.semana));
+  m.facturacion += Math.round((r.ingresos || 0) / idx);
+  m.ganancia += Math.round(((r.ingresos || 0) - (r.gastos || 0)) / idx);
+  if (r.hito === 'mejorDeLaCiudad' && !m.ciudad) m.ciudad = e.semana;
+  if (r.hito === 'mejorDeLaProvincia' && !m.provincia) m.provincia = e.semana;
+  if (r.hito === 'mejorDelPais' && !m.pais) m.pais = e.semana;
+}
+// Qué tan lejos llegaste: 0 ciudad, 1 provincia, 2 país, 3 ganaste el país
+export function etapaAlcanzada(e) {
+  if (e.mejorDelPais) return 3;
+  if (enPais(e)) return 2;
+  if (enProvincia(e) || e.mejorDeLaProvincia) return 1;
+  return 0;
+}
+export function marcasRanking(e) {
+  const m = e.marcas || marcasVacias(e.semana);
+  return { ...m, etapa: etapaAlcanzada(e), rep: Math.round(e.rep || 0), semana: e.semana };
 }
 
 export function aplicarIndices(e) {
@@ -1057,6 +1086,7 @@ export function nuevaPartida(opcionPrestamo, semilla = Date.now() >>> 0, origen 
   const e = {
     version: VERSION_PARTIDA,
     indices: { costos: 1, precios: 1, alquileres: 1, sueldos: 1, etapa: 1 },
+    marcas: marcasVacias(1),
     inflacion: { historial: [], meses: 0 },
     semilla,
     semana: 1,
@@ -2121,6 +2151,7 @@ export function cerrarSemana(e, plan) {
     evento('Con tu reputación, Mercado Libre empieza a traerte pedidos en serio.', 'buena');
   }
 
+  registrarMarcas(e, r);
   e.tio.confianza = confianzaTio(e);
   r.plata = e.plata;
   r.rep = e.rep;

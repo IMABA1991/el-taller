@@ -19,10 +19,13 @@ import {
   TRAICIO_TEXTOS, elegirOrigen, nombreCiudad, pistaProvincia, abrirLocal, cambiarEncargado, asignarLelo, cambiarDefensaPais, costoDefensaPais,
   gastosLocalesDelMes, provinciasLibres, costoAbrirLocal, alquilerLocal, sueldoEncargado, ofertaPaisVigente, tomarOfertaPais, enCamino,
   costoTraslado, cumpleRequisito, puedeOfertarLicitacion, coberturaRRHH, tieneRRHH, horasCostura, elegirGenero,
-  inflacionActual, clientesDeLaSemana, rechazarCliente,
+  inflacionActual, clientesDeLaSemana, rechazarCliente, marcasRanking,
 } from './engine.js';
 import { guardar, cargar, borrar } from './storage.js';
-import { iniciarNube, alCambiar, estadoNube, entrarConGoogle, salir, bajarPartida, subirPartida } from './nube.js';
+import {
+  iniciarNube, alCambiar, estadoNube, entrarConGoogle, salir, bajarPartida, subirPartida,
+  leerMiRanking, guardarMiRanking, borrarMiRanking, topRanking, puestoEnRanking,
+} from './nube.js';
 import { imagen } from './arte.js';
 import { sonido, sonidoDeEvento, alternarSonido, sonidoActivo, flotar, contar } from './efectos.js';
 import { escenaTaller, maquinasDeLaEscena } from './escena.js';
@@ -125,10 +128,12 @@ function subirAhora() {
   subidaPendiente = null;
   if (!nubeLista || !partida) return;
   subirPartida(partida).catch(() => { avisoNube = 'No se pudo subir la partida a la nube. Se reintenta en el próximo guardado.'; });
+  actualizarRanking();
 }
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden' && subidaPendiente) subirAhora(); });
 window.addEventListener('pagehide', () => { if (subidaPendiente) subirAhora(); });
 
+const escaparTexto = (t) => String(t ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const resumenPartida = (p) => `semana ${p.semana}${p.meta ? ` · meta: ${p.meta}` : ''} · $${Math.round(p.plata || 0).toLocaleString('es-AR')}`;
 const fechaGuardado = (t) => (t ? new Date(t).toLocaleString('es-AR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : 'sin fecha');
 
@@ -137,6 +142,7 @@ async function sincronizarNube() {
   if (!usuario) { nubeLista = false; uidSincronizado = null; return; }
   if (uidSincronizado === usuario.uid) return;
   uidSincronizado = usuario.uid;
+  leerMiRanking().then((r) => { miRanking = r; }).catch(() => { miRanking = null; });
   let enNube = null;
   try {
     enNube = await bajarPartida();
@@ -201,7 +207,7 @@ function pantallaConflicto() {
 
 alCambiar(() => {
   if (estadoNube().usuario) sincronizarNube();
-  else { nubeLista = false; uidSincronizado = null; }
+  else { nubeLista = false; uidSincronizado = null; miRanking = null; }
   if (pantallaActual === 'inicio' && !conflicto) pantallaInicio();
 });
 
@@ -227,6 +233,157 @@ function conectarCuenta() {
   };
 }
 
+// ---------- Ranking ----------
+// Cada jugador con cuenta puede aparecer con un apodo. Se guarda su MEJOR marca en cada ranking (en pesos de enero
+// del año 1, sin inflación). Los números los sube el juego de cada uno: las reglas de Firestore rechazan valores imposibles.
+let miRanking = null;
+let pestanaRanking = 'ganancia';
+let etapaRapido = 'ciudad';
+const RANKINGS = {
+  ganancia: { titulo: 'Más ganó', campo: 'ganancia', explica: 'Ganancia de toda la partida (lo que vendiste menos lo que gastaste).' },
+  facturacion: { titulo: 'Más facturó', campo: 'facturacion', explica: 'Todo lo que vendiste en la partida.' },
+  rapido: { titulo: 'Más rápido', explica: 'Semanas desde el arranque hasta ganar la etapa: menos es mejor.' },
+  lejos: { titulo: 'Más lejos', campo: 'lejos', explica: 'Hasta qué etapa llegaste y con cuánta reputación.' },
+};
+const ETAPAS_RANKING = ['Ciudad', 'Provincia', 'País', '🏆 Ganó el país'];
+const PALABRAS_FEAS = ['puto', 'puta', 'mierda', 'pelotud', 'boludo', 'forro', 'concha', 'pija', 'verga', 'culo', 'trolo', 'negro de', 'mogolic', 'retrasad', 'nazi', 'hitler', 'idiota', 'imbecil', 'imbécil', 'garcha', 'choto', 'orto'];
+
+function validarApodo(a) {
+  const t = (a || '').trim().replace(/\s+/g, ' ');
+  if (t.length < 3 || t.length > 20) return { ok: false, motivo: 'El apodo tiene que tener entre 3 y 20 letras.' };
+  if (!/^[\p{L}\p{N} ._-]+$/u.test(t)) return { ok: false, motivo: 'Usá solo letras, números, espacios, puntos o guiones.' };
+  const plano = t.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]/g, '');
+  if (PALABRAS_FEAS.some((p) => plano.includes(p.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]/g, '')))) return { ok: false, motivo: 'Elegí otro apodo, ese no va.' };
+  return { ok: true, apodo: t };
+}
+
+// Junta la mejor marca de antes con la de la partida actual
+function mejoresMarcas(prev, e, apodo) {
+  const m = marcasRanking(e);
+  const max = (a, b) => Math.round(Math.max(a ?? -Infinity, b ?? -Infinity));
+  const lejos = max(prev?.lejos, m.etapa * 1000 + m.rep);
+  const d = {
+    apodo,
+    facturacion: Math.max(0, max(prev?.facturacion, m.facturacion)),
+    ganancia: max(prev?.ganancia, m.ganancia),
+    lejos,
+    etapa: Math.floor(lejos / 1000),
+    rep: lejos % 1000,
+    semana: max(prev?.semana, m.semana),
+    actualizado: Date.now(),
+  };
+  if (d.ganancia > d.facturacion) d.ganancia = d.facturacion;
+  const minimos = { ciudad: 15, provincia: 40, pais: 80 };
+  for (const k of ['ciudad', 'provincia', 'pais']) {
+    const v = [prev?.[k], m[k]].filter((x) => Number.isInteger(x) && x >= minimos[k]);
+    if (v.length) d[k] = Math.min(...v);
+  }
+  return d;
+}
+
+let rankingEnCurso = false;
+async function actualizarRanking() {
+  if (!miRanking || !partida || rankingEnCurso) return;
+  const nuevo = mejoresMarcas(miRanking, partida, miRanking.apodo);
+  const cambia = ['facturacion', 'ganancia', 'lejos', 'semana', 'ciudad', 'provincia', 'pais'].some((k) => nuevo[k] !== miRanking[k]);
+  if (!cambia) return;
+  rankingEnCurso = true;
+  try { await guardarMiRanking(nuevo); miRanking = nuevo; } catch { /* se reintenta en el próximo guardado */ }
+  rankingEnCurso = false;
+}
+
+const plataCorta = (n) => {
+  const a = Math.abs(n);
+  const t = a >= 1e9 ? `${(a / 1e9).toFixed(1).replace('.', ',')} mil M` : a >= 1e6 ? `${(a / 1e6).toFixed(1).replace('.', ',')} M` : a.toLocaleString('es-AR');
+  return `${n < 0 ? '−' : ''}$${t}`;
+};
+function valorRanking(clave, d) {
+  if (clave === 'rapido') return `${d[etapaRapido]} semanas`;
+  if (clave === 'lejos') return d.etapa >= 3 ? ETAPAS_RANKING[3] : `${ETAPAS_RANKING[d.etapa]} · ${d.rep}/100`;
+  return plataCorta(d[RANKINGS[clave].campo]);
+}
+
+async function pantallaRanking(volver, mensaje = '') {
+  pantallaActual = 'ranking';
+  const clave = pestanaRanking;
+  const campo = clave === 'rapido' ? etapaRapido : RANKINGS[clave].campo;
+  const menor = clave === 'rapido';
+  const { usuario, listo } = estadoNube();
+  const pintar = (lista, puesto, error = '') => {
+    const tabs = Object.entries(RANKINGS).map(([k, r]) => `<button type="button" class="chico ${k === clave ? 'elegido' : ''}" data-pestana="${k}">${r.titulo}</button>`).join('');
+    const subtabs = clave === 'rapido' ? `<div class="alterna" style="margin-top:6px">${['ciudad', 'provincia', 'pais'].map((k) => `<button type="button" class="chico ${k === etapaRapido ? 'elegido' : ''}" data-etapa="${k}">${{ ciudad: 'Ciudad', provincia: 'Provincia', pais: 'País' }[k]}</button>`).join('')}</div>` : '';
+    const filas = lista === null ? '<p class="suave">Cargando…</p>'
+      : !lista.length ? '<p class="suave">Todavía no hay nadie en este ranking. ¡Podés ser el primero!</p>'
+      : `<ol class="ranking">${lista.map((d, i) => `<li class="${usuario && d.uid === usuario.uid ? 'yo' : ''}"><span class="puesto">${i < 3 ? ['🥇', '🥈', '🥉'][i] : `${i + 1}.`}</span><span class="apodo">${escaparTexto(d.apodo)}</span><span class="valor">${valorRanking(clave, d)}</span></li>`).join('')}</ol>`;
+    let cuenta;
+    if (!listo) cuenta = '<p class="suave">Conectando…</p>';
+    else if (!usuario) cuenta = '<p class="suave">Para aparecer en el ranking entrá con tu cuenta de Google desde la pantalla de inicio.</p>';
+    else if (!miRanking) cuenta = `<p>Para aparecer, elegí un apodo (no se muestra tu nombre ni tu email):</p>
+      <input type="text" id="apodo" maxlength="20" placeholder="Ej: Taller del Oeste" style="width:100%">
+      <button type="button" class="boton" id="aparecer" style="margin-top:8px">Aparecer en el ranking</button>`;
+    else cuenta = `<p style="margin:0">Aparecés como <strong>${escaparTexto(miRanking.apodo)}</strong>${puesto ? ` · tu puesto acá: <strong>${puesto}°</strong>` : ''}.</p>
+      <div class="alterna" style="margin-top:8px"><button type="button" class="chico" id="cambiarApodo">Cambiar apodo</button><button type="button" class="chico" id="noAparecer">Dejar de aparecer</button></div>`;
+    window.scrollTo(0, 0);
+    app.innerHTML = `
+      <h1>🏆 Ranking</h1>
+      <p class="suave">Cuenta la mejor marca de cada jugador. La plata va en <strong>pesos de enero del año 1</strong> (sin la inflación), para comparar partidas cortas y largas.</p>
+      ${mensaje ? `<div class="tarjeta tio"><p>${mensaje}</p></div>` : ''}
+      <div class="tarjeta"><div class="alterna">${tabs}</div>${subtabs}<p class="suave" style="margin-top:8px">${RANKINGS[clave].explica}</p>${error ? `<p class="suave">${error}</p>` : filas}</div>
+      <div class="tarjeta">${cuenta}</div>
+      <button class="boton secundario" id="volverRanking">Volver</button>
+    `;
+    app.querySelectorAll('[data-pestana]').forEach((b) => { b.onclick = () => { pestanaRanking = b.dataset.pestana; pantallaRanking(volver); }; });
+    app.querySelectorAll('[data-etapa]').forEach((b) => { b.onclick = () => { etapaRapido = b.dataset.etapa; pantallaRanking(volver); }; });
+    document.getElementById('volverRanking').onclick = volver;
+    const ap = document.getElementById('aparecer');
+    if (ap) ap.onclick = async () => {
+      const v = validarApodo(document.getElementById('apodo').value);
+      if (!v.ok) { pantallaRanking(volver, v.motivo); return; }
+      const actual = partida || cargar();
+      const datos = actual ? mejoresMarcas(null, actual, v.apodo) : { apodo: v.apodo, facturacion: 0, ganancia: 0, lejos: 0, etapa: 0, rep: 0, semana: 1, actualizado: Date.now() };
+      try { await guardarMiRanking(datos); miRanking = datos; pantallaRanking(volver, '¡Listo! Ya aparecés en el ranking.'); }
+      catch { pantallaRanking(volver, 'No se pudo guardar en el ranking. Probá de nuevo en un rato.'); }
+    };
+    const cambiar = document.getElementById('cambiarApodo');
+    if (cambiar) cambiar.onclick = async () => {
+      // Se reusa el formulario del apodo, con el apodo actual cargado
+      const prev = miRanking;
+      miRanking = null;
+      pantallaRanking(volver);
+      setTimeout(() => {
+        const input = document.getElementById('apodo');
+        const boton = document.getElementById('aparecer');
+        if (!input || !boton) return;
+        input.value = prev.apodo;
+        boton.textContent = 'Guardar apodo';
+        boton.onclick = async () => {
+          const v = validarApodo(input.value);
+          if (!v.ok) { miRanking = prev; pantallaRanking(volver, v.motivo); return; }
+          const datos = { ...prev, apodo: v.apodo, actualizado: Date.now() };
+          try { await guardarMiRanking(datos); miRanking = datos; pantallaRanking(volver, 'Apodo cambiado.'); }
+          catch { miRanking = prev; pantallaRanking(volver, 'No se pudo cambiar el apodo.'); }
+        };
+      }, 0);
+    };
+    const no = document.getElementById('noAparecer');
+    if (no) no.onclick = async () => {
+      try { await borrarMiRanking(); miRanking = null; pantallaRanking(volver, 'Ya no aparecés en el ranking. Podés volver cuando quieras.'); }
+      catch { pantallaRanking(volver, 'No se pudo sacarte del ranking. Probá de nuevo.'); }
+    };
+  };
+  pintar(null, null);
+  if (!estadoNube().disponible) { pintar([], null, 'El ranking necesita conexión con la nube y ahora no está disponible.'); return; }
+  try {
+    if (usuario && miRanking) await actualizarRanking();
+    const lista = await topRanking(campo, menor);
+    const mio = miRanking?.[campo];
+    const puesto = miRanking && mio != null ? await puestoEnRanking(campo, mio, menor).catch(() => null) : null;
+    if (pantallaActual === 'ranking' && pestanaRanking === clave && (clave !== 'rapido' || etapaRapido === campo)) pintar(lista, puesto);
+  } catch {
+    pintar([], null, 'No se pudo cargar el ranking. Probá de nuevo en un rato.');
+  }
+}
+
 // ---------- Pantalla: inicio ----------
 function pantallaInicio() {
   pantallaActual = 'inicio';
@@ -243,10 +400,12 @@ function pantallaInicio() {
     ${guardada ? `<button class="boton" id="continuar" ${esperando ? 'disabled' : ''}>Continuar partida (semana ${guardada.semana})</button>` : ''}
     <button class="boton ${guardada ? 'secundario' : ''}" id="nueva" ${esperando ? 'disabled' : ''}>Nueva partida</button>
     ${avisoNube ? `<div class="tarjeta tio"><p>${avisoNube}</p></div>` : ''}
+    <button class="boton secundario" id="verRanking" ${esperando ? 'disabled' : ''}>🏆 Ranking</button>
     ${bloqueCuenta()}
   `;
   avisoNube = '';
   conectarCuenta();
+  document.getElementById('verRanking').onclick = () => pantallaRanking(() => pantallaInicio());
   document.getElementById('nueva').onclick = () => {
     if (guardada && !confirmarReinicio) {
       confirmarReinicio = true;
@@ -386,6 +545,7 @@ function bloqueEncabezado(e, extra = '') {
       ${extra}
       ${menuAbierto ? `<div class="menu">
         <button id="menuInicio">Volver al inicio</button>
+        <button id="menuRanking">🏆 Ranking</button>
         <button id="reiniciar" class="peligro">${confirmarReinicio ? 'Tocá de nuevo para borrar la partida' : 'Empezar de nuevo'}</button>
       </div>` : ''}
     </div>`;
@@ -498,6 +658,8 @@ function conectarMenu() {
   if (partida) plataVista = partida.plata;
   const inicio = document.getElementById('menuInicio');
   if (inicio) inicio.onclick = () => { menuAbierto = false; pantallaInicio(); };
+  const rk = document.getElementById('menuRanking');
+  if (rk) rk.onclick = () => { menuAbierto = false; if (subidaPendiente) subirAhora(); pantallaRanking(() => { pantallaActual = 'juego'; siguientePantalla(); }); };
   const reiniciar = document.getElementById('reiniciar');
   if (reiniciar) reiniciar.onclick = () => {
     if (!confirmarReinicio) { confirmarReinicio = true; refrescar(); return; }

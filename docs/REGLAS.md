@@ -1,6 +1,6 @@
 # El Taller — Documento de diseño del juego
 
-> Versión 0.32 · Reglas en definición
+> Versión 0.33 · Reglas en definición
 > Juego web por turnos, para jugar solo, contra bots o online.
 
 ---
@@ -28,6 +28,7 @@ Simulador de emprendedor de sublimación con humor argentino. Arrancás sin nada
   - No se muestra el porcentaje de error: solo "cuanta más experiencia tengas, menos errores vas a cometer".
   - **Merma mensual:** si hay stock guardado, una vez por mes se pierde un producto (gotera, se cayó de la mesa, lo regalaste en un cumpleaños que te olvidaste, el perro, tu vieja se lo regaló a la vecina...). Por eso conviene sacar el sobrante en la feria.
 - **Guardado (v0.32):** la partida se guarda siempre en el navegador. Si entrás con tu **cuenta de Google** (botón en la pantalla de inicio), además se sube a la nube (como mucho cada 15 segundos y al cerrar o esconder la página) y la seguís desde la PC o el celular. Al entrar se compara con lo que ya hay en la nube: si la copia más nueva es también la más avanzada, se sigue esa sin preguntar; si no, el juego muestra las dos (semana, meta, plata y fecha) y elegís con cuál seguir. Sin cuenta se juega igual. Desde navegadores de adentro de apps (Instagram, Facebook) Google no deja entrar: el juego avisa que hay que abrirlo en Chrome o Safari.
+- **Ranking (v0.33):** botón **🏆 Ranking** en el inicio y en el menú ⋮. Cuatro rankings: **Más ganó** (ganancia de toda la partida), **Más facturó** (todo lo vendido), **Más rápido** (semanas desde el arranque hasta ganar la ciudad, la provincia o el país; menos es mejor) y **Más lejos** (etapa alcanzada y reputación). La plata va en **pesos de enero del año 1** (descontada la inflación con el índice de costos), para comparar partidas cortas y largas. Cuenta la **mejor marca** de cada jugador en cada ranking, aunque empiece otra partida. Para aparecer hay que entrar con Google y elegir un **apodo** (3 a 20 letras, con filtro de palabras feas; no se muestra el nombre ni el email); se puede cambiar o dejar de aparecer. Se ve el top 50 y tu puesto. Las marcas se suben junto con la partida. Plan gratis: los números los calcula el juego de cada jugador y las reglas de Firestore rechazan valores imposibles (ciudad en menos de 15 semanas, provincia en menos de 40, país en menos de 80, más de $60 M por semana, etc.); no es a prueba de alguien que sepa programar. Las partidas de antes de la v0.33 empiezan a contar desde que se actualizan, y las etapas que ya habían ganado no entran en "Más rápido".
 - **Inicio de sesión:** con cuenta de Google (hecho, v0.32). Email y contraseña, más adelante.
 - **Diseño pensado primero para celular** (pantalla vertical, botones grandes); en la PC funciona igual.
 - **Servidor:** Firebase, plan gratuito Spark, proyecto `el-taller-38851` de la cuenta ventas@amoresublimacion.com.ar (Authentication con Google + Firestore en Santiago de Chile). El juego sigue publicado en GitHub Pages (dominio autorizado `imaba1991.github.io`); Firebase solo guarda las cuentas y las partidas, en `partidas/{uid}`. Las reglas de Firestore dejan que cada jugador lea y escriba solo su propia partida.

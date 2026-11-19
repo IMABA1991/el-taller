@@ -1,0 +1,41 @@
+rules_version = '2';
+
+// El Taller — copia de las reglas publicadas en la consola de Firebase (proyecto el-taller-38851).
+// - partidas/{uid}: cada jugador solo lee y guarda su propia partida.
+// - ranking/{uid}: lo lee cualquiera; cada jugador escribe solo el suyo, con valores posibles.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /partidas/{uid} {
+      allow read, delete: if request.auth != null && request.auth.uid == uid;
+      allow create, update: if request.auth != null && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['datos', 'actualizado', 'version', 'semana', 'meta'])
+        && request.resource.data.datos is string
+        && request.resource.data.datos.size() < 900000;
+    }
+
+    function rankingValido(d) {
+      return d.keys().hasOnly(['apodo', 'facturacion', 'ganancia', 'lejos', 'etapa', 'rep', 'semana', 'actualizado', 'ciudad', 'provincia', 'pais'])
+        && d.keys().hasAll(['apodo', 'facturacion', 'ganancia', 'lejos', 'etapa', 'rep', 'semana', 'actualizado'])
+        && d.apodo is string && d.apodo.size() >= 3 && d.apodo.size() <= 20
+        && d.semana is int && d.semana >= 1 && d.semana <= 5000
+        && d.facturacion is int && d.facturacion >= 0 && d.facturacion <= d.semana * 60000000
+        && d.ganancia is int && d.ganancia <= d.facturacion
+        && d.etapa is int && d.etapa >= 0 && d.etapa <= 3
+        && d.rep is int && d.rep >= 0 && d.rep <= 100
+        && d.lejos == d.etapa * 1000 + d.rep
+        && (!('ciudad' in d) || (d.ciudad is int && d.ciudad >= 15 && d.ciudad <= d.semana))
+        && (!('provincia' in d) || (d.provincia is int && d.provincia >= 40 && d.provincia <= d.semana))
+        && (!('pais' in d) || (d.pais is int && d.pais >= 80 && d.pais <= d.semana));
+    }
+
+    match /ranking/{uid} {
+      allow read: if true;
+      allow delete: if request.auth != null && request.auth.uid == uid;
+      allow create, update: if request.auth != null && request.auth.uid == uid && rankingValido(request.resource.data);
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

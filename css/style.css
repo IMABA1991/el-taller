@@ -366,3 +366,13 @@ details.detalle-semana summary { cursor: pointer; font-weight: 700; padding: 6px
 .grilla-stock .casillero b { font-size: 1.2rem; }
 .grilla-stock .casillero span { font-size: .72rem; line-height: 1.15; opacity: .8; }
 .grilla-stock .casillero.vacio { opacity: .45; }
+
+/* Ranking */
+button.chico.elegido { background: var(--principal); color: #fff; border-color: var(--principal); }
+ol.ranking { list-style: none; padding: 0; margin: 10px 0 0; }
+ol.ranking li { display: flex; align-items: center; gap: 10px; padding: 8px 4px; border-bottom: 1px solid var(--borde); }
+ol.ranking li:last-child { border-bottom: 0; }
+ol.ranking li.yo { background: #fff6d6; border-radius: 8px; font-weight: 700; }
+ol.ranking .puesto { width: 2.2em; text-align: center; flex: none; }
+ol.ranking .apodo { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+ol.ranking .valor { flex: none; font-variant-numeric: tabular-nums; }
