@@ -285,7 +285,7 @@ details.detalle-semana summary { cursor: pointer; font-weight: 700; padding: 6px
 @keyframes aguja { from { transform: translateY(0); } to { transform: translateY(4px); } }
 @keyframes latido { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.25); } }
 @keyframes vapor { 0% { opacity: 0; transform: translateY(0); } 30% { opacity: .9; } 100% { opacity: 0; transform: translateY(-12px); } }
-@keyframes pasea { from { transform: translateX(0); } to { transform: translateX(var(--dx, 10px)); } }
+@keyframes pasea { from { transform: translate(0, 0); } to { transform: translate(var(--dx, 10px), var(--dy, 0px)); } }
 @keyframes alerta { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.3); } }
 @keyframes hormiga { to { stroke-dashoffset: -16; } }
 .escena .esc-pasea { animation: pasea var(--t, 4s) ease-in-out infinite alternate; }
@@ -318,3 +318,14 @@ details.detalle-semana summary { cursor: pointer; font-weight: 700; padding: 6px
 .leyenda-mapa i { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 4px; vertical-align: -2px; }
 .avatar.mini { --avatar: 32px; }
 .detalle.con-avatar { align-items: center; }
+
+/* Escena isométrica */
+.escena.iso { background: linear-gradient(#eef4fb, #fdf6ec); }
+.escena .esc-fantasma { filter: grayscale(1); opacity: .45; }
+.escena .esc-vacio { opacity: .55; }
+.escena.interactiva .zona { cursor: pointer; }
+.escena.interactiva .zona:hover image { filter: drop-shadow(0 0 4px rgba(245, 197, 24, .9)); }
+.escena .zona.elegida image { filter: drop-shadow(0 0 3px #f5c518) drop-shadow(0 0 8px #f5c518); }
+.escena .zona.elegida image.esc-fantasma { filter: grayscale(1) drop-shadow(0 0 3px #f5c518) drop-shadow(0 0 8px #f5c518); opacity: .7; }
+.panel-titulo { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 8px; margin: 8px 0; font-weight: 800; font-size: 1.05rem; }
+.panel-titulo .suave { flex-basis: 100%; }

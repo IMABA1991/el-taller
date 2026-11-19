@@ -21,7 +21,7 @@ Si lo querés hacer vos:
 4. En `js/arte.js`, escribí el nombre del archivo en `archivo` (por ejemplo `tio: { archivo: 'tio.png', ... }`).
 5. Subí los cambios a GitHub: en un par de minutos se ve en la web.
 
-Ya llegó `iso-casa` (guardada en `herramientas/fuentes/`). Las piezas isométricas del taller no van en `arte.js`: cuando estén todas (o casi), se arma la escena nueva en `js/escena.js` usando esos archivos. Hasta entonces sigue la escena dibujada en código.
+**v0.23: la escena isométrica ya está armada** (`js/escena.js`) con todas las piezas de `assets/iso/` (originales en `herramientas/fuentes/`, recortadas con `python3 herramientas/recortar_iso.py fuente.jpg salida.png`). Para cambiar una pieza, se reemplaza su PNG con el mismo nombre (y su tamaño en `TAM`, en `escena.js`). Las piezas isométricas no van en `arte.js`: cuando estén todas (o casi), se arma la escena nueva en `js/escena.js` usando esos archivos. Hasta entonces sigue la escena dibujada en código.
 
 ## Cómo lograr que salgan parejas
 

@@ -1,6 +1,6 @@
 # El Taller — Documento de diseño del juego
 
-> Versión 0.22 · Reglas en definición
+> Versión 0.23 · Reglas en definición
 > Juego web por turnos, para jugar solo, contra bots o online.
 
 ---
@@ -47,7 +47,7 @@ Simulador de emprendedor de sublimación con humor argentino. Arrancás sin nada
   - **Puerta:** locales del país, feria del domingo y mudarte de lugar.
   - **Cajas:** el stock y el traslado a los locales.
   - **Vos:** estudiar y cómo vas (finanzas, reputación, rivales). **Equipo** (cualquier persona): contratar, despedir, capacitar; el sábado, cuántas horas tiene tu equipo.
-  - **Botones debajo del dibujo (provisorios):** mientras la escena sea la dibujada en código, cada objeto tiene también su botón con nombre. Cuando esté la escena isométrica (objetos más grandes y claros), **los botones se sacan** y se toca directamente el dibujo.
+  - **Escena isométrica (v0.23):** el taller se ve como una maqueta (pieza, local chico, local grande, galpón o planta) con las máquinas en fila contra la pared, la PC con el celular al lado, el corcho colgado, la puerta y las cajas (más grandes cuanto más stock). Se toca directamente el dibujo (ya no hay botones abajo); arriba del panel dice qué elegiste. De las máquinas que no tenés se ven en gris solo las **dos próximas**; las demás se compran desde **Vos** (Comprar y pagar) o en la lista.
   - Lo que pide atención lleva un **❗** que late (una decisión pendiente, una licitación sin ofertar, pedidos sin cubrir); al entrar se abre solo el primero (el sábado, primero las máquinas). El botón **Ver todo en lista** muestra la pantalla entera como antes, y el juego recuerda cuál elegiste.
 - **La gente del taller:** se ve una persona por cada empleado, más vos (con una flechita amarilla) y Lelo, paseando y trabajando. Si son muchos, se achican.
 - **Hombre o mujer:** al arrancar elegís cómo te mostramos en el taller. Las partidas guardadas de antes lo preguntan una sola vez al continuar. Cada empleado y cada encargado tiene su **género guardado** (según su nombre): se dibuja así en el taller y su foto coincide ("Encargada: Norma"). Mientras falte la imagen del otro género de un puesto, se muestra un emoji.

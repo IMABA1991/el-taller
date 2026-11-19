@@ -277,13 +277,9 @@ function armarConEscena(e, partes, { pantalla, porDefecto = 'pc', fantasmas = fa
     zonaActiva = (maquinasPrimero ? [...Object.keys(MAQUINAS), ...ORDEN_ZONAS] : [...ORDEN_ZONAS, ...Object.keys(MAQUINAS)]).find((z) => alertas.has(z)) || porDefecto;
   }
   const lista = vista === 'lista';
-  const maqs = maquinasDeLaEscena(e, { fantasmas, enPais: enPais(e) });
-  const zonasConCosas = new Set(conContenido.map((x) => x.zona));
-  const chips = [...ORDEN_ZONAS.filter((z) => zonasConCosas.has(z) || z === zonaActiva), ...maqs]
-    .map((z) => { const d = datosZona(z); return `<button type="button" data-ir-zona="${z}" class="${z === zonaActiva ? 'activa' : ''}">${z === 'vos' && e.genero === 'mujer' ? '🙋‍♀️' : d.icono} ${d.nombre}${!e.maquinas[z] && MAQUINAS[z] ? ' +' : ''}${alertas.has(z) ? '<span class="punto">!</span>' : ''}</button>`; }).join('');
   const tarjetaEscena = `<div class="tarjeta">
       ${escenaTaller(e, { zona: lista ? null : zonaActiva, alertas: lista ? new Set() : alertas, fantasmas: fantasmas && !lista, enPais: enPais(e), interactiva: !lista })}
-      ${lista ? '' : `<div class="zonas">${chips}</div>`}
+      ${lista ? '' : `<p class="panel-titulo">${zonaActiva === 'vos' && e.genero === 'mujer' ? '🙋‍♀️' : datosZona(zonaActiva).icono} ${datosZona(zonaActiva).nombre}${!e.maquinas[zonaActiva] && MAQUINAS[zonaActiva] ? ' (para comprar)' : ''}<span class="suave" style="font-weight:400;font-size:.85rem">Tocá otra cosa del taller para ver lo suyo.</span></p>`}
       <div class="vista-lista"><button type="button" class="chico" id="vistaBoton">${lista ? '🏠 Ver el taller' : '☰ Ver todo en lista'}</button></div>
     </div>`;
   const arriba = partes.filter((x) => !x.zona && x.arriba).map((x) => x.html).join('');
@@ -300,8 +296,8 @@ function conectarEscena() {
       zonaActiva = el.dataset.zona || el.dataset.irZona;
       sonido('click');
       refrescar();
-      const t = app.querySelector('.zonas');
-      if (t) t.scrollIntoView({ block: 'start', behavior: 'smooth' });
+      const t = app.querySelector('.panel-titulo');
+      if (t) t.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
     });
   });
   const vb = document.getElementById('vistaBoton');
@@ -1013,7 +1009,7 @@ function pantallaPublicidad() {
     { zona: 'vos', html: bloqueEstado(e) },
     { zona: 'equipo', html: bloqueEquipo(e) },
     ...maqs.map((m) => ({ zona: m, html: htmlMaquinaDomingo(e, m), soloEscena: true })),
-    { zona: 'vos', html: bloqueComprasYReinicio(e), soloLista: true },
+    { zona: 'vos', html: bloqueComprasYReinicio(e) },
     { html: barraInferior(horas, v.costo || null, v.errores, 'Arrancar la semana', 'publicar') },
   ];
 
