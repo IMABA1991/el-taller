@@ -63,7 +63,7 @@ function azar(i, k = 1) {
 }
 
 // opciones: zona elegida, alertas (Set de zonas con ❗), fantasmas (máquinas por comprar), enPais.
-export function escenaTaller(e, { zona = null, alertas = new Set(), fantasmas = false, enPais = false, interactiva = false } = {}) {
+export function escenaTaller(e, { zona = null, alertas = new Set(), fantasmas = false, enPais = false, interactiva = false, contratar = false } = {}) {
   const lugar = LUGARES[e.local] || LUGARES.casa;
   const [LW, LH] = TAM[lugar];
   const titulo = e.nombreTaller || (e.origen?.municipio ? `Taller · ${e.origen.municipio}` : 'Tu taller');
@@ -142,6 +142,16 @@ export function escenaTaller(e, { zona = null, alertas = new Set(), fantasmas = 
     persona(mujer ? 'iso-empleada' : 'iso-empleado', i + 2, 'equipo');
   });
   if (lelo) persona('iso-lelo', 1, 'equipo');
+  // Un candidato en gris adelante, con un "+": tocándolo se abre Equipo (contratar). Está siempre que haya lugar.
+  if (contratar && interactiva) {
+    const [u, v] = [0.62, 0.96];
+    const [x, y] = punto(u, v);
+    const p = pieza('iso-empleado', x, y, ALTO.persona, { clase: 'esc-fantasma' });
+    const yMas = p.caja[1] + p.caja[3] * 0.4;
+    const mas = `<g transform="translate(${x.toFixed(1)},${yMas.toFixed(1)})"><circle r="17" fill="#fff" stroke="#1f2a44" stroke-width="3"/><text y="9" font-size="26" font-weight="800" text-anchor="middle" fill="#1f2a44">+</text></g>`;
+    const cartel = `<text x="${x.toFixed(1)}" y="${(p.caja[1] - 8).toFixed(1)}" font-size="24" font-weight="800" text-anchor="middle" fill="#1d2433" stroke="#fff" stroke-width="6" paint-order="stroke">Contratar</text>`;
+    cosas.push({ prof: u + v + 0.02, svg: `<g${zonaAttr('equipo')}>${p.svg}${mas}${cartel}</g>` });
+  }
   // Vos, en la esquina de la derecha, mirando todo
   persona(e.genero === 'mujer' ? 'iso-vos-mujer' : 'iso-vos-hombre', 0, 'vos', { etiqueta: 'Vos', fijo: [0.94, 0.5], grande: 1.08 });
   const alertaGente = alertas.has('equipo') ? (() => { const [x, y] = punto(0.95, 0.95); return alerta(x, y - 150); })() : '';

@@ -1,6 +1,6 @@
 # El Taller — Documento de diseño del juego
 
-> Versión 0.28 · Reglas en definición
+> Versión 0.29 · Reglas en definición
 > Juego web por turnos, para jugar solo, contra bots o online.
 
 ---
@@ -52,6 +52,7 @@ Simulador de emprendedor de sublimación con humor argentino. Arrancás sin nada
   - **Ubicación (v0.24):** máquinas en grilla de a 3, separadas para que se vean los ❗; vos, en la esquina de la derecha, quieto y un poco más grande ("controlando todo"); corcho y puerta más grandes. Las **cajas** muestran el stock en grilla: un casillero por producto con su foto y la cantidad.
   - **Escena isométrica (v0.23):** el taller se ve como una maqueta (pieza, local chico, local grande, galpón o planta) con las máquinas en fila contra la pared, la PC con el celular al lado, el corcho colgado, la puerta y las cajas (más grandes cuanto más stock). Se toca directamente el dibujo (ya no hay botones abajo); arriba del panel dice qué elegiste. De las máquinas que no tenés se ven en gris solo las **dos próximas**; las demás se compran desde **Vos** (Comprar y pagar) o en la lista.
   - Lo que pide atención lleva un **❗** que late (una decisión pendiente, una licitación sin ofertar, pedidos sin cubrir); al entrar se abre solo el primero (el sábado, primero las máquinas). El botón **Ver todo en lista** muestra la pantalla entera como antes, y el juego recuerda cuál elegiste.
+- **Contratar desde el taller (v0.29):** mientras haya lugar en el equipo, adelante en el piso hay una **persona gris con un + y el cartel "Contratar"** (como las máquinas por comprar): tocándola se abre Equipo, aunque todavía no tengas empleados. En **Vos** hay además un botón **Ir a Equipo**, y el tío lo explica en la semana 7 del tutorial.
 - **La gente del taller:** se ve una persona por cada empleado, más vos (con una flechita amarilla) y Lelo, paseando y trabajando. Si son muchos, se achican.
 - **Hombre o mujer:** al arrancar elegís cómo te mostramos en el taller. Las partidas guardadas de antes lo preguntan una sola vez al continuar. Si elegiste mujer, **los textos que te hablan van en femenino** (v0.26): "campeona" (tío y Chuchu), "trabajás sola", "estás muy cansada", "reventada", "¡Sos la mejor de la ciudad!", "Esta piba va a llegar lejos", etc. Cada empleado y cada encargado tiene su **género guardado** (según su nombre): se dibuja así en el taller y su foto coincide ("Encargada: Norma"). Mientras falte la imagen del otro género de un puesto, se muestra un emoji.
 - **Secciones contraíbles:** cada sección con título tiene un **+/−** en el borde superior derecho para achicarla o mostrarla. El juego recuerda cuáles dejaste cerradas.

@@ -322,7 +322,7 @@ function armarConEscena(e, partes, { pantalla, porDefecto = 'pc', fantasmas = fa
   }
   const lista = vista === 'lista';
   const tarjetaEscena = `<div class="tarjeta">
-      ${escenaTaller(e, { zona: lista ? null : zonaActiva, alertas: lista ? new Set() : alertas, fantasmas: fantasmas && !lista, enPais: enPais(e), interactiva: !lista })}
+      ${escenaTaller(e, { zona: lista ? null : zonaActiva, alertas: lista ? new Set() : alertas, fantasmas: fantasmas && !lista, enPais: enPais(e), interactiva: !lista, contratar: empleadosContratados(e) < cupoEquipo(e) || !e.equipo.empleados.length })}
       ${lista ? '' : `<p class="panel-titulo">${zonaActiva === 'vos' && e.genero === 'mujer' ? '🙋‍♀️' : datosZona(zonaActiva).icono} ${datosZona(zonaActiva).nombre}${!e.maquinas[zonaActiva] && MAQUINAS[zonaActiva] ? ' (para comprar)' : ''}<span class="suave" style="font-weight:400;font-size:.85rem">Tocá otra cosa del taller para ver lo suyo.</span></p>`}
       <div class="vista-lista"><button type="button" class="chico" id="vistaBoton">${lista ? '🏠 Ver el taller' : '☰ Ver todo en lista'}</button></div>
     </div>`;
@@ -1062,6 +1062,7 @@ function pantallaPublicidad() {
       ${opcionFeriaVendedor(e)}
     </div>` },
     { zona: 'puerta', html: bloqueMudanza(e), soloEscena: true },
+    { zona: 'vos', html: `<div class="tarjeta panel-zona"><p style="margin:0">👥 Para contratar, despedir o capacitar, tocá a tu gente en el taller o la <strong>persona gris con el +</strong> (adelante, en el taller).</p><div class="alterna" style="margin-top:8px"><button type="button" class="chico" data-ir-zona="equipo">Ir a Equipo</button></div></div>` },
     { zona: 'vos', html: `<div class="tarjeta sec-estudio">
       <h2>Estudiar</h2>
       ${e.curso.semanasRestantes > 0
@@ -1274,7 +1275,7 @@ function pantallaPedidos() {
       return { zona: m, html: tarjetaProducir(deEsta, `Producir · ${MAQUINAS[m].nombre}`), alerta: deEsta.some((id) => faltanDe(id) > 0), soloEscena: true };
     }),
     { zona: 'pc', html: tarjetaProducir(productos), soloLista: true },
-    { zona: 'equipo', html: `<div class="tarjeta panel-zona"><h3>👥 Tu equipo el sábado</h3>${lineaOperarios(e) || '<p class="suave">Producís solo. El domingo podés contratar gente desde Equipo.</p>'}${repartoTexto(e)}</div>`, soloEscena: true },
+    { zona: 'equipo', html: `<div class="tarjeta panel-zona"><h3>👥 Tu equipo el sábado</h3>${lineaOperarios(e) || '<p class="suave">Producís solo. El domingo podés contratar gente: tocá la persona gris con el + (adelante, en el taller).</p>'}${repartoTexto(e)}</div>`, soloEscena: true },
     { zona: 'vos', html: bloqueEstado(e) },
     { html: barraInferior(v.horas, v.costo, v.errores, 'Producir y entregar el domingo', 'terminar') },
   ];
