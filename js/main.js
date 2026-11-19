@@ -202,11 +202,13 @@ function pantallaPrestamo() {
 function bloqueEncabezado(e, extra = '') {
   const c = calendario(e.semana);
   return `<div class="encabezado">
-      <div class="fila">
+      <div class="fila principal">
         <span class="plata">${plata(e.plata)}</span>
+        <span class="rep-cabecera" title="Reputación: llegá a 100 para ser el mejor de ${e.meta === 'pais' ? 'el país' : e.meta === 'provincia' ? 'la provincia' : 'la ciudad'}"><span class="rep-num">⭐ <b>${Math.floor(e.rep)}</b><small>/100</small></span><span class="rep-meta">Reputación · ${e.meta === 'pais' ? 'país' : e.meta === 'provincia' ? 'provincia' : 'ciudad'}</span><span class="rep-barra"><span style="width:${pct(e.rep)}"></span></span></span>
+      </div>
+      <div class="fila">
         <span class="fecha">Semana ${e.semana} · ${c.nombreMes} (${c.estacion})${e.origen ? ` · ${nombreCiudad(e)}` : ''}</span>
-        <button class="sonido-boton" id="sonidoBoton" aria-label="${sonidoActivo() ? 'Silenciar' : 'Activar sonido'}">${sonidoActivo() ? '🔊' : '🔇'}</button>
-        <button class="menu-boton" id="menuBoton" aria-label="Menú">⋮</button>
+        <span class="botones-cabecera"><button class="sonido-boton" id="sonidoBoton" aria-label="${sonidoActivo() ? 'Silenciar' : 'Activar sonido'}">${sonidoActivo() ? '🔊' : '🔇'}</button><button class="menu-boton" id="menuBoton" aria-label="Menú">⋮</button></span>
       </div>
       ${extra}
       ${menuAbierto ? `<div class="menu">
@@ -451,6 +453,16 @@ function bloqueComprasYReinicio(e) {
       ${(e.local || 'casa') !== 'casa' ? '<button class="chico" id="dejarLocal">Devolver el local y volver a tu casa</button>' : ''}
       ${!despuesDeLaCiudad(e) ? `<p class="suave">El ${LOCALES.grande.nombre.toLowerCase()} (hasta ${LOCALES.grande.cupo}) se consigue en la provincia.</p>` : !enPais(e) ? `<p class="suave">En el país vas a poder mudarte a un galpón (hasta ${LOCALES.galpon.cupo}) o a una planta industrial pequeña (hasta ${LOCALES.planta.cupo}).</p>` : ''}
     </div>`;
+}
+
+// Stock guardado, en grilla: un casillero por producto que fabricás (con su foto y cuántos tenés).
+function grillaStock(e) {
+  const ids = Object.keys(PRODUCTOS).filter((id) => e.maquinas[PRODUCTOS[id].maquina] || e.stock[id]);
+  const total = ids.reduce((t, id) => t + (e.stock[id] || 0), 0);
+  return `<div class="tarjeta panel-zona"><h3>📦 Stock guardado: ${total} ${total === 1 ? 'unidad' : 'unidades'}</h3>
+    <div class="grilla-stock">${ids.map((id) => `<div class="casillero${e.stock[id] ? '' : ' vacio'}">${imagen(id, 'logo')}<b>${e.stock[id] || 0}</b><span>${PRODUCTOS[id].nombre}</span></div>`).join('')}</div>
+    <p class="suave">Lo guardado se usa primero para los pedidos. Lo que sobra se vende en la feria (o lo mandás a los locales).</p>
+  </div>`;
 }
 
 // Partes de "Comprar y pagar" para la escena: cada máquina, el tío (celular) y la mudanza (puerta).
@@ -1007,6 +1019,7 @@ function pantallaPublicidad() {
           ${pub.curso ? '<button class="chico" id="sinCurso" style="margin-top:8px">No estudiar esta semana</button>' : ''}`}
     </div>` },
     { zona: 'vos', html: bloqueEstado(e) },
+    { zona: 'cajas', html: grillaStock(e), soloEscena: true },
     { zona: 'equipo', html: bloqueEquipo(e) },
     ...maqs.map((m) => ({ zona: m, html: htmlMaquinaDomingo(e, m), soloEscena: true })),
     { zona: 'vos', html: bloqueComprasYReinicio(e) },
@@ -1166,7 +1179,6 @@ function pantallaPedidos() {
     </div>` : '');
   const faltanDe = (id) => Math.max(0, pedidas[id] + empresa[id] + (id === 'combo' ? combos : 0) - e.stock[id] - plan.producir[id]);
   const maqs = maquinasDeLaEscena(e, { fantasmas: false });
-  const stockHtml = Object.keys(PRODUCTOS).filter((id) => e.stock[id]).map((id) => `${e.stock[id]} ${nombreUnidades(id, e.stock[id])}`).join(', ');
   const empresas = bloqueEmpresas(e);
   const partes = [
     { arriba: true, html: aviso ? `<div class="tarjeta tio"><p>${aviso}</p></div>` : '' },
@@ -1190,7 +1202,7 @@ function pantallaPedidos() {
       ${e.mejorDeLaCiudad ? '<p class="suave" style="margin-top:8px">Tercerizar: otro taller lo hace por vos. No te lleva horas ni stock, pero te queda solo un 5-10% de ganancia. "El resto" son los pedidos que no cubrís con tu stock y lo que vas a producir. Ojo: a veces la tercerizadora entrega mal y perdés el pedido y el insumo.</p>' : ''}
       <p class="suave" style="margin-top:8px">Si no entregás un pedido aceptado perdés reputación. Si sabés que no llegás, rechazalo: perdés mucho menos.${sem.pedidos.some((p) => p.envio || p.diseno) ? ' Los envíos los hace un operario con horas libres (si no, vos) y suman reputación; el diseño propio lo hace tu diseñador de esa máquina (si no tenés, o no le alcanzan las horas, vos).' : ''}</p>
     </div>` },
-    { zona: 'cajas', html: `<div class="tarjeta panel-zona"><h3>📦 Stock</h3><p class="suave">${stockHtml ? `Tenés guardado: ${stockHtml}.` : 'No tenés nada guardado.'} Se usa primero para los pedidos.</p></div>`, soloEscena: true },
+    { zona: 'cajas', html: grillaStock(e), soloEscena: true },
     { zona: 'cajas', html: bloqueTransporte(e, sem) },
     { zona: 'corcho', html: empresas, alerta: (e.pedidosEmpresa || []).some((x) => x.estado === 'oferta') },
     ...maqs.map((m) => {

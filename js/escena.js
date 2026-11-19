@@ -27,7 +27,7 @@ function punto(u, v) {
 // Alto de cada cosa en la escena (el lugar mide unos 830 de ancho)
 const ALTO = {
   tazas: 132, gorras: 132, plancha30: 132, plancha1m: 146, calandra: 140, costura: 116, bordado: 124,
-  pc: 104, celular: 44, cajas: 70, puerta: 150, corcho: 82, persona: 128,
+  pc: 104, celular: 44, cajas: 70, puerta: 205, corcho: 130, persona: 128,
 };
 const IMG_MAQ = { tazas: 'iso-tazas', gorras: 'iso-gorras', plancha30: 'iso-plancha30', plancha1m: 'iso-plancha1m', calandra: 'iso-calandra', costura: 'iso-costura', bordado: 'iso-bordado' };
 
@@ -70,18 +70,17 @@ export function escenaTaller(e, { zona = null, alertas = new Set(), fantasmas = 
   const cosas = []; // { prof, svg } — se dibujan de atrás para adelante
   const zonaAttr = (id) => (interactiva ? ` data-zona="${id}" class="zona${zona === id ? ' elegida' : ''}"` : '');
   const agregar = (id, u, v, html, caja, extra = '') => {
-    const marca = alertas.has(id) ? alerta(caja[0] + caja[2] * 0.75, caja[1] + 12) : '';
+    const marca = alertas.has(id) ? alerta(caja[0] + caja[2] * 0.5, caja[1] - 4) : '';
     cosas.push({ prof: u + v, svg: `<g${zonaAttr(id)}>${html}${extra}${marca}</g>` });
   };
 
   // Máquinas: en fila contra la pared izquierda (y una segunda fila si son más de 4)
   const maquinas = maquinasDeLaEscena(e, { fantasmas, enPais });
   maquinas.forEach((m, i) => {
-    const fila = i < 4 ? 0 : 1;
-    const enFila = fila === 0 ? Math.min(4, maquinas.length) : maquinas.length - 4;
-    const k = fila === 0 ? i : i - 4;
-    const u = fila === 0 ? 0.16 : 0.36;
-    const v = 0.3 + (k + 0.5) * (0.56 / Math.max(enFila, 3));
+    const fila = Math.floor(i / 3);
+    const k = i % 3;
+    const u = [0.15, 0.4, 0.63][fila] ?? 0.63;
+    const v = [0.3, 0.58, 0.86][k];
     const [x, y] = punto(u, v);
     const tiene = e.maquinas[m];
     const p = pieza(IMG_MAQ[m], x, y, ALTO[m], { clase: tiene ? 'esc-maquina' : 'esc-fantasma' });
@@ -102,14 +101,14 @@ export function escenaTaller(e, { zona = null, alertas = new Set(), fantasmas = 
   }
   {
     // El corcho, colgado en la pared derecha (arriba de la PC)
-    const [x, y] = punto(0.86, 0.0);
-    const p = pieza('iso-corcho', x, y, ALTO.corcho, { espejo: true, subir: 150 });
+    const [x, y] = punto(0.8, 0.0);
+    const p = pieza('iso-corcho', x, y, ALTO.corcho, { espejo: true, subir: 140 });
     cosas.push({ prof: -1, svg: `<g${zonaAttr('corcho')}>${p.svg}${alertas.has('corcho') ? alerta(p.caja[0] + p.caja[2] * 0.8, p.caja[1] + 10) : ''}</g>` });
   }
   {
     // La puerta, en la pared izquierda, adelante
-    const [x, y] = punto(0.0, 0.93);
-    const p = pieza('iso-puerta', x + 4, y, ALTO.puerta);
+    const [x, y] = punto(0.0, 0.9);
+    const p = pieza('iso-puerta', x + 6, y, ALTO.puerta);
     cosas.push({ prof: 0.5, svg: `<g${zonaAttr('puerta')}>${p.svg}${alertas.has('puerta') ? alerta(p.caja[0] + p.caja[2] * 0.7, p.caja[1] + 10) : ''}</g>` });
   }
   {
@@ -126,12 +125,12 @@ export function escenaTaller(e, { zona = null, alertas = new Set(), fantasmas = 
   const lelo = e.equipo.empleados.some((x) => x.esLelo);
   const total = 1 + (lelo ? 1 : 0) + emps.length;
   const esc = total <= 8 ? 1 : total <= 20 ? 0.82 : 0.66;
-  const persona = (nombre, i, id, { etiqueta = '' } = {}) => {
-    const u = 0.42 + azar(i, 1) * 0.5;
-    const v = 0.36 + azar(i, 2) * 0.56;
+  const persona = (nombre, i, id, { etiqueta = '', fijo = null, grande = 1 } = {}) => {
+    const u = fijo ? fijo[0] : 0.4 + azar(i, 1) * 0.42;
+    const v = fijo ? fijo[1] : 0.4 + azar(i, 2) * 0.55;
     const [x, y] = punto(u, v);
-    const p = pieza(nombre, x, y, ALTO.persona * esc);
-    const paso = (azar(i, 3) - 0.5) * 60;
+    const p = pieza(nombre, x, y, ALTO.persona * (fijo ? Math.max(esc, 0.9) * grande : esc));
+    const paso = fijo ? 0 : (azar(i, 3) - 0.5) * 60;
     const flecha = etiqueta ? `<path d="M${x - 9},${p.caja[1] - 22} h18 l-9,11z" fill="#f5c518" stroke="#1d2433" stroke-width="2" class="esc-latido"/>` : '';
     cosas.push({
       prof: u + v + 0.01,
@@ -143,7 +142,8 @@ export function escenaTaller(e, { zona = null, alertas = new Set(), fantasmas = 
     persona(mujer ? 'iso-empleada' : 'iso-empleado', i + 2, 'equipo');
   });
   if (lelo) persona('iso-lelo', 1, 'equipo');
-  persona(e.genero === 'mujer' ? 'iso-vos-mujer' : 'iso-vos-hombre', 0, 'vos', { etiqueta: 'Vos' });
+  // Vos, en la esquina de la derecha, mirando todo
+  persona(e.genero === 'mujer' ? 'iso-vos-mujer' : 'iso-vos-hombre', 0, 'vos', { etiqueta: 'Vos', fijo: [0.94, 0.5], grande: 1.08 });
   const alertaGente = alertas.has('equipo') ? (() => { const [x, y] = punto(0.95, 0.95); return alerta(x, y - 150); })() : '';
 
   cosas.sort((a, b) => a.prof - b.prof);
