@@ -315,6 +315,24 @@ details.detalle-semana summary { cursor: pointer; font-weight: 700; padding: 6px
 .mapa .prov:hover { stroke: #1f2a44; stroke-width: 1.4; }
 .mapa .prov.seleccionada { stroke: #2f6fde; stroke-width: 2.2; }
 .leyenda-mapa { display: flex; flex-wrap: wrap; gap: 6px 12px; justify-content: center; font-size: .78rem; color: var(--suave); margin: 6px 0 4px; }
+.leyenda-mapa .ico-leyenda { height: 15px; width: auto; vertical-align: -3px; margin-right: 3px; }
+.mapa-semana { padding-top: 8px; }
+.mapa-semana .mapa { max-height: 36vh; width: auto; max-width: 100%; }
+.mapa-caption { text-align: center; margin: 0 0 6px; line-height: 1.25; }
+.mapa-caption strong { display: block; }
+.mapa-caption span { display: block; font-size: .8rem; color: var(--suave); }
+.mapa .pin, .mapa .pin-base { transform-box: fill-box; transform-origin: bottom center; }
+.mapa .late { animation: late-pin .5s ease-out; }
+@keyframes late-pin { 0% { transform: scale(1); } 40% { transform: scale(1.35); } 100% { transform: scale(1); } }
+.mapa .sprite.tiembla image { animation: tiembla .12s linear infinite; }
+@keyframes tiembla { 0%, 100% { transform: translate(0, 0); } 25% { transform: translate(-1px, .5px); } 75% { transform: translate(1px, -.5px); } }
+.mapa .sprite { transition: opacity .4s; }
+.mapa .sprite.se-va { opacity: 0; }
+.mapa .sprite.aparece { animation: aparece-sobre .7s ease-out forwards; }
+@keyframes aparece-sobre { from { opacity: 0; } 30% { opacity: 1; } to { opacity: 0; } }
+.mapa .cartel-mapa { animation: aparece-cartel .25s ease-out; }
+@keyframes aparece-cartel { from { opacity: 0; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .mapa .late, .mapa .sprite.tiembla image { animation: none; } }
 .leyenda-mapa i { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 4px; vertical-align: -2px; }
 .avatar.mini { --avatar: 32px; }
 .detalle.con-avatar { align-items: center; }

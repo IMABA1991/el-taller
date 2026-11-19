@@ -7,7 +7,7 @@ import {
   SERVICIOS, LELO_VIAJE, TRAICIO, SIN_TEXTIL_ERRORES, PROVINCIA, LELO_GERENTE, DEFENSAS, SEGURIDAD, EMPRESAS,
   TERCERIZAR, LICITACION, VOZ_DE_ADENTRO, ABUELA,
   RRHH, PROVINCIAS_AR, PAIS, ENCARGADO, TRANSPORTE, LELO_COMERCIAL, TOPA, MARCAS, ATAQUES_PAIS, DEFENSAS_PAIS, PRODUCTOS_SIMPLES,
-  GRANDES, INFOARG, EVENTOS_MARCA, EMPRESAS_PAIS, CLUBES_BARRIO, LICITACION_SEGUNDA, TRAICIO_TEXTOS, INFLACION, SUELDOS_ETAPA,
+  REGIONES, diaRegion, GRANDES, INFOARG, EVENTOS_MARCA, EMPRESAS_PAIS, CLUBES_BARRIO, LICITACION_SEGUNDA, TRAICIO_TEXTOS, INFLACION, SUELDOS_ETAPA,
 } from './data.js';
 
 export const VERSION_PARTIDA = 7;
@@ -1542,6 +1542,7 @@ export function publicar(e, pub) {
   if (enPais(e)) {
     const horasMarca = horas + horasVendedores;
     const pedidosPais = pedidosDeLocales(e, { ...pub, horasMarca }, enDia, evento, diaAlAzar);
+    viajesDeLaSemana(e, enDia);
     if (!e.mejorDelPais || true) ofertasEspecialesPais(e, enDia, evento);
     const totalU = pedidosPais.reduce((t, p) => t + p.cantidad, 0);
     enDia(6, totalU ? `📦 Los locales juntaron ${totalU} producto${totalU === 1 ? '' : 's'} para mandar. Se producen hoy y llegan la semana que viene.` : '📦 Los locales no juntaron pedidos esta semana.', 'cierre');
@@ -3132,7 +3133,8 @@ function pedidosDeLocales(e, pub, enDia, evento, diaAlAzar) {
       pedidos.push({ id: `p${e.semana}-${++n}`, producto: id, cantidad: cant, cliente: `el local de ${PROVINCIAS_AR[l.prov].nombre}`, local: l.prov, rechazado: false, dia: 6, pais: true });
     }
     const total = Object.values(resumen).reduce((a, b) => a + b, 0);
-    const dia = diaAlAzar();
+    const azar = diaAlAzar(); // se sigue tirando para no cambiar el resto del azar
+    const dia = diaRegion(l.prov) ?? azar; // los pedidos vuelven el día de su región
     if (total) enDia(dia, `🏪 Local de ${PROVINCIAS_AR[l.prov].nombre}: ${total} pedido${total === 1 ? '' : 's'} (${describirUnidades(resumen)}).`, 'pedido');
     else enDia(dia, `🏪 Local de ${PROVINCIAS_AR[l.prov].nombre}: semana flojita, sin pedidos.`, 'info');
     if (perdidos) enDia(Math.min(6, dia + 1), `🤦 ${enc.nombre}, del local de ${PROVINCIAS_AR[l.prov].nombre}, perdió ${perdidos} pedido${perdidos === 1 ? '' : 's'} (anotados en una servilleta).`, 'mala');
@@ -3215,6 +3217,56 @@ function enviarALocal(e, r, p, precio, transporte) {
   envio.valor += precio;
 }
 
+// Qué pasa con un envío en el camino. Se decide el domingo (para mostrarlo en el mapa de la semana)
+// y se cobra al cerrar la semana.
+function resolverEnvio(e, env) {
+  if (env.resuelto) return env.resuelto;
+  let parte = 1; // lo que llega
+  if (env.transporte) {
+    const t = TRANSPORTE[env.transporte];
+    if (siguienteAzar(e) < t.falla) {
+      const total = siguienteAzar(e) < t.total;
+      parte = total ? 0 : 1 - entre(e, TRANSPORTE.parcial.min, TRANSPORTE.parcial.max);
+    }
+  }
+  const llegaron = {};
+  const perdidas = {};
+  let texto = null;
+  if (parte < 1) {
+    // Se pierden unidades al azar de lo que iba
+    const lista = [];
+    for (const [id, n] of Object.entries(env.items)) for (let i = 0; i < n; i++) lista.push(id);
+    mezclar(e, lista);
+    const pierde = parte === 0 ? lista.length : Math.max(1, Math.round(lista.length * (1 - parte)));
+    lista.forEach((id, i) => { if (i < pierde) perdidas[id] = (perdidas[id] || 0) + 1; else llegaron[id] = (llegaron[id] || 0) + 1; });
+    const plantilla = parte === 0
+      ? TRANSPORTE.textosTotal[Math.floor(siguienteAzar(e) * TRANSPORTE.textosTotal.length)]
+      : TRANSPORTE.textosParcial[Math.floor(siguienteAzar(e) * TRANSPORTE.textosParcial.length)];
+    texto = plantilla.replace('{local}', PROVINCIAS_AR[env.local].nombre).replace('{u}', describirUnidades(perdidas));
+  } else Object.assign(llegaron, env.items);
+  env.resuelto = { parte, llegaron, perdidas, texto };
+  return env.resuelto;
+}
+
+// Domingo, país: se decide qué pasa en cada viaje de la semana y se cuenta el día de su región.
+function viajesDeLaSemana(e, enDia) {
+  const porDia = {};
+  for (const env of e.pais.envios.filter((x) => x.llega === e.semana)) {
+    const res = resolverEnvio(e, env);
+    if (!env.transporte) continue; // el local de tu ciudad no necesita traslado
+    const dia = diaRegion(env.local) ?? 6;
+    (porDia[dia] ||= { transporte: env.transporte, llegan: [] });
+    if (res.parte > 0) porDia[dia].llegan.push(PROVINCIAS_AR[env.local].nombre);
+    if (res.texto) enDia(dia, `🚚 ${res.texto}`, res.parte === 0 ? 'desastre' : 'mala');
+  }
+  const quien = { avion: 'El avión', flete: 'El flete', amigo: 'Tu amigo con el auto' };
+  for (const [dia, v] of Object.entries(porDia)) {
+    if (!v.llegan.length) continue;
+    const r = REGIONES.find((x) => x.dia === Number(dia));
+    enDia(Number(dia), `🚚 ${quien[v.transporte] || 'El envío'} recorrió ${r?.ruta || 'la ruta'}: llegó la mercadería a ${listaY(v.llegan)}.`, 'buena');
+  }
+}
+
 function llegadaEnvios(e, r, evento) {
   const llegan = e.pais.envios.filter((x) => x.llega <= e.semana);
   e.pais.envios = e.pais.envios.filter((x) => x.llega > e.semana);
@@ -3223,26 +3275,8 @@ function llegadaEnvios(e, r, evento) {
   for (const env of llegan) {
     const l = e.pais.locales.find((x) => x.prov === env.local);
     if (!l) continue;
-    const nombre = PROVINCIAS_AR[env.local].nombre;
-    let parte = 1; // lo que llega
-    if (env.transporte) {
-      const t = TRANSPORTE[env.transporte];
-      if (siguienteAzar(e) < t.falla) {
-        const total = siguienteAzar(e) < t.total;
-        parte = total ? 0 : 1 - entre(e, TRANSPORTE.parcial.min, TRANSPORTE.parcial.max);
-      }
-    }
+    const { parte, llegaron, texto } = resolverEnvio(e, env);
     const unidades = Object.values(env.items).reduce((a, b) => a + b, 0);
-    const llegaron = {};
-    const perdidas = {};
-    if (parte < 1) {
-      // Se pierden unidades al azar de lo que iba
-      const lista = [];
-      for (const [id, n] of Object.entries(env.items)) for (let i = 0; i < n; i++) lista.push(id);
-      mezclar(e, lista);
-      const pierde = parte === 0 ? lista.length : Math.max(1, Math.round(lista.length * (1 - parte)));
-      lista.forEach((id, i) => { if (i < pierde) perdidas[id] = (perdidas[id] || 0) + 1; else llegaron[id] = (llegaron[id] || 0) + 1; });
-    } else Object.assign(llegaron, env.items);
     const nLlegaron = Object.values(llegaron).reduce((a, b) => a + b, 0);
     const nPerdidas = unidades - nLlegaron;
     // Se cobra lo que llegó (proporcional al valor), con la defensa "precio de batalla" para los simples
@@ -3263,10 +3297,7 @@ function llegadaEnvios(e, r, evento) {
     moverRepLocal(e, l, gu * nLlegaron + gu * PAIS.noEntregado * nPerdidas);
     if (nPerdidas) {
       perdidasTotales += nPerdidas;
-      const plantilla = parte === 0
-        ? TRANSPORTE.textosTotal[Math.floor(siguienteAzar(e) * TRANSPORTE.textosTotal.length)]
-        : TRANSPORTE.textosParcial[Math.floor(siguienteAzar(e) * TRANSPORTE.textosParcial.length)];
-      evento(`🚚 ${plantilla.replace('{local}', nombre).replace('{u}', describirUnidades(perdidas))} Lo que no llegó cuenta como no entregado en ese local.`, parte === 0 ? 'desastre' : 'mala');
+      evento(`🚚 ${texto} Lo que no llegó cuenta como no entregado en ese local.`, parte === 0 ? 'desastre' : 'mala');
     }
   }
   if (cobrado) r.lineas.push(`Los locales cobraron ${plata$(cobrado)} por lo que llegó esta semana.`);

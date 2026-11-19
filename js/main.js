@@ -25,7 +25,7 @@ import { guardar, cargar, borrar } from './storage.js';
 import { imagen } from './arte.js';
 import { sonido, sonidoDeEvento, alternarSonido, sonidoActivo, flotar, contar } from './efectos.js';
 import { escenaTaller, maquinasDeLaEscena } from './escena.js';
-import { mapaPais, leyendaMapa } from './mapa.js';
+import { mapaPais, leyendaMapa, datosMapaSemana, animadorMapa, duracionDiaMapa } from './mapa.js';
 
 const app = document.getElementById('app');
 let partida = null;
@@ -1124,9 +1124,12 @@ function pantallaPublicidad() {
 
 
 // ---------- La semana de publicidad, día por día ----------
+let animMapa = null; // la animación del mapa de la semana (país)
 function frenarAnimacion() {
   temporizadores.forEach(clearTimeout);
   temporizadores = [];
+  animMapa?.parar();
+  animMapa = null;
 }
 
 function pantallaAnimacion(sem) {
@@ -1134,18 +1137,29 @@ function pantallaAnimacion(sem) {
   window.scrollTo(0, 0);
   const e = partida;
   const c = calendario(e.semana);
+  // País: de lunes a sábado sale un viaje por región y vuelven los sobres de pedidos; el domingo, descanso.
+  const dm = enPais(e) && sem.transporte !== undefined ? datosMapaSemana(e, sem) : null;
   app.innerHTML = `
     <div class="encabezado">
       <div class="fila"><span class="plata">${plata(e.plata)}</span><span class="fecha">Semana ${e.semana} · ${c.nombreMes}</span></div>
       <div class="paso-semana">Publicidad en marcha · ${sem.horasRedes} h</div>
     </div>
     <div class="dias">${sem.dias.map((d, i) => `<span class="dia" data-dia="${i}">${d.nombre}</span>`).join('')}</div>
+    ${dm ? `<div class="tarjeta mapa-semana"><p class="mapa-caption" id="mapaCaption"><strong>Domingo</strong><span>descanso</span></p>${mapaPais(e, { conCamiones: false, clase: 'mapa-anim' })}</div>` : ''}
     <div class="tarjeta"><ul class="feed" id="feed"></ul></div>
     <div class="barra-inferior"><div class="contenido">
       <button class="boton secundario" id="saltar">Saltar</button>
     </div></div>
   `;
   const feed = document.getElementById('feed');
+  const caption = document.getElementById('mapaCaption');
+  if (dm) animMapa = animadorMapa(app.querySelector('.mapa-anim'), dm);
+  const textoDia = (i) => {
+    const d = dm.dias[i];
+    if (!d.region) return `<strong>${DIAS_LARGOS[i]}</strong><span>descanso</span>`;
+    const algo = d.viaje ? (d.sobres.length ? 'viaja la mercadería y vuelven los pedidos' : 'viaja la mercadería') : d.sobres.length ? 'vuelven los pedidos' : 'sin movimiento';
+    return `<strong>${DIAS_LARGOS[i]} · ${d.region.nombre}</strong><span>${algo}</span>`;
+  };
   const marcarDia = (i) => app.querySelectorAll('.dia').forEach((el) => {
     const n = Number(el.dataset.dia);
     el.classList.toggle('activo', n === i);
@@ -1161,6 +1175,7 @@ function pantallaAnimacion(sem) {
   const terminar = () => {
     frenarAnimacion();
     marcarDia(7);
+    if (caption) caption.innerHTML = '<strong>Así quedó tu país esta semana</strong><span>colores: reputación de cada local</span>';
     feed.innerHTML = '';
     sem.dias.forEach((d, i) => {
       const titulo = document.createElement('li');
@@ -1176,8 +1191,10 @@ function pantallaAnimacion(sem) {
   };
   let t = 300;
   sem.dias.forEach((d, i) => {
+    const inicioDia = t;
     temporizadores.push(setTimeout(() => {
       marcarDia(i);
+      if (dm) { caption.innerHTML = textoDia(i); animMapa?.dia(i); }
       const titulo = document.createElement('li');
       titulo.className = 'titulo-dia';
       titulo.textContent = DIAS_LARGOS[i];
@@ -1190,6 +1207,7 @@ function pantallaAnimacion(sem) {
       t += 450;
     });
     t += 300;
+    if (dm) t = Math.max(t, inicioDia + duracionDiaMapa(dm.dias[i], dm.origen) + 200); // el día espera al vehículo
   });
   temporizadores.push(setTimeout(terminar, t + 400));
   document.getElementById('saltar').onclick = terminar;

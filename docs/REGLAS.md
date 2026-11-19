@@ -1,6 +1,6 @@
 # El Taller — Documento de diseño del juego
 
-> Versión 0.29 · Reglas en definición
+> Versión 0.31 · Reglas en definición
 > Juego web por turnos, para jugar solo, contra bots o online.
 
 ---
@@ -37,7 +37,8 @@ Simulador de emprendedor de sublimación con humor argentino. Arrancás sin nada
 - **Cantidades a producir:** se suben o bajan con + y −; si mantenés apretado el botón, el número sigue corriendo cada vez más rápido. También se puede tocar el número y escribirlo con el teclado. No hay alertas nuevas: valen las validaciones de siempre.
 - **Semana animada:** la pantalla queda fija mientras aparecen los eventos; si querés ver los nuevos, deslizás vos.
 - **Eventos destacados:** las **oportunidades** (pedidos de empresas, licitaciones que abren, la abuela pidiendo trabajo para Lelo) salen en **amarillo fuerte**; los **desastres** (sabotajes de Traicio, cartas malas grandes del mazo, tercerizaciones que fallan) en **rojo fuerte**.
-- **Gráficos (v0.21):** escena del taller dibujada en código que cambia según el lugar (casa, local, galpón, planta), las máquinas compradas, el equipo y el stock, con animaciones (prensas, calandra, vapor); mapa de Argentina con las provincias pintadas según la reputación de cada local (⭐ tu ciudad, 😏 Lelo, 🚚 mercadería en camino); tocar una provincia libre la elige para abrir un local.
+- **Gráficos (v0.21):** escena del taller dibujada en código que cambia según el lugar (casa, local, galpón, planta), las máquinas compradas, el equipo y el stock, con animaciones (prensas, calandra, vapor); mapa de Argentina con las provincias pintadas según la reputación de cada local (pin dorado: tu taller; pin amarillo: cada local; 😏 Lelo; el vehículo del traslado en camino); tocar una provincia libre la elige para abrir un local.
+- **Mapa de la semana (v0.31, país):** en la semana animada aparece el mapa aparte, arriba de los eventos. De lunes a sábado sale **un viaje por región** (lunes NOA, martes NEA, miércoles Cuyo, jueves Centro, viernes Buenos Aires, sábado Patagonia) con el vehículo elegido (camión del flete, avión o el auto del amigo), que recorre los locales de la región; ese mismo día vuelven volando los **sobres de pedidos** de esos locales hacia tu taller. Si algo sale mal en la ruta, el vehículo frena a mitad de camino con un cartel rojo y el evento sale ese día. El domingo no hay viajes: el mapa queda quieto para analizarlo. Es solo visual: se manda el sábado y llega y se cobra la semana siguiente, como siempre (lo que pasa en el camino ahora se decide el domingo). Los pedidos de cada local llegan el día de su región.
 - **Efectos:** la plata que salta (+/−) cuando cambia, sonidos cortos sintetizados (caja registradora, prensa, pedidos, desastres, logros) con botón para silenciar, y un resumen semanal con el resultado grande, lo más importante arriba y el resto desplegable.
 - **Estilo de las ilustraciones:** caricatura plana para personajes, productos e íconos; isométrico solo para la escena del taller. Las imágenes se generan con Gemini y reemplazan de a poco los emojis y los dibujos en código (ver `docs/ARTE.md`).
 - **El taller es el menú (v0.22):** el domingo y el sábado arrancan con la escena del taller. Tocás un objeto (o su botón debajo) y abajo se ve **solo lo de ese objeto**:

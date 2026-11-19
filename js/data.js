@@ -706,6 +706,18 @@ export const VOZ_DE_ADENTRO = [
 // Provincias (y la Ciudad de Buenos Aires) con su población del Censo 2022, en miles.
 // El mercado de cada local se reparte según la población. El juego nunca muestra estos números:
 // solo da pistas ("mucha gente", "alquiler caro").
+// Recorrido de la semana en el país: de lunes a sábado sale un vehículo por región (el domingo, descanso).
+// Lo que se manda a los locales de una región llega ese día, y ese mismo día vuelven sus sobres de pedidos.
+export const REGIONES = [
+  { dia: 1, nombre: 'NOA', ruta: 'el NOA', provs: ['jujuy', 'salta', 'tucuman', 'catamarca', 'santiago', 'laRioja'] },
+  { dia: 2, nombre: 'NEA', ruta: 'el NEA', provs: ['misiones', 'corrientes', 'chaco', 'formosa'] },
+  { dia: 3, nombre: 'Cuyo', ruta: 'Cuyo', provs: ['mendoza', 'sanJuan', 'sanLuis'] },
+  { dia: 4, nombre: 'Centro', ruta: 'el Centro', provs: ['cordoba', 'santaFe', 'entreRios'] },
+  { dia: 5, nombre: 'Buenos Aires', ruta: 'Buenos Aires', provs: ['buenosAires', 'caba', 'laPampa'] },
+  { dia: 6, nombre: 'Patagonia', ruta: 'la Patagonia', provs: ['neuquen', 'rioNegro', 'chubut', 'santaCruz', 'tierraDelFuego'] },
+];
+export const diaRegion = (prov) => REGIONES.find((r) => r.provs.includes(prov))?.dia ?? null;
+
 export const PROVINCIAS_AR = {
   buenosAires: { nombre: 'Buenos Aires', pob: 17523 },
   caba: { nombre: 'Ciudad de Buenos Aires', pob: 3121 },
