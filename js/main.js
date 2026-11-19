@@ -19,7 +19,7 @@ import {
   TRAICIO_TEXTOS, elegirOrigen, nombreCiudad, pistaProvincia, abrirLocal, cambiarEncargado, asignarLelo, cambiarDefensaPais, costoDefensaPais,
   gastosLocalesDelMes, provinciasLibres, costoAbrirLocal, alquilerLocal, sueldoEncargado, ofertaPaisVigente, tomarOfertaPais, enCamino,
   costoTraslado, cumpleRequisito, puedeOfertarLicitacion, coberturaRRHH, tieneRRHH, horasCostura, elegirGenero,
-  inflacionActual,
+  inflacionActual, clientesDeLaSemana, rechazarCliente,
 } from './engine.js';
 import { guardar, cargar, borrar } from './storage.js';
 import { imagen } from './arte.js';
@@ -377,6 +377,9 @@ function conectarMenu() {
     pantallaInicio();
   };
 }
+
+const capitalizarTexto = (t) => t.charAt(0).toUpperCase() + t.slice(1);
+const listaConY = (xs) => (xs.length > 1 ? `${xs.slice(0, -1).join(', ')} y ${xs[xs.length - 1]}` : xs.join(''));
 
 // Inflación: la del último mes, la de los últimos 12 y cuánto falta para que se actualicen precios, sueldos y alquileres
 function bloqueInflacion(e) {
@@ -1236,23 +1239,32 @@ function pantallaPedidos() {
     { arriba: true, html: aviso ? `<div class="tarjeta tio"><p>${aviso}</p></div>` : '' },
     { zona: 'pc', html: sem.eventos.length ? `<div class="tarjeta"><ul class="eventos">${sem.eventos.map((ev) => `<li class="${ev.tipo}">${ev.texto}</li>`).join('')}</ul></div>` : '' },
     { zona: 'pc', html: `<div class="tarjeta sec-trabajo">
-      <h2>Pedidos de la semana (${sem.pedidos.filter((p) => !p.rechazado).length})</h2>
-      ${enPais(e) ? htmlPedidosPais(e, sem, precio, costoTerc) : sem.pedidos.length ? sem.pedidos.map((p) => `
-        <div class="pedido ${p.rechazado ? 'rechazado' : ''}">
+      <h2>Pedidos de la semana (${enPais(e) ? sem.pedidos.filter((p) => !p.rechazado).length : `${clientesDeLaSemana({ pedidos: sem.pedidos.filter((p) => !p.rechazado) }).length} clientes`})</h2>
+      ${enPais(e) ? htmlPedidosPais(e, sem, precio, costoTerc) : sem.pedidos.length ? clientesDeLaSemana(sem).map((g) => {
+        const activas = g.lineas.filter((p) => !p.rechazado);
+        const terc = g.lineas.filter((p) => p.tercerizado);
+        const rechazado = !activas.length;
+        const marca = (p) => `${p.envio ? ' 🚚' : ''}${p.diseno ? ' 🎨' : ''}`;
+        const items = g.lineas.map((p) => `${p.cantidad} ${nombreUnidades(p.producto, p.cantidad)}${marca(p)}`);
+        const total = g.lineas.reduce((t, p) => t + precio(p), 0);
+        const estado = rechazado ? ' · rechazado' : terc.length ? ` · <strong>tercerizado${terc.length < activas.length ? `: ${terc.map((p) => `${p.cantidad} ${nombreUnidades(p.producto, p.cantidad)}`).join(', ')}` : ''}</strong> (${plata(terc.reduce((t, p) => t + costoTerc(p), 0))})` : '';
+        const marcado = activas.length && activas.every((p) => seleccionTerc?.has(p.id));
+        return `
+        <div class="pedido ${rechazado ? 'rechazado' : ''}">
           <div class="info">
-            <div class="nombre">${p.cantidad} ${nombreUnidades(p.producto, p.cantidad)}</div>
-            <div class="detalle">${p.cliente} · ${plata(precio(p))}${servicios(p)}${p.rechazado ? ' · rechazado' : ''}${p.tercerizado ? ` · <strong>tercerizado</strong> (${plata(costoTerc(p))})` : ''}</div>
+            <div class="nombre">${capitalizarTexto(g.cliente)}</div>
+            <div class="detalle">${listaConY(items)} · ${plata(total)}${estado}</div>
           </div>
           <div class="acciones-pedido">
-            ${seleccionTerc && !p.rechazado ? `<label class="marcar"><input type="checkbox" data-marcar="${p.id}" ${seleccionTerc.has(p.id) ? 'checked' : ''}> ${plata(costoTerc(p))}</label>`
-              : p.tercerizado ? '' : `<button class="chico" data-rechazar="${p.id}">${p.rechazado ? 'Aceptar' : 'Rechazar'}</button>`}
-          </div>
-        </div>`).join('') : '<p class="suave">No llegaron pedidos. Probá con más horas de publicidad la semana que viene.</p>'}
+            ${seleccionTerc && !rechazado ? `<label class="marcar"><input type="checkbox" data-marcar-cliente="${g.id}" ${marcado ? 'checked' : ''}> ${plata(activas.reduce((t, p) => t + costoTerc(p), 0))}</label>`
+              : terc.length && terc.length === activas.length ? '' : `<button class="chico" data-rechazar-cliente="${g.id}">${rechazado ? 'Aceptar' : 'Rechazar'}</button>`}
+          </div>        </div>`;
+      }).join('') : '<p class="suave">No llegaron pedidos. Probá con más horas de publicidad la semana que viene.</p>'}
       ${e.mejorDeLaCiudad && sem.pedidos.some((p) => !p.rechazado) ? (seleccionTerc
         ? `<div class="alterna" style="margin-top:8px"><button class="chico activo" id="tercConfirmar">Tercerizar marcados (${seleccionTerc.size})</button><button class="chico" id="tercCancelar">Cancelar</button></div>`
         : `<div class="alterna" style="margin-top:8px"><button class="chico" id="tercTodo">Tercerizar todo</button><button class="chico" id="tercResto">Tercerizar el resto</button><button class="chico" id="tercElegir">Elegir cuáles</button>${sem.pedidos.some((p) => p.tercerizado) ? '<button class="chico" id="tercNada">No tercerizar nada</button>' : ''}</div>`) : ''}
       ${e.mejorDeLaCiudad ? '<p class="suave" style="margin-top:8px">Tercerizar: otro taller lo hace por vos. No te lleva horas ni stock, pero te queda solo un 5-10% de ganancia. "El resto" son los pedidos que no cubrís con tu stock y lo que vas a producir. Ojo: a veces la tercerizadora entrega mal y perdés el pedido y el insumo.</p>' : ''}
-      <p class="suave" style="margin-top:8px">Si no entregás un pedido aceptado perdés reputación. Si sabés que no llegás, rechazalo: perdés mucho menos.${sem.pedidos.some((p) => p.envio || p.diseno) ? ' Los envíos los hace un operario con horas libres (si no, vos) y suman reputación; el diseño propio lo hace tu diseñador de esa máquina (si no tenés, o no le alcanzan las horas, vos).' : ''}</p>
+      <p class="suave" style="margin-top:8px">Si no entregás un pedido aceptado perdés reputación. Si sabés que no llegás, rechazalo: perdés mucho menos.${sem.pedidos.some((p) => p.envio || p.diseno) ? ` 🚚 = envío a domicilio (+${Math.round(SERVICIOS.envio.recargo * 100)}%, ${SERVICIOS.envio.horas} h c/u) · 🎨 = trae su diseño (+${Math.round(SERVICIOS.diseno.recargo * 100)}%, lleva más tiempo).` : ''}${sem.pedidos.some((p) => p.envio || p.diseno) ? ' Los envíos los hace un operario con horas libres (si no, vos) y suman reputación; el diseño propio lo hace tu diseñador de esa máquina (si no tenés, o no le alcanzan las horas, vos).' : ''}</p>
     </div>` },
     { zona: 'cajas', html: grillaStock(e), soloEscena: true },
     { zona: 'cajas', html: bloqueTransporte(e, sem) },
@@ -1281,6 +1293,21 @@ function pantallaPedidos() {
       const p = sem.pedidos.find((x) => x.id === b.dataset.rechazar);
       rechazarPedido(partida, p.id, !p.rechazado);
       guardarPartida();
+      refrescar();
+    };
+  });
+  app.querySelectorAll('[data-rechazar-cliente]').forEach((b) => {
+    b.onclick = () => {
+      const g = clientesDeLaSemana(sem).find((x) => x.id === b.dataset.rechazarCliente);
+      rechazarCliente(partida, g.id, g.lineas.some((p) => !p.rechazado));
+      guardarPartida();
+      refrescar();
+    };
+  });
+  app.querySelectorAll('[data-marcar-cliente]').forEach((i) => {
+    i.onchange = () => {
+      const g = clientesDeLaSemana(sem).find((x) => x.id === i.dataset.marcarCliente);
+      for (const p of g.lineas.filter((x) => !x.rechazado)) { if (i.checked) seleccionTerc.add(p.id); else seleccionTerc.delete(p.id); }
       refrescar();
     };
   });

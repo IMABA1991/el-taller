@@ -271,7 +271,12 @@ export const CLIENTES = [
   'Marta', 'Don Rubén', 'la profe de Lengua', 'el kiosco de la esquina', 'Sofi', 'la peluquería del barrio',
   'Nacho', 'la abuela Chela', 'un grupo de egresados', 'la veterinaria', 'Caro', 'el club del barrio',
   'Juanma', 'la panadería', 'Vicky', 'el gimnasio', 'Tobías', 'la escuelita de fútbol',
+  'Lucho', 'la farmacia', 'Romi', 'el taller mecánico', 'Fede', 'la verdulería',
+  'Agus', 'la academia de danza', 'Mica', 'el bar de la esquina', 'Pato', 'la librería',
 ];
+// Pedidos por cliente (v0.28): cada cliente puede pedir varias cosas. Con muchos pedidos se juntan
+// en 10 a 20 clientes por semana (la cantidad total de productos no cambia).
+export const CLIENTES_SEMANA = { agruparDesde: 10, min: 10, max: 20 };
 
 export const PROMO = { descuento: 0.15, extraDemanda: 0.2, horas: 2, falla: 0.1 }; // 1 de cada 10 promos falla
 

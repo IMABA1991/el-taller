@@ -1,7 +1,7 @@
 // Motor del juego "El Taller". Lógica pura: no toca la pantalla ni el guardado.
 import {
   HORAS_POR_SEMANA, SEMANAS_POR_ANIO, MESES, MAQUINAS, PRODUCTOS, FECHAS_ESPECIALES, RAMPA_FECHA,
-  PRESTAMO, GASTOS_FIJOS, VENTAS, REPUTACION, PRIMO, CURSOS, CURSO_MAX_PUNTOS, CURSO_BAJA_POR_MES, MAZO, TUTORIAL, PROMO, CLIENTES,
+  PRESTAMO, GASTOS_FIJOS, VENTAS, REPUTACION, PRIMO, CURSOS, CURSO_MAX_PUNTOS, CURSO_BAJA_POR_MES, MAZO, TUTORIAL, PROMO, CLIENTES, CLIENTES_SEMANA,
   MAZO_FERIA, PROB_CARTA_FERIA, MERMA, CANSANCIO, PUESTOS, RASGOS, NOMBRES_EMPLEADOS, EQUIPO, CAPACITACION,
   LELO_EMPLEADO, CHUCHU, NOMBRES_FEMENINOS, CYBER, CONFIANZA, ORDEN_MAQUINAS, MAQUINAS_FUTURAS, LOCALES, VOLANTES,
   SERVICIOS, LELO_VIAJE, TRAICIO, SIN_TEXTIL_ERRORES, PROVINCIA, LELO_GERENTE, DEFENSAS, SEGURIDAD, EMPRESAS,
@@ -1604,10 +1604,14 @@ export function publicar(e, pub) {
       }
     }
   }
+  agruparPorCliente(e, pedidos, diaAlAzar);
   pedidos.sort((a, b) => a.dia - b.dia);
-  const extras = (p) => `${p.envio ? ' Quiere que se lo lleves a la casa 🚚.' : ''}${p.diseno ? ' Trae su propio diseño 🎨.' : ''}`;
-  for (const p of [...pedidos, ...deLelo].sort((a, b) => a.dia - b.dia)) {
-    enDia(p.dia, `📩 ${capitalizar(p.cliente)} te pidió ${p.cantidad} ${nombreUnidades(p.producto, p.cantidad)}.${p.diaCancela === undefined ? extras(p) : ''}`, 'pedido');
+  for (const p of deLelo) enDia(p.dia, `📩 ${capitalizar(p.cliente)} te pidió ${p.cantidad} ${nombreUnidades(p.producto, p.cantidad)}.`, 'pedido');
+  for (const g of clientesDeLaSemana({ pedidos })) {
+    const conEnvio = g.lineas.filter((p) => p.envio).map((p) => PRODUCTOS[p.producto].singular);
+    const conDiseno = g.lineas.filter((p) => p.diseno).map((p) => PRODUCTOS[p.producto].singular);
+    const extras = `${conEnvio.length ? ` Quiere que se lo lleves a la casa 🚚${g.lineas.length > 1 ? ` (${listaY(conEnvio)})` : ''}.` : ''}${conDiseno.length ? ` Trae su propio diseño 🎨${g.lineas.length > 1 ? ` (${listaY(conDiseno)})` : ''}.` : ''}`;
+    enDia(g.dia, `📩 ${capitalizar(g.cliente)} te pidió ${describirLineas(g.lineas)}.${extras}`, 'pedido');
   }
   // Cancelaciones: con muchas el mismo día, se agrupan
   for (let d = 0; d < 7; d++) {
@@ -1682,6 +1686,49 @@ function venderUnaDelStock(e) {
   const id = conStock.find((x) => (t -= e.stock[x]) < 0) || conStock[0];
   e.stock[id]--;
   return id;
+}
+
+const deCliente = (c) => (c.startsWith('el ') ? `del ${c.slice(3)}` : `de ${c}`);
+const listaY = (xs) => (xs.length > 1 ? `${xs.slice(0, -1).join(', ')} y ${xs[xs.length - 1]}` : xs.join(''));
+const describirLineas = (lineas) => listaY(lineas.map((p) => `${p.cantidad} ${nombreUnidades(p.producto, p.cantidad)}`));
+
+// Junta los pedidos de la semana por cliente: si son pocos, cada uno es de un cliente distinto; si son muchos,
+// se reparten entre 10 y 20 clientes (cada uno pide varias cosas). Lo del mismo producto de un cliente va junto.
+function agruparPorCliente(e, pedidos, diaAlAzar) {
+  const n = pedidos.length;
+  if (!n) return;
+  const cs = CLIENTES_SEMANA;
+  const clientes = n <= cs.agruparDesde ? n : Math.min(cs.max, Math.max(cs.min, Math.round(n / entre(e, 2.5, 4))));
+  const nombres = mezclar(e, [...CLIENTES]);
+  const grupos = Array.from({ length: clientes }, (_, k) => ({ id: `c${e.semana}-${k + 1}`, cliente: nombres[k % nombres.length], dia: diaAlAzar(), lineas: [] }));
+  mezclar(e, [...pedidos]).forEach((p, i) => grupos[i < clientes ? i : Math.floor(siguienteAzar(e) * clientes)].lineas.push(p));
+  const juntos = [];
+  for (const g of grupos) {
+    const porProducto = {};
+    for (const p of g.lineas) {
+      const q = porProducto[p.producto];
+      if (q) { q.cantidad += p.cantidad; q.envio = q.envio || p.envio; q.diseno = q.diseno || p.diseno; continue; }
+      Object.assign(p, { cliente: g.cliente, dia: g.dia, grupo: g.id });
+      porProducto[p.producto] = p;
+      juntos.push(p);
+    }
+  }
+  pedidos.splice(0, n, ...juntos);
+}
+
+// Los pedidos de la semana agrupados por cliente (las partidas viejas no tienen grupo: cada pedido es un cliente)
+export function clientesDeLaSemana(sem) {
+  const grupos = new Map();
+  for (const p of sem?.pedidos || []) {
+    const k = p.grupo || p.id;
+    if (!grupos.has(k)) grupos.set(k, { id: k, cliente: p.cliente, dia: p.dia, lineas: [] });
+    grupos.get(k).lineas.push(p);
+  }
+  return [...grupos.values()];
+}
+
+export function rechazarCliente(e, idCliente, rechazar = true) {
+  for (const p of e.semanaEnCurso?.pedidos || []) if ((p.grupo || p.id) === idCliente && !p.tercerizado) p.rechazado = rechazar;
 }
 
 function describirUnidades(cuenta) {
@@ -1864,6 +1911,14 @@ export function cerrarSemana(e, plan) {
   let entregados = 0;
   let unidadesEntregadas = 0;
   const noLlegan = {};
+  const porCliente = { rechazados: {}, fallados: {}, noEntregados: {} };
+  const lineasDe = {};
+  for (const p of sem.pedidos) lineasDe[p.grupo || p.id] = (lineasDe[p.grupo || p.id] || 0) + 1;
+  const anotarCliente = (tipo, p, rep, insumo = 0) => {
+    const k = p.grupo || p.id;
+    const g = (porCliente[tipo][k] ||= { cliente: p.cliente, lineas: [], rep: 0, insumo: 0, total: lineasDe[k] });
+    g.lineas.push(p); g.rep = redondear(g.rep + rep, 2); g.insumo += insumo;
+  };
   for (const p of sem.pedidos) {
     const nombre = `${p.cantidad} ${nombreUnidades(p.producto, p.cantidad)}`;
     if (p.pais) {
@@ -1894,7 +1949,7 @@ export function cerrarSemana(e, plan) {
     if (p.rechazado) {
       const d = p.cantidad * REPUTACION.porPedidoRechazado;
       deltaRep += d;
-      evento(`Rechazaste el pedido de ${p.cliente}: ${nombre} (${formatoRep(d)} de reputación).`, 'info');
+      anotarCliente('rechazados', p, d);
       continue;
     }
     if (p.tercerizado || e.stock[p.producto] >= p.cantidad) {
@@ -1904,7 +1959,7 @@ export function cerrarSemana(e, plan) {
           const insumo = PRODUCTOS[p.producto].costo * p.cantidad;
           e.plata -= insumo; r.gastos += insumo;
           deltaRep += TERCERIZAR.repFalla;
-          evento(`🏭 La tercerizadora le erró a la calidad del pedido de ${p.cliente} (${nombre}): perdiste el pedido y el insumo (−${plata$(insumo)}, −0,02 de reputación).`, 'desastre');
+          anotarCliente('fallados', p, TERCERIZAR.repFalla, insumo);
           continue;
         }
         const costo = Math.round(PRODUCTOS[p.producto].precio * p.cantidad * (p.factorTerc || TERCERIZAR.max));
@@ -1919,9 +1974,13 @@ export function cerrarSemana(e, plan) {
     } else {
       const d = p.cantidad * REPUTACION.porPedidoNoEntregado;
       deltaRep += d;
-      evento(`No entregaste el pedido de ${p.cliente}: ${nombre} (${formatoRep(d)} de reputación).`, 'mala');
+      anotarCliente('noEntregados', p, d);
     }
   }
+  // Los avisos van por cliente: "No entregaste el pedido de Tobías: 1 taza y 2 remeras (−1,5 de reputación)"
+  for (const g of Object.values(porCliente.rechazados)) evento(`Rechazaste el pedido ${deCliente(g.cliente)}: ${describirLineas(g.lineas)} (${formatoRep(g.rep)} de reputación).`, 'info');
+  for (const g of Object.values(porCliente.fallados)) evento(`🏭 La tercerizadora le erró a la calidad del pedido ${deCliente(g.cliente)} (${describirLineas(g.lineas)}): perdiste ${g.lineas.length < g.total ? 'esa parte del pedido' : 'el pedido'} y el insumo (−${plata$(g.insumo)}, −${String(Math.abs(g.rep)).replace('.', ',')} de reputación).`, 'desastre');
+  for (const g of Object.values(porCliente.noEntregados)) evento(`No entregaste ${g.lineas.length < g.total ? 'parte del' : 'el'} pedido ${deCliente(g.cliente)}: ${describirLineas(g.lineas)} (${formatoRep(g.rep)} de reputación).`, 'mala');
   const vendedoresSem = presentes(e, 'vendedor');
   for (const v of vendedoresSem) {
     if (v.rasgo === 'creativo') sumarRep((entregados * EQUIPO.repCreativo * factorRep) / vendedoresSem.length);
@@ -1943,7 +2002,11 @@ export function cerrarSemana(e, plan) {
     if (activos) linea(`Mandaste a los locales ${unidadesEntregadas} productos (${entregados} de ${activos} pedidos)${r.traslado ? ` en ${TRANSPORTE[transporte].nombre.toLowerCase()} (${plata$(r.traslado)} de traslado)` : ''}: llegan la semana que viene.`);
     const faltaron = Object.entries(noLlegan);
     if (faltaron.length) evento(`No te alcanzó para mandar todo: quedaron sin mercadería ${faltaron.map(([prov, n]) => `${PROVINCIAS_AR[prov].nombre} (${n})`).join(', ')}. Esos locales pierden reputación.`, 'mala');
-  } else if (activos) linea(`Entregaste ${entregados} de ${activos} pedidos (${unidadesEntregadas} productos).`);
+  } else if (activos) {
+    const clientes = clientesDeLaSemana({ pedidos: sem.pedidos.filter((p) => !p.rechazado) });
+    const completos = clientes.filter((g) => !g.lineas.some((p) => porCliente.noEntregados[p.grupo || p.id]?.lineas.includes(p) || porCliente.fallados[p.grupo || p.id]?.lineas.includes(p))).length;
+    linea(`Le entregaste todo a ${completos} de ${clientes.length} cliente${clientes.length === 1 ? '' : 's'} (${unidadesEntregadas} productos).`);
+  }
   const serv = serviciosDeLaSemana(sem);
   if (serv.envios || serv.diseno.length) {
     const partes = [];

@@ -1,6 +1,6 @@
 # El Taller — Documento de diseño del juego
 
-> Versión 0.27 · Reglas en definición
+> Versión 0.28 · Reglas en definición
 > Juego web por turnos, para jugar solo, contra bots o online.
 
 ---
@@ -23,6 +23,7 @@ Simulador de emprendedor de sublimación con humor argentino. Arrancás sin nada
      - Si se pasó: "Tus últimos avisos no tuvieron ni un me gusta".
      - El tío, en el tutorial, sugiere por lo bajo ("con un par de horas me alcanzaba") para que el jugador vaya subiendo solo.
   2. **Sábado: pedidos y producción.** Se ven los pedidos (cliente, producto, cantidad y servicios especiales). Recién ahí **producís** (la producción arranca siempre en 0 y lo que falta se resalta) y **el domingo se entrega**. Podés **rechazar** un pedido a tiempo (−0,1 de reputación por unidad); si lo aceptás y no lo entregás, −0,5 por unidad. La feria vende lo que te sobre de stock.
+  - **Pedidos por cliente (v0.28):** cada cliente puede pedir varias cosas ("Tobías te pidió 1 taza de cerámica, 2 remeras y 1 buzo"). Con hasta 10 pedidos, cada uno es de un cliente distinto; con más, se juntan en **10 a 20 clientes por semana**, con la **misma cantidad total de productos**. Se rechaza (o se marca para tercerizar) **el cliente entero**; los 🚚 y 🎨 marcan qué producto lleva envío o diseño propio. Los avisos también van por cliente ("No entregaste parte del pedido de Caro: 2 buzos"). En el país los pedidos siguen agrupados por local.
   - Los mensajes siempre dicen qué producto se arruinó o qué pedido no se entregó, y cuánto afectó la reputación.
   - No se muestra el porcentaje de error: solo "cuanta más experiencia tengas, menos errores vas a cometer".
   - **Merma mensual:** si hay stock guardado, una vez por mes se pierde un producto (gotera, se cayó de la mesa, lo regalaste en un cumpleaños que te olvidaste, el perro, tu vieja se lo regaló a la vecina...). Por eso conviene sacar el sobrante en la feria.
@@ -947,6 +948,7 @@ Eventos esporádicos de gastos inoportunos y ganancias oportunas que, **sumados,
 - [x] Pantalla: cantidades, semana animada fija, colores de eventos y secciones contraíbles (1.1).
 - [x] Rebalanceo de la provincia (v0.19): Traicio arranca con 8; ~73% de victorias de primera en ~46-47 semanas.
 - [x] Economía con inflación (v0.27): 30-40% anual estacional, precios/sueldos/alquileres con 3 meses de atraso, sueldos por etapa, alquileres y máquinas más caros, Traicio arranca con 6 y crece 5-8% más lento; 75% de victorias de primera.
+- [x] Pedidos agrupados por cliente: 10 a 20 clientes por semana (v0.28).
 - [ ] Varias tercerizadoras con distinta calidad y precio.
 - [x] Darle uso al 30% del diseñador deportivo: clubes de barrio con diseño propio (5.3).
 - [ ] Encargados: más adelante, más variedad de rasgos según cómo se juegue.
