@@ -96,32 +96,3 @@ Ilustración isométrica a 30 grados, estilo maqueta de juguete con colores plan
 ```
 Ilustración isométrica a 30 grados, estilo maqueta de juguete con colores planos y cálidos, luz desde arriba a la izquierda, sombras suaves de un tono, contornos suaves, vista desde la esquina inferior izquierda, un solo objeto centrado y aislado, fondo blanco liso, sin texto ni letras. Una pila de cajas de cartón cerradas con mercadería, algunas con cinta de embalar.
 ```
-
-### Gente (de pie, misma escala que las máquinas)
-
-La gente camina por el taller, así que va **sin base de madera debajo** (las máquinas sí pueden tenerla).
-
-**Vos (hombre)**
-```
-Ilustración isométrica a 30 grados, estilo maqueta de juguete con colores planos y cálidos, luz desde arriba a la izquierda, sombras suaves de un tono, contornos suaves, vista desde la esquina inferior izquierda, un solo objeto centrado y aislado, fondo blanco liso, sin texto ni letras. Solo la persona, sin mesa, sin muebles y sin base ni plataforma debajo: un joven de unos 19 años con delantal de trabajo, de pie, sosteniendo una taza recién sublimada.
-```
-
-**Vos (mujer)**
-```
-Ilustración isométrica a 30 grados, estilo maqueta de juguete con colores planos y cálidos, luz desde arriba a la izquierda, sombras suaves de un tono, contornos suaves, vista desde la esquina inferior izquierda, un solo objeto centrado y aislado, fondo blanco liso, sin texto ni letras. Solo la persona, sin mesa, sin muebles y sin base ni plataforma debajo: una joven de unos 19 años con delantal de trabajo y el pelo atado, de pie, sosteniendo una taza recién sublimada.
-```
-
-**Lelo**
-```
-Ilustración isométrica a 30 grados, estilo maqueta de juguete con colores planos y cálidos, luz desde arriba a la izquierda, sombras suaves de un tono, contornos suaves, vista desde la esquina inferior izquierda, un solo objeto centrado y aislado, fondo blanco liso, sin texto ni letras. Solo la persona, sin base ni plataforma debajo: un joven de 19 años con flequillo y buzo con capucha amarillo, de pie, mirando el celular con sonrisa canchera.
-```
-
-**Empleado**
-```
-Ilustración isométrica a 30 grados, estilo maqueta de juguete con colores planos y cálidos, luz desde arriba a la izquierda, sombras suaves de un tono, contornos suaves, vista desde la esquina inferior izquierda, un solo objeto centrado y aislado, fondo blanco liso, sin texto ni letras. Solo la persona, sin base ni plataforma debajo: un hombre joven con delantal azul y gorra, de pie, cargando una remera recién estampada.
-```
-
-**Empleada**
-```
-Ilustración isométrica a 30 grados, estilo maqueta de juguete con colores planos y cálidos, luz desde arriba a la izquierda, sombras suaves de un tono, contornos suaves, vista desde la esquina inferior izquierda, un solo objeto centrado y aislado, fondo blanco liso, sin texto ni letras. Solo la persona, sin base ni plataforma debajo: una mujer joven con delantal azul y el pelo atado, de pie, sosteniendo una taza recién sublimada con guantes térmicos.
-```
