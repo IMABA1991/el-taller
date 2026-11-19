@@ -28,6 +28,39 @@ import { mapaPais, leyendaMapa } from './mapa.js';
 
 const app = document.getElementById('app');
 let partida = null;
+
+// ---------- Textos para jugadora ----------
+// Las frases que le hablan al jugador se pasan a femenino si elegiste "mujer".
+// Se aplica a todo lo que aparece en pantalla (incluidos los mensajes del tío, Chuchu y los eventos).
+const FRASES_FEMENINO = [
+  [/\bcampeón\b/g, 'campeona'],
+  [/\bCampeón\b/g, 'Campeona'],
+  [/Este pibe va a llegar lejos/g, 'Esta piba va a llegar lejos'],
+  [/trabajás solo\b/g, 'trabajás sola'],
+  [/Producís solo\b/g, 'Producís sola'],
+  [/estás muy cansado\b/g, 'estás muy cansada'],
+  [/estás destruido\b/g, 'estás destruida'],
+  [/Estás reventado\b/g, 'Estás reventada'],
+  [/te quedaste corto\b/g, 'te quedaste corta'],
+  [/(Lograste|Volviste a|Volvé a|[Aa]l|para) ser el mejor\b/g, '$1 ser la mejor'],
+  [/(Otra vez|Sos|sos) el mejor\b/g, '$1 la mejor'],
+  [/el dueño es feo/g, 'la dueña es fea'],
+];
+function aFemenino(t) {
+  return FRASES_FEMENINO.reduce((x, [re, por]) => x.replace(re, por), t);
+}
+function adaptarTextos(raiz) {
+  if (partida?.genero !== 'mujer' || !raiz) return;
+  const w = document.createTreeWalker(raiz, NodeFilter.SHOW_TEXT);
+  for (let n = w.nextNode(); n; n = w.nextNode()) {
+    const nuevo = aFemenino(n.data);
+    if (nuevo !== n.data) n.data = nuevo;
+  }
+  raiz.querySelectorAll?.('[title]').forEach((el) => { el.title = aFemenino(el.title); });
+}
+new MutationObserver((cambios) => {
+  for (const c of cambios) c.addedNodes.forEach((n) => (n.nodeType === 1 ? adaptarTextos(n) : n.nodeType === 3 && partida?.genero === 'mujer' && (n.data = aFemenino(n.data))));
+}).observe(app, { childList: true, subtree: true });
 let plan = null; // paso 2: producción
 let pub = null; // paso 1: publicidad
 let aviso = null; // mensaje después de una acción (compra, pago)
