@@ -19,6 +19,7 @@ import {
   TRAICIO_TEXTOS, elegirOrigen, nombreCiudad, pistaProvincia, abrirLocal, cambiarEncargado, asignarLelo, cambiarDefensaPais, costoDefensaPais,
   gastosLocalesDelMes, provinciasLibres, costoAbrirLocal, alquilerLocal, sueldoEncargado, ofertaPaisVigente, tomarOfertaPais, enCamino,
   costoTraslado, cumpleRequisito, puedeOfertarLicitacion, coberturaRRHH, tieneRRHH, horasCostura, elegirGenero,
+  inflacionActual,
 } from './engine.js';
 import { guardar, cargar, borrar } from './storage.js';
 import { imagen } from './arte.js';
@@ -377,6 +378,15 @@ function conectarMenu() {
   };
 }
 
+// Inflación: la del último mes, la de los últimos 12 y cuánto falta para que se actualicen precios, sueldos y alquileres
+function bloqueInflacion(e) {
+  const i = inflacionActual(e);
+  if (!e.inflacion?.historial?.length) return '';
+  const pc = (x) => `${String(Math.round(x * 10) / 10).replace('.', ',')}%`;
+  const ajuste = i.mesesAlProximoAjuste === 1 ? 'a fin de este mes' : `en ${i.mesesAlProximoAjuste} meses`;
+  return `<div class="stat"><div class="etiqueta">Inflación del mes pasado</div><div class="valor">${pc(i.mes)}</div><div class="detalle suave">${i.anual !== null ? `Últimos 12 meses: ${pc(i.anual)}. ` : ''}Precios, sueldos y alquileres se actualizan ${ajuste}.</div></div>`;
+}
+
 function bloqueEstado(e) {
   const c = calendario(e.semana);
   const p = e.prestamo;
@@ -408,6 +418,7 @@ function bloqueEstado(e) {
         <div class="stat"><div class="etiqueta">Equipo · ${localActual(e).nombre.toLowerCase()}</div><div class="valor">${empleadosContratados(e)}/${cupoEquipo(e)}${e.equipo.empleados.some((x) => x.esLelo) ? ' + Lelo' : ''}</div></div>
         ${enPais(e) ? `<div class="stat"><div class="etiqueta">Locales de venta</div><div class="valor">${e.pais.locales.length}/${Object.keys(PROVINCIAS_AR).length}</div></div><div class="stat"><div class="etiqueta">En camino a los locales</div><div class="valor">${enCamino(e)}</div></div>` : ''}
         <div class="stat"><div class="etiqueta">Sueldos por mes</div><div class="valor">${plata(e.equipo.empleados.reduce((t, x) => t + x.sueldo, 0))}</div></div>
+        ${bloqueInflacion(e)}
       </div>
       <p class="suave" style="margin-top:8px">Stock: ${Object.keys(PRODUCTOS).filter((id) => e.maquinas[PRODUCTOS[id].maquina] && (!PRODUCTOS[id].soloPedido || e.stock[id])).map((id) => `${e.stock[id]} ${nombreUnidades(id, e.stock[id])}`).join(' · ')}</p>
       ${porCobrar(e) ? `<p class="suave">Por cobrar de empresas: ${plata(porCobrar(e))} (${e.cobros.map((c) => `${c.cliente} en ${c.semana - e.semana} sem.`).join(', ')}).</p>` : ''}

@@ -1,6 +1,6 @@
 # El Taller — Documento de diseño del juego
 
-> Versión 0.26 · Reglas en definición
+> Versión 0.27 · Reglas en definición
 > Juego web por turnos, para jugar solo, contra bots o online.
 
 ---
@@ -139,7 +139,7 @@ Terminaste el secundario en diciembre y no sabés qué hacer. En las fiestas hab
 
 - **Nombre:** Traicio Nero ("traicionero"). **Empresa:** Talleres Judas.
 - **Estilo:** mucho más agresivo que Lelo, juega a traición: **sabotaje industrial** y competencia feroz. Los golpes son **chicos**: molestan, pero no hunden.
-- **Arranque:** como ya es el mejor de otra ciudad, **arranca la provincia con 8 de reputación** (compensa el +7,5 de aceptar a Lelo).
+- **Arranque:** como ya es el mejor de otra ciudad, **arranca la provincia con 6 de reputación** (compensa el +7,5 de aceptar a Lelo).
 - **Frecuencia:** sabotea cada 3 semanas en promedio (entre 2 y 4).
 - **Tamaño de los sabotajes:** proporcional, igual que las cartas del mazo (10%, 20% y 35% de tu ganancia mensual).
 
@@ -166,7 +166,7 @@ Terminaste el secundario en diciembre y no sabés qué hacer. En las fiestas hab
 | **Persona de seguridad** | $30.000 | Frena 1 de cada 3 sabotajes y te avisa cuando Traicio habla con alguno de tus empleados o le hace una oferta |
 
 - **Persona de seguridad:** trabaja de noche, con el taller cerrado, y **no ocupa lugar** en el equipo. Lo que avisa **siempre es cierto** (no es una suposición), así podés subirle el sueldo al empleado antes de que se vaya. Si le pagás menos que la media del mercado, **Traicio la puede sobornar** (3 de cada 10 sabotajes): no miente, simplemente deja de avisar y de frenar sabotajes. Subirle el sueldo la vuelve a poner de tu lado.
-- **Ritmo de Traicio:** su reputación crece un **3-5% más lento que la del jugador** (el porcentaje se sortea al arrancar la provincia), medido sobre lo que ganaste de reputación con tu trabajo en las **últimas 12 semanas** (el bonus de la abuela no cuenta). Las pérdidas por sabotajes no bajan su ritmo. **Piso:** nunca sube menos de 1,4 puntos por semana, así que si te estancás, te alcanza. Cada semana varía un ±15%.
+- **Ritmo de Traicio:** su reputación crece un **5-8% más lento que la del jugador** (el porcentaje se sortea al arrancar la provincia), medido sobre lo que ganaste de reputación con tu trabajo en las **últimas 12 semanas** (el bonus de la abuela no cuenta). Las pérdidas por sabotajes no bajan su ritmo. **Piso:** nunca sube menos de 1,4 puntos por semana, así que si te estancás, te alcanza. Cada semana varía un ±15%.
 - **Efecto de cada sabotaje:** reseñas falsas −1 de reputación; habla mal −10% de pedidos por 2 semanas; soborno al proveedor −4 h la semana siguiente; tintura: pagás una limpieza (20% de tu ganancia mensual) y perdés el 30% de las tazas guardadas, o las tirás y perdés la mitad; propaganda engañosa: la desmentís (3 h y −1) o la dejás pasar (−2); entrega trucha −2 de reputación; robo de cliente grande: se lleva tu pedido de empresa más grande (y el cliente no vuelve), o un cliente fijo, o si no tenés, −20% de pedidos por 2 semanas.
 - **Robo de empleado:** te avisan en el resumen y lo decidís el domingo. Si igualás la oferta, se queda seguro.
 - **Barra de Traicio:** su número se calcula todas las semanas, pero la barra **solo se actualiza una vez por mes**, con la nota de **La Voz de Adentro** (ver 5.4). Lo que dice el diario siempre es cierto, aunque sea de hace unas semanas. Cuando Traicio pasa de **85**, sale una nota de alerta ("Talleres Judas está a un paso").
@@ -277,7 +277,8 @@ Se sube por **reputación**:
 - Ritmo esperado: con unos 4 pedidos por semana, ser el mejor de la ciudad lleva unos 6 meses (26 turnos).
 - **Provincia: mucho más lenta.** Ser el mejor de la provincia tiene que llevar **unos 50 turnos** después de ganar la ciudad. Para eso, **cada venta suma un 5% de lo que suma en la ciudad** (se probó con la mitad, pero con el mercado de la provincia se venden 70 a 140 unidades por semana y la meta se ganaba en 8 semanas). Lo que más suma son los pedidos grandes: cada pedido de empresa entregado y cada licitación cumplida suman +3. Los sabotajes de Traicio frenan todavía más.
 - **País:** la reputación del país es el **promedio de tus locales** (ver 5.5). Sin aprovechar los eventos de marca se tarda unos 2 años y 8 meses; aprovechándolos, entre 1,5 y 2 años. **Topa llega a 100 a los 2 años y medio**, así que quien no aprovecha los eventos pierde.
-- **Balance probado con la simulación** (240 partidas de un jugador razonable, v0.19): la provincia se gana en unas 46-47 semanas y se le gana a Traicio de primera unas 7 de cada 10 veces (73%). Sin el arranque de Traicio en 8, aceptar a Lelo (40 h y +7,5) subía las victorias al 90%. Quien gasta todo en máquinas y no paga defensas sufre más sabotajes y pierde más seguido. Queda 1 quiebra en 240 partidas (el jugador de prueba se queda sin caja después de comprar la calandra).
+- **Balance probado con la simulación (v0.27, con inflación, sueldos por etapa y alquileres nuevos):** el "buen jugador" de `tests/bot.js` (240 partidas) le gana a Traicio de primera el **75%** de las veces, en unas **52 semanas** desde que gana la ciudad, sin quiebras. En el país gana 32 de 32 en unas **106 semanas** aprovechando los eventos; sin aprovecharlos, Topa gana siempre. Ver 6.1.1.
+- *Balance anterior* (240 partidas de un jugador razonable, v0.19): la provincia se gana en unas 46-47 semanas y se le gana a Traicio de primera unas 7 de cada 10 veces (73%). Sin el arranque de Traicio en 8, aceptar a Lelo (40 h y +7,5) subía las victorias al 90%. Quien gasta todo en máquinas y no paga defensas sufre más sabotajes y pierde más seguido. Queda 1 quiebra en 240 partidas (el jugador de prueba se queda sin caja después de comprar la calandra).
 
 ### 4.5 Expansión mundial (después de Sudamérica)
 
@@ -349,18 +350,18 @@ Se sube por **reputación**:
 |---|---|---|---|---|---|---|
 | Tazas | $150.000 | Taza de plástico | $5.000 | $3.000 | $2.000 | 30 min |
 | | | Taza de cerámica | $8.000 | $4.000 | $4.000 | 1 h |
-| Gorras | $150.000 | Gorra | $10.000 | $2.000 | $8.000 | 1 h 36 min |
-| Plancha 30x30 | $900.000 | Remera | $15.000 | $5.000 | $10.000 | 1 h 36 min |
+| Gorras | $200.000 | Gorra | $10.000 | $2.000 | $8.000 | 1 h 36 min |
+| Plancha 30x30 | $1.000.000 | Remera | $15.000 | $5.000 | $10.000 | 1 h 36 min |
 | | | Manga larga | $20.000 | $6.000 | $14.000 | 2 h 15 min |
 | | | Buzo | $50.000 | $10.000 | $40.000 | 2 h (menos demanda) |
-| Plancha 1x1 m | $4.000.000 | Los mismos productos en **full color** | x2 | Igual | — | El del producto común + 30 min |
-| Calandra | $10.000.000 | Camiseta, pedidos intermedios | $25.000–30.000 | $5.000 | — | Ver combos (5.1) |
+| Plancha 1x1 m | $10.000.000 | Los mismos productos en **full color** | x2 | Igual | — | El del producto común + 30 min |
+| Calandra | $25.000.000 | Camiseta, pedidos intermedios | $25.000–30.000 | $5.000 | — | Ver combos (5.1) |
 | | | Camiseta, club del ascenso | $60.000 | $5.000 | $55.000 | |
 | | | Camiseta, club de segunda | $80.000 | $5.000 | $75.000 | |
 | | | Camiseta, club de primera | $100.000 | $5.000 | $95.000 | |
 | | | Short | 50% de la camiseta | $2.500 | — | La mitad de una camiseta |
-| Estación de costura (país) | $15.000.000 | Corte y costura de los combos | — | — | — | Los 30 min de cada combo los hacen los costureros |
-| Estación de bordado (país) | $20.000.000 | Gorra bordada | $18.000 (x1,8) | $3.500 | $14.500 | 1 h 36 min |
+| Estación de costura (país) | $80.000.000 | Corte y costura de los combos | — | — | — | Los 30 min de cada combo los hacen los costureros |
+| Estación de bordado (país) | $150.000.000 | Gorra bordada | $18.000 (x1,8) | $3.500 | $14.500 | 1 h 36 min |
 | | | Remera bordada | $30.000 (x2) | $7.000 | $23.000 | 1 h 48 min |
 | | | Chomba bordada (empresas) | $30.000 | $8.000 | $22.000 | 1 h 30 min |
 | | | Camiseta con escudo bordado (clubes de barrio) | $36.400 (x1,3) | $8.000 | $28.400 | 1 h 48 min |
@@ -560,15 +561,26 @@ Se pagan cada 4 turnos, junto con el mes:
 | Lugar | Alquiler por mes | Luz extra | Empleados | Disponible |
 |---|---|---|---|---|
 | Tu casa | — | — | Hasta 2 | Desde el inicio |
-| Local chico | $60.000 | +$8.000 | Hasta 5 | Desde el inicio |
-| Local grande | $200.000 | +$20.000 | Hasta 12 | Desde la provincia |
-| Galpón | $600.000 | +$50.000 | Hasta 25 | Desde el país |
-| Planta industrial pequeña | $1.500.000 | +$120.000 | Hasta 50 | Desde el país, con 8 locales abiertos |
+| Local chico | $200.000 | +$15.000 | Hasta 5 | Desde el inicio |
+| Local grande | $600.000 | +$40.000 | Hasta 12 | Desde la provincia |
+| Galpón | $2.500.000 | +$100.000 | Hasta 25 | Desde el país |
+| Planta industrial pequeña | $6.000.000 | +$250.000 | Hasta 50 | Desde el país, con 8 locales abiertos |
 
 - "Pequeña" porque más adelante (Sudamérica) puede haber plantas más grandes.
 - Lelo, la persona de seguridad y los encargados de los locales no ocupan lugar. Para volver a un lugar más chico, primero hay que achicar el equipo.
 - En el tutorial, cuota de $22.000 + gastos de $30.000 = **$52.000 por mes** contra unos $120.000 de ganancia (ver 8.3): quedan unos $68.000 por mes para ahorrar.
 - Las ventas de verano del tutorial se ajustan en pruebas para que el arranque se sienta justo.
+
+### 6.1.1 Inflación, sueldos por etapa y precio de las máquinas (v0.27)
+
+- **Inflación de 30 a 40% por año**, distinta cada mes: hay meses de 0,5% (invierno) y otros de 4-5% (diciembre, abril). Arranca después del tutorial (semana 9). Los diarios la anuncian a fin de cada mes (📰 El diario del barrio, La Voz de Adentro o InfoArg, según la etapa).
+- **Los costos suben todos los meses:** insumos, máquinas, luz, gastos fijos, volantes, mesa de la feria, cursos, defensas, anuncios y capacitaciones.
+- **Lo demás va atrasado:** los **precios de venta, los sueldos y los alquileres se actualizan cada 3 meses** ("Actualización trimestral"), y ahí se ponen al día con todo lo que subieron los costos. En los meses de mucha inflación perdés margen hasta el ajuste.
+- **En el panel "Vos"** se ve la inflación del mes pasado, la de los últimos 12 meses y cuánto falta para la próxima actualización.
+- **Sueldos por etapa:** al llegar a la provincia todo tu equipo pasa a cobrar **un 50% más**, y al llegar al país, **2,5 veces lo de la ciudad**. Los sueldos de mercado (anuncios, Chuchu, bolsa, Lelo, encargados, seguridad) siguen esa misma escala.
+- **Alquileres mucho más caros** que antes (ver tabla de 6.1): mudarse tiene que pagarse con lo que vende el taller.
+- **Precio de las máquinas:** calibrado con un buen jugador para que cada una cueste varios meses de lo que gana en su etapa. Ganancia semanal medida (mitad de las partidas / el mejor cuarto): ciudad $29.000 / $63.000; provincia $1,7 M / $3,2 M; país $13 M / $20 M. Se compran, en promedio: gorras en la semana 26; plancha 30x30 a las 9 semanas de llegar a la provincia; plancha 1x1 m a las 17; calandra a las 32. Las estaciones de costura y bordado del país todavía no las prueba la simulación: hay que confirmarlas jugando.
+- **El buen jugador de la simulación** guarda un colchón (reserva + sueldos + alquileres), contrata a sueldo de mercado sin pasar el 40% de lo que vende, despide si cierra el mes en rojo, se muda solo si el alquiler entra en lo que vende y acepta pedidos de empresas solo si puede bancar el costo hasta cobrar. Quien no hace eso, con esta economía, quiebra.
 
 ### 6.2 Empleados
 
@@ -767,7 +779,7 @@ Se pagan cada 4 turnos, junto con el mes:
 \* Con reputación 0 en tu ciudad, por redes y Marketplace. La feria suma aparte.
 
 - **Cuenta del tutorial (verano):** tazas por redes ≈ $20.000 por semana + una feria ≈ $10.000 neto (descontada la mesa) = **unos $30.000 por semana, $120.000 por mes**.
-- Descontando cuota y gastos fijos quedan unos $68.000 por mes: la máquina de gorras ($150.000) se puede comprar alrededor de marzo o abril (o antes, con el segundo préstamo del tío).
+- Descontando cuota y gastos fijos quedan unos $68.000 por mes: la máquina de gorras ($200.000) se puede comprar alrededor de marzo o abril (o antes, con el segundo préstamo del tío).
 
 ### 8.4 Volantería
 
@@ -934,6 +946,7 @@ Eventos esporádicos de gastos inoportunos y ganancias oportunas que, **sumados,
 - [x] Diseñadores: diseños personalizados por máquina y más pedidos personalizados (6.2 y 8.5).
 - [x] Pantalla: cantidades, semana animada fija, colores de eventos y secciones contraíbles (1.1).
 - [x] Rebalanceo de la provincia (v0.19): Traicio arranca con 8; ~73% de victorias de primera en ~46-47 semanas.
+- [x] Economía con inflación (v0.27): 30-40% anual estacional, precios/sueldos/alquileres con 3 meses de atraso, sueldos por etapa, alquileres y máquinas más caros, Traicio arranca con 6 y crece 5-8% más lento; 75% de victorias de primera.
 - [ ] Varias tercerizadoras con distinta calidad y precio.
 - [x] Darle uso al 30% del diseñador deportivo: clubes de barrio con diseño propio (5.3).
 - [ ] Encargados: más adelante, más variedad de rasgos según cómo se juegue.

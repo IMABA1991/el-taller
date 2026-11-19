@@ -7,10 +7,10 @@ import {
   SERVICIOS, LELO_VIAJE, TRAICIO, SIN_TEXTIL_ERRORES, PROVINCIA, LELO_GERENTE, DEFENSAS, SEGURIDAD, EMPRESAS,
   TERCERIZAR, LICITACION, VOZ_DE_ADENTRO, ABUELA,
   RRHH, PROVINCIAS_AR, PAIS, ENCARGADO, TRANSPORTE, LELO_COMERCIAL, TOPA, MARCAS, ATAQUES_PAIS, DEFENSAS_PAIS, PRODUCTOS_SIMPLES,
-  GRANDES, INFOARG, EVENTOS_MARCA, EMPRESAS_PAIS, CLUBES_BARRIO, LICITACION_SEGUNDA, TRAICIO_TEXTOS,
+  GRANDES, INFOARG, EVENTOS_MARCA, EMPRESAS_PAIS, CLUBES_BARRIO, LICITACION_SEGUNDA, TRAICIO_TEXTOS, INFLACION, SUELDOS_ETAPA,
 } from './data.js';
 
-export const VERSION_PARTIDA = 6;
+export const VERSION_PARTIDA = 7;
 
 // ---------- Azar con semilla (para poder guardar y reproducir partidas) ----------
 function siguienteAzar(estado) {
@@ -209,6 +209,12 @@ export function migrarPartida(e) {
   if (e.origen === undefined) e.origen = null;
   // Versión 6: cómo te mostramos en el taller (hombre o mujer); si falta, se pregunta al continuar
   if (e.genero === undefined) e.genero = null;
+  // Versión 7: inflación y sueldos por etapa
+  if (!e.indices) {
+    e.indices = { costos: 1, precios: 1, alquileres: 1, sueldos: 1, etapa: 1 };
+    e.inflacion = { historial: [], meses: 0 };
+    if (e.meta === 'provincia' || e.meta === 'pais') e.avisoEtapaSueldos = e.meta;
+  }
   for (const x of e.equipo.empleados) if (!x.genero) x.genero = x.esLelo ? 'hombre' : generoDeNombre(x.nombre);
   for (const l of e.pais?.locales || []) if (l.encargado && !l.encargado.genero) l.encargado.genero = generoDeNombre(l.encargado.nombre);
   if (!e.equipo.rrhhCubre) e.equipo.rrhhCubre = [];
@@ -217,7 +223,9 @@ export function migrarPartida(e) {
   if (e.mejorDeLaProvincia && e.meta === 'provincia') iniciarPais(e);
   if (e.mazo.cartas.some((c) => !c.clase)) e.mazo = { trimestre: -1, cartas: [] };
   e.tio.confianza = confianzaTio(e);
+  if (e.avisoEtapaSueldos) { subirSueldosDeEtapa(e, e.avisoEtapaSueldos, (t) => { e.avisoPendiente = t; }); delete e.avisoEtapaSueldos; }
   e.version = VERSION_PARTIDA;
+  aplicarIndices(e);
   return e;
 }
 
@@ -232,6 +240,112 @@ export function expEn(x, maquina) {
 const PARTE_COSTURA = 1 / 3;
 function factorEstacion(e, idProducto) {
   return idProducto === 'combo' && e?.maquinas?.costura ? 1 - PARTE_COSTURA : 1;
+}
+
+// ---------- Inflación ----------
+// Los valores de data.js son los de arranque. aplicarIndices(e) pone los valores de hoy (según la inflación de
+// la partida) en el catálogo, así todo el juego los usa sin tocar cada cuenta. Se llama al cargar y en cada semana.
+const BASE = {
+  productos: Object.fromEntries(Object.entries(PRODUCTOS).map(([k, v]) => [k, { precio: v.precio, costo: v.costo }])),
+  maquinas: Object.fromEntries(Object.entries(MAQUINAS).map(([k, v]) => [k, v.precio])),
+  locales: Object.fromEntries(Object.entries(LOCALES).map(([k, v]) => [k, { alquiler: v.alquiler, luz: v.luz }])),
+  gastos: { ...GASTOS_FIJOS },
+  volantes: VOLANTES.costo,
+  mesa: VENTAS.feria.costoMesa,
+  cursos: Object.fromEntries(Object.entries(CURSOS).map(([k, v]) => [k, v.costo])),
+  defensas: Object.fromEntries(Object.entries(DEFENSAS).map(([k, v]) => [k, v.costo])),
+  anuncio: EQUIPO.anuncio.costo,
+  capacitacion: JSON.parse(JSON.stringify(CAPACITACION)),
+  licitacion: { precioRef: LICITACION.precioRef, costo: LICITACION.costo },
+  licitacion2: { precioRef: LICITACION_SEGUNDA.precioRef, costo: LICITACION_SEGUNDA.costo },
+};
+const redondeo = (x) => (x >= 100000 ? Math.round(x / 10000) * 10000 : x >= 10000 ? Math.round(x / 1000) * 1000 : Math.round(x / 100) * 100);
+function escalarCapacitacion(base, f) {
+  const out = {};
+  for (const [k, v] of Object.entries(base)) out[k] = typeof v === 'number' && /costo|buffet|precio|porEmpleado/i.test(k) ? redondeo(v * f) : (v && typeof v === 'object' ? escalarCapacitacion(v, f) : v);
+  return out;
+}
+
+export function aplicarIndices(e) {
+  const ix = e.indices || { costos: 1, precios: 1, alquileres: 1 };
+  for (const [k, b] of Object.entries(BASE.productos)) { PRODUCTOS[k].precio = redondeo(b.precio * ix.precios); PRODUCTOS[k].costo = redondeo(b.costo * ix.costos); }
+  for (const [k, b] of Object.entries(BASE.maquinas)) MAQUINAS[k].precio = redondeo(b * ix.costos);
+  for (const [k, b] of Object.entries(BASE.locales)) { LOCALES[k].alquiler = redondeo(b.alquiler * ix.alquileres); LOCALES[k].luz = redondeo(b.luz * ix.costos); }
+  for (const [k, b] of Object.entries(BASE.gastos)) GASTOS_FIJOS[k] = redondeo(b * ix.costos);
+  VOLANTES.costo = redondeo(BASE.volantes * ix.costos);
+  VENTAS.feria.costoMesa = redondeo(BASE.mesa * ix.costos);
+  for (const [k, b] of Object.entries(BASE.cursos)) CURSOS[k].costo = redondeo(b * ix.costos);
+  for (const [k, b] of Object.entries(BASE.defensas)) DEFENSAS[k].costo = redondeo(b * ix.costos);
+  EQUIPO.anuncio.costo = redondeo(BASE.anuncio * ix.costos);
+  Object.assign(CAPACITACION, escalarCapacitacion(BASE.capacitacion, ix.costos));
+  LICITACION.precioRef = redondeo(BASE.licitacion.precioRef * ix.precios); LICITACION.costo = redondeo(BASE.licitacion.costo * ix.costos);
+  LICITACION_SEGUNDA.precioRef = redondeo(BASE.licitacion2.precioRef * ix.precios); LICITACION_SEGUNDA.costo = redondeo(BASE.licitacion2.costo * ix.costos);
+}
+
+const NOMBRE_DIARIO = (e) => (enPais(e) ? '📰 InfoArg' : enProvincia(e) ? '📰 La Voz de Adentro' : '📰 El diario del barrio');
+const pctTxt = (x) => `${(Math.round(x * 10) / 10).toString().replace('.', ',')}%`;
+
+// Al cerrar el mes: la inflación de ese mes (sube los costos) y, cada 3 meses, se actualizan precios, sueldos y alquileres.
+function inflacionDelMes(e, c, evento) {
+  if (e.semana < INFLACION.desdeSemana) return;
+  const inf = e.inflacion;
+  let tasa = INFLACION.perfil[c.mes] + entre(e, -INFLACION.ruido, INFLACION.ruido);
+  tasa = Math.max(INFLACION.minimoMes, tasa);
+  // Diciembre cierra el año dentro de 30-40%
+  const ultimos = inf.historial.slice(-11);
+  if (ultimos.length === 11) {
+    const acum = ultimos.reduce((t, x) => t * (1 + x / 100), 1);
+    const min = ((1 + INFLACION.anualMin / 100) / acum - 1) * 100;
+    const max = ((1 + INFLACION.anualMax / 100) / acum - 1) * 100;
+    tasa = limitar(tasa, Math.max(INFLACION.minimoMes, min), Math.max(INFLACION.minimoMes, max));
+  }
+  tasa = Math.round(tasa * 10) / 10;
+  inf.historial.push(tasa);
+  if (inf.historial.length > 24) inf.historial.shift();
+  e.indices.costos *= 1 + tasa / 100;
+  inf.meses += 1;
+  const anual = (inf.historial.slice(-12).reduce((t, x) => t * (1 + x / 100), 1) - 1) * 100;
+  evento(`${NOMBRE_DIARIO(e)}: la inflación de ${c.nombreMes.toLowerCase()} fue de ${pctTxt(tasa)}${inf.historial.length >= 12 ? ` (${pctTxt(anual)} en los últimos 12 meses)` : ''}. Los insumos, la luz y las máquinas ya salen más caros.`, tasa >= 3 ? 'mala' : 'info');
+  if (inf.meses % INFLACION.ajusteCadaMeses === 0) actualizarPreciosYSueldos(e, evento);
+  aplicarIndices(e);
+}
+
+// Cada 3 meses: precios de venta, alquileres y sueldos se ponen al día con la inflación acumulada.
+function actualizarPreciosYSueldos(e, evento) {
+  const ix = e.indices;
+  const subePrecios = ix.costos / ix.precios;
+  const subeAlquiler = ix.costos / ix.alquileres;
+  ix.precios = ix.costos;
+  ix.alquileres = ix.costos;
+  const factor = ix.costos / (ix.sueldos || 1);
+  ix.sueldos = ix.costos;
+  let empleados = 0;
+  for (const emp of e.equipo.empleados) { emp.sueldo = Math.round((emp.sueldo * factor) / 1000) * 1000; if (emp.pideAumento) emp.pideAumento = Math.round((emp.pideAumento * factor) / 1000) * 1000; empleados++; }
+  for (const l of e.pais?.locales || []) if (l.encargado) l.encargado.sueldo = Math.round((l.encargado.sueldo * factor) / 1000) * 1000;
+  if (e.seguridad) e.seguridad.sueldo = Math.round((e.seguridad.sueldo * factor) / 1000) * 1000;
+  e.equipo.mercado = redondear(e.equipo.mercado * factor, 3);
+  const partes = [`subiste los precios de venta un ${pctTxt((subePrecios - 1) * 100)}`];
+  if (localActual(e).alquiler || e.pais?.locales.length) partes.push(`el alquiler subió un ${pctTxt((subeAlquiler - 1) * 100)}`);
+  if (empleados) partes.push(`los sueldos subieron un ${pctTxt((factor - 1) * 100)} (paritaria)`);
+  evento(`Actualización trimestral: ${partes.join(', ')}.`, 'info');
+}
+
+// Al subir de etapa los sueldos del mercado son más altos (provincia x4, país x10 respecto de la ciudad).
+function subirSueldosDeEtapa(e, etapa, evento) {
+  const objetivo = SUELDOS_ETAPA[etapa] || 1;
+  const actual = e.indices.etapa || 1;
+  if (objetivo <= actual) return;
+  const f = objetivo / actual;
+  e.indices.etapa = objetivo;
+  for (const emp of e.equipo.empleados) { emp.sueldo = Math.round((emp.sueldo * f) / 1000) * 1000; if (emp.pideAumento) emp.pideAumento = Math.round((emp.pideAumento * f) / 1000) * 1000; }
+  if (e.seguridad) e.seguridad.sueldo = Math.round((e.seguridad.sueldo * f) / 1000) * 1000;
+  e.equipo.mercado = redondear(e.equipo.mercado * f, 3);
+  evento?.(`En ${etapa === 'pais' ? 'el país' : 'la provincia'} los sueldos son más altos: tu equipo ahora cobra un ${Math.round((f - 1) * 100)}% más que antes.`, 'mala');
+}
+
+export function inflacionActual(e) {
+  const h = e.inflacion?.historial || [];
+  return { mes: h.length ? h[h.length - 1] : 0, anual: h.length >= 12 ? (h.slice(-12).reduce((t, x) => t * (1 + x / 100), 1) - 1) * 100 : null, mesesAlProximoAjuste: INFLACION.ajusteCadaMeses - ((e.inflacion?.meses || 0) % INFLACION.ajusteCadaMeses) };
 }
 
 export function horasPorUnidad(e, idProducto) {
@@ -823,11 +937,11 @@ export function responderAbuela(e, acepta) {
     sumarLelo(e);
     if (enPais(e)) {
       e.leloComercial = true;
-      e.equipo.empleados.find((x) => x.esLelo).sueldo = LELO_COMERCIAL.sueldo;
+      e.equipo.empleados.find((x) => x.esLelo).sueldo = Math.round((LELO_COMERCIAL.sueldo * e.equipo.mercado) / 1000) * 1000;
       if (!e.pais.lelo.local) e.pais.lelo.local = e.pais.locales[0]?.prov || null;
     } else if (e.mejorDeLaProvincia) {
       e.leloGerente = true;
-      e.equipo.empleados.find((x) => x.esLelo).sueldo = LELO_GERENTE.sueldo;
+      e.equipo.empleados.find((x) => x.esLelo).sueldo = Math.round((LELO_GERENTE.sueldo * e.equipo.mercado) / 1000) * 1000;
     }
     mover(ABUELA.bonus);
     if (e.leloComercial) return { ok: true, mensaje: `Le dijiste que sí. La abuela está chocha y Lelo arranca el lunes como gerente comercial de los locales: no te ocupa un lugar en el equipo y cobra ${plata$(LELO_COMERCIAL.sueldo)} por mes. +${numero(ABUELA.bonus)} de reputación, de experiencia y de confianza del tío.` };
@@ -926,7 +1040,7 @@ function sumarLelo(e) {
   if (e.equipo.empleados.some((x) => x.esLelo)) return;
   e.equipo.empleados.push({
     id: 'lelo', nombre: 'Lelo', genero: 'hombre', esLelo: true, puesto: 'operario', variante: 'operario', origen: 'familia',
-    sueldo: LELO_EMPLEADO.sueldo, exp: LELO_EMPLEADO.exp, rasgo: null, rasgoVisible: true, leal: true,
+    sueldo: Math.round((LELO_EMPLEADO.sueldo * (e.equipo?.mercado || 1)) / 1000) * 1000, exp: LELO_EMPLEADO.exp, rasgo: null, rasgoVisible: true, leal: true,
     desde: e.semana, semanasMes: 0, capacitadoMes: false, desganado: false, pideAumento: null, falta: false, semanasTrabajadas: 0,
     retraso: {},
   });
@@ -939,8 +1053,11 @@ export function leloDeViaje(e) {
 // ---------- Partida nueva ----------
 export function nuevaPartida(opcionPrestamo, semilla = Date.now() >>> 0, origen = null) {
   if (!['A', 'B'].includes(opcionPrestamo)) throw new Error('Opción de préstamo inválida');
+  aplicarIndices({}); // el catálogo vuelve a los valores de arranque
   const e = {
     version: VERSION_PARTIDA,
+    indices: { costos: 1, precios: 1, alquileres: 1, sueldos: 1, etapa: 1 },
+    inflacion: { historial: [], meses: 0 },
     semilla,
     semana: 1,
     plata: PRESTAMO.monto - MAQUINAS.tazas.precio,
@@ -1683,6 +1800,7 @@ export function cerrarSemana(e, plan) {
   const repInicial = e.rep;
   const linea = (t) => r.lineas.push(t);
   const evento = (t, tipo = 'info') => r.eventos.push({ texto: t, tipo });
+  if (e.avisoPendiente) { evento(e.avisoPendiente, 'mala'); delete e.avisoPendiente; }
   const precioRedes = precioRedesSemana(sem);
   let deltaRep = 0;
   let repBruta = 0; // lo que ganás de reputación con tu trabajo (para medir tu ritmo)
@@ -1959,6 +2077,7 @@ export function cerrarSemana(e, plan) {
 // Atajo para simulaciones: publicidad + producción en una sola llamada.
 // plan.producir puede ser un objeto o una función (semanaEnCurso) => objeto.
 export function jugarSemana(e, plan) {
+  aplicarIndices(e);
   for (let i = 0; i < 10 && e.decisiones.length; i++) {
     const d = e.decisiones[0];
     resolverDecision(e, plan.decision?.[d.id] || Object.keys(MAZO.decisiones[d.id].opciones)[0]);
@@ -1998,6 +2117,7 @@ function cierreDeMes(e, c, r, evento) {
   }
   if (enProvincia(e) && !e.mejorDeLaProvincia && e.traicio) vozDeAdentro(e, c, evento);
   if (enPais(e)) cierreDeMesPais(e, c, r, evento);
+  inflacionDelMes(e, c, evento);
 
   const p = e.prestamo;
   if (p.opcion === 'B' && !p.pagado && e.semana > p.inicio - 1) {
@@ -2098,6 +2218,7 @@ function finDeAnio(e, r, evento) {
 
 export function iniciarProvincia(e, revancha = false) {
   e.meta = 'provincia';
+  subirSueldosDeEtapa(e, 'provincia', (t) => { e.avisoPendiente = t; });
   e.reconquista = false;
   e.rep = 0;
   e.traicio = {
@@ -2173,7 +2294,7 @@ function reconquistarCiudad(e, r, evento) {
   evento(`¡Volviste a ser el mejor de la ciudad! Lelo se rindió otra vez: cerró el taller y se fue un mes a Santa Clara del Mar. Arranca otra vez la pelea por la provincia: ${TRAICIO.nombre} te espera con ${PROVINCIA.repTraicioRevancha} de reputación.`, 'hito');
 }
 
-// ---------- Ritmo de Traicio: un 3-5% más lento que el tuyo, con un piso ----------
+// ---------- Ritmo de Traicio: un 5-8% más lento que el tuyo, con un piso ----------
 function avanzarTraicio(e, repBruta) {
   const t = e.traicio;
   t.ganancias.push(repBruta);
@@ -2851,6 +2972,7 @@ export function gastosLocalesDelMes(e) {
 // ---------- Arrancar el país ----------
 export function iniciarPais(e) {
   e.meta = 'pais';
+  subirSueldosDeEtapa(e, 'pais', (t) => { e.avisoPendiente = t; });
   e.reconquista = false;
   const prov = e.origen?.provincia && PROVINCIAS_AR[e.origen.provincia] ? e.origen.provincia : 'buenosAires';
   e.pais = {
@@ -2877,7 +2999,7 @@ export function iniciarPais(e) {
   e.leloGerente = false;
   const lelo = e.equipo.empleados.find((x) => x.esLelo);
   e.leloComercial = Boolean(lelo);
-  if (lelo) lelo.sueldo = LELO_COMERCIAL.sueldo;
+  if (lelo) lelo.sueldo = Math.round((LELO_COMERCIAL.sueldo * e.equipo.mercado) / 1000) * 1000;
   if (e.traicio) { e.traicio.sabotaje = null; e.traicio.robo = null; e.traicio.malDemanda = null; }
   e.defensas = { proteccion: false, seguro: false };
   e.licitacion.proximaSegunda = e.semana + enteroEntre(e, 3, 6);
@@ -2892,7 +3014,7 @@ function perderPais(e, r, evento) {
   for (const l of e.pais.locales) recupero += Math.round((l.armado || alquilerProvincia(l.prov)) * PAIS.ventaLocal);
   e.plata += recupero; r.ingresos += recupero;
   const lelo = e.equipo.empleados.find((x) => x.esLelo);
-  if (lelo) lelo.sueldo = LELO_EMPLEADO.sueldo;
+  if (lelo) lelo.sueldo = Math.round((LELO_EMPLEADO.sueldo * e.equipo.mercado) / 1000) * 1000;
   e.leloComercial = false;
   e.leloGerente = false;
   e.pais = null;

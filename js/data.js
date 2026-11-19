@@ -24,13 +24,13 @@ export const MESES = [
 
 export const MAQUINAS = {
   tazas: { nombre: 'Máquina de tazas', precio: 150000, luzExtra: 0 },
-  gorras: { nombre: 'Máquina de gorras', precio: 150000, luzExtra: 5000 },
-  plancha30: { nombre: 'Plancha 30x30', precio: 900000, luzExtra: 10000 },
-  plancha1m: { nombre: 'Plancha 1x1 m', precio: 4000000, luzExtra: 20000 },
-  calandra: { nombre: 'Calandra', precio: 10000000, luzExtra: 40000 },
+  gorras: { nombre: 'Máquina de gorras', precio: 200000, luzExtra: 5000 },
+  plancha30: { nombre: 'Plancha 30x30', precio: 1000000, luzExtra: 10000 },
+  plancha1m: { nombre: 'Plancha 1x1 m', precio: 10000000, luzExtra: 20000 },
+  calandra: { nombre: 'Calandra', precio: 25000000, luzExtra: 40000 },
   // Estaciones del país (más caras que la calandra a propósito).
-  costura: { nombre: 'Estación de costura', precio: 15000000, luzExtra: 30000, desdePais: true },
-  bordado: { nombre: 'Estación de bordado', precio: 20000000, luzExtra: 40000, desdePais: true },
+  costura: { nombre: 'Estación de costura', precio: 80000000, luzExtra: 30000, desdePais: true },
+  bordado: { nombre: 'Estación de bordado', precio: 150000000, luzExtra: 40000, desdePais: true },
 };
 
 // sens = cuánto aprovecha el producto el multiplicador de reputación (1 alta, 0.7 media, 0.4 baja).
@@ -174,13 +174,29 @@ export const ORDEN_MAQUINAS = ['tazas', 'gorras', 'plancha30', 'plancha1m', 'cal
 export const MAQUINAS_FUTURAS = {};
 
 // Dónde trabajás: en tu casa entran 2 empleados; para más, alquilás un local.
+// Alquileres (v0.27): mucho más caros que antes. Suben con la inflación cada 3 meses.
 export const LOCALES = {
   casa: { nombre: 'Tu casa', alquiler: 0, luz: 0, cupo: 2 },
-  chico: { nombre: 'Local chico', alquiler: 60000, luz: 8000, cupo: 5 },
-  grande: { nombre: 'Local grande', alquiler: 200000, luz: 20000, cupo: 12, desdeProvincia: true },
-  galpon: { nombre: 'Galpón', alquiler: 600000, luz: 50000, cupo: 25, desdePais: true },
-  planta: { nombre: 'Planta industrial pequeña', alquiler: 1500000, luz: 120000, cupo: 50, desdePais: true, localesMin: 8 },
+  chico: { nombre: 'Local chico', alquiler: 200000, luz: 15000, cupo: 5 },
+  grande: { nombre: 'Local grande', alquiler: 600000, luz: 40000, cupo: 12, desdeProvincia: true },
+  galpon: { nombre: 'Galpón', alquiler: 2500000, luz: 100000, cupo: 25, desdePais: true },
+  planta: { nombre: 'Planta industrial pequeña', alquiler: 6000000, luz: 250000, cupo: 50, desdePais: true, localesMin: 8 },
 };
+
+// Inflación (v0.27): entre 30 y 40% por año, distinta cada mes (enero a diciembre, en %).
+// Los costos (insumos, máquinas, luz, cursos...) suben todos los meses; los precios de venta, los sueldos
+// y los alquileres se actualizan cada 3 meses (van atrasados: en los meses de mucha inflación perdés margen).
+export const INFLACION = {
+  perfil: [3.5, 2.5, 3, 4, 2, 1, 0.5, 0.5, 0.5, 2.5, 3.5, 4.5],
+  ruido: 0.6, // ± puntos al azar cada mes
+  minimoMes: 0.2,
+  anualMin: 30,
+  anualMax: 40,
+  desdeSemana: 9, // arranca después del tutorial
+  ajusteCadaMeses: 3,
+};
+// Sueldos por etapa: en la provincia se paga un 50% más que en la ciudad, y en el país 2,5 veces lo de la ciudad.
+export const SUELDOS_ETAPA = { provincia: 1.5, pais: 2.5 };
 
 // Volantería: imprimís volantes y alguien los reparte por el barrio.
 export const VOLANTES = { costo: 5000, horas: 6, extra: 0.15, extraSiguiente: 0.07 };
@@ -603,7 +619,7 @@ export const PROVINCIA = {
   repAlPerder: 75, // si Traicio te gana, volvés a la ciudad con esta reputación
   repLeloAlVolver: 50,
   repTraicioRevancha: 30, // si volvés a la provincia después de perderla
-  repTraicioInicial: 8, // Traicio ya es el mejor de otra ciudad: arranca con ventaja
+  repTraicioInicial: 6, // Traicio ya es el mejor de otra ciudad: arranca con ventaja
 };
 
 export const LELO_GERENTE = { sueldo: 150000, errores: 0.8, umbralCansancio: 28 };
@@ -612,7 +628,7 @@ export const LELO_GERENTE = { sueldo: 150000, errores: 0.8, umbralCansancio: 28 
 export const TRAICIO = {
   nombre: 'Traicio Nero', empresa: 'Talleres Judas',
   ventanaRitmo: 12, // semanas para medir tu ritmo
-  factorMin: 0.95, factorMax: 0.97, // crece un 3-5% más lento que vos
+  factorMin: 0.92, factorMax: 0.95, // crece un 5-8% más lento que vos
   ritmoMinimo: 1.4, // si te estancás, él sigue a este ritmo por semana
   ruido: 0.15,
   alerta: 85,

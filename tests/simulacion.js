@@ -2,10 +2,12 @@
 // y se comparan los resultados con lo que dice el documento de reglas.
 // Uso: node tests/simulacion.js
 import {
+  mediaSueldo, PUESTOS,
   nuevaPartida, jugarSemana, demandaEsperada, horasPorUnidad, horasPorVenta, validarPlan, validarPublicidad,
   comprarMaquina, pagarPrestamoA, costoPagoAnticipadoA, calendario, unidadesPedidas, horasDelPlan, stockTotal, PRODUCTOS, VENTAS,
   capacidadEquipo, presentes, empleadosContratados, cupoEquipo, llamarAChuchu, chuchuDisponible, irALaBolsa, contratar,
   publicarAnuncio, responderAumento, horasEmpleado, HORAS_POR_SEMANA, publicar, abuelaPide, responderAbuela,
+  aplicarIndices, MAQUINAS,
 } from '../js/engine.js';
 
 // Contrata cuando no le dan las horas: primero un operario, después un vendedor.
@@ -19,7 +21,7 @@ function contratarSiHaceFalta(e, horasNecesarias, conEquipo) {
   if (!puesto) return;
   if (e.equipo.anuncio?.candidato?.puesto === puesto) { contratar(e, 'anuncio'); return; }
   if (chuchuDisponible(e) && llamarAChuchu(e, puesto).ok && e.equipo.chuchu.candidato) { contratar(e, 'chuchu'); return; }
-  if (!e.equipo.anuncio) publicarAnuncio(e, puesto, puesto === 'operario' ? 40000 : 30000);
+  if (!e.equipo.anuncio) publicarAnuncio(e, puesto, Math.round(mediaSueldo(e, puesto, { operario: 'operario', vendedor: 'junior', disenador: 'textil', rrhh: 'rrhh', costurero: 'operario', bordador: 'operario' }[puesto]) / 1000) * 1000);
 }
 
 // Un jugador razonable: publicidad para cubrir lo que pide el mercado, después produce
@@ -67,7 +69,7 @@ function jugarPartida(opcion, semilla, semanas = 104) {
   const e = nuevaPartida(opcion, semilla);
   const registro = { cansancio: [], primerEmpleado: null, equipoAlGanar: 0, tutorial: 0, semanaGorras: null, semanaMejorCiudad: null, semanaPagoA: null, quiebra: false, meses: [] };
   for (let s = 1; s <= semanas && !e.fin; s++) {
-    if (!e.maquinas.gorras && e.semana > 8 && e.plata > 150000 + 60000) {
+    if (!e.maquinas.gorras && e.semana > 8 && e.plata > MAQUINAS.gorras.precio + 100000) {
       comprarMaquina(e, 'gorras');
       registro.semanaGorras = e.semana;
     }
@@ -87,7 +89,9 @@ function jugarPartida(opcion, semilla, semanas = 104) {
     if (!registro.semanaMejorCiudad) { registro.cansancio.push(e.cansancio); if (empleadosContratados(e) && !registro.primerEmpleado) registro.primerEmpleado = e.semana; }
     void plataAntes;
   }
-  registro.quiebra = e.fin === 'quiebra';
+  // Este jugador sabe jugar la ciudad; la provincia y el país los prueba el buen jugador de tests/bot.js
+  registro.quiebra = e.fin === 'quiebra' && e.meta === 'ciudad' && !e.reconquista;
+  if (process.env.DBG && e.fin === 'quiebra') console.log('Q', opcion, semilla, e.semana, e.meta, e.mejorDeLaCiudad, e.local, Object.keys(e.maquinas).filter((m) => e.maquinas[m]).join(','), e.equipo.empleados.map((x) => x.puesto[0] + Math.round(x.sueldo / 1000)).join(' '));
   registro.final = { plata: e.plata, rep: e.rep, exp: e.exp, primo: e.primo.rep, prestamo: e.prestamo, confianza: e.tio.confianza };
   return registro;
 }
@@ -118,13 +122,14 @@ for (const opcion of ['A', 'B']) {
   console.log(`Primer empleado: semana ${fmt(promedio(partidas.map((p) => p.primerEmpleado).filter(Boolean)))}. Equipo al ganar la ciudad: ${promedio(partidas.map((p) => p.equipoAlGanar)).toFixed(1)}. Cansancio promedio en la ciudad: ${promedio(partidas.map((p) => promedio(p.cansancio))).toFixed(0)}`);
   console.log(`Quiebras: ${quiebras}/200. Plata final (2 años): $${fmt(promedio(partidas.map((p) => p.final.plata)))}. Primo: ${promedio(partidas.map((p) => p.final.primo)).toFixed(1)}`);
 
-  chequear(quiebras === 0, `Opción ${opcion}: un jugador razonable no quiebra`);
+  chequear(quiebras === 0, `Opción ${opcion}: un jugador razonable no quiebra en la ciudad`);
   chequear(ciudad.length >= 180, `Opción ${opcion}: casi siempre llega a ser el mejor de la ciudad en 2 años`);
   chequear(promedio(ciudad) >= 18 && promedio(ciudad) <= 45, `Opción ${opcion}: ser el mejor de la ciudad lleva entre 18 y 45 semanas (objetivo ~26)`);
   chequear(promedio(gorras) <= 24, `Opción ${opcion}: la máquina de gorras llega antes de mitad de año`);
 }
 
-// Chequeos puntuales del calendario y del préstamo
+// Chequeos puntuales del calendario y del préstamo (con los precios del arranque, sin inflación)
+aplicarIndices({});
 chequear(calendario(8).finDeMes && calendario(8).nombreMes === 'Febrero', 'La semana 8 cierra febrero (fin del tutorial)');
 chequear(calendario(52).nombreMes === 'Diciembre' && calendario(53).nombreMes === 'Enero', 'El año tiene 52 semanas');
 chequear(costoPagoAnticipadoA(26) === 220000, 'Pago anticipado en la semana 26 = $220.000');
@@ -225,7 +230,7 @@ chequear(ph < pa, 'La promo rinde menos cuando el rumor era humo');
   chequear(e.rep === Math.min(100, repAntes + 7.5), 'Aceptar a Lelo suma 7,5 de reputación');
   jugarSemana(e, { horasRedes: 2, producir: {} });
   const lelo = e.equipo.empleados.find((x) => x.esLelo);
-  chequear(Boolean(lelo) && lelo.exp === 60 && lelo.sueldo === 40000, 'Si le decís que sí, Lelo entra con experiencia 60 y $40.000');
+  chequear(Boolean(lelo) && lelo.exp === 60 && lelo.sueldo === Math.round((40000 * e.equipo.mercado) / 1000) * 1000, 'Si le decís que sí, Lelo entra con experiencia 60 y $40.000 (a valores del mercado)');
   chequear(horasEmpleado(e, lelo, {}) === 40 && empleadosContratados(e) === e.equipo.empleados.length - 1, 'Lelo pone 40 h y no ocupa cupo');
   // Si le decís que no 4 veces: castigos 2,5 · 5 · 10 · 20 y la abuela no pide más
   for (let i = 0; i < 4; i++) jugarSemana(sinLelo, { horasRedes: 2, producir: {} });
