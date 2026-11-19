@@ -15,7 +15,7 @@ import {
   subirSueldoSeguridad, mediaSeguridad, responderPedidoEmpresa, tercerizarPedidoEmpresa, unidadesEmpresa, porCobrar,
   abuelaPide, responderAbuela, tercerizarVarios, tercerizarTodo, tercerizarResto, LELO_EMPLEADO,
   ponerNombreTaller, nombreDelTaller, localesDisponibles, PROVINCIA, LELO_GERENTE, DEFENSAS, SEGURIDAD, EMPRESAS, LICITACION, TERCERIZAR,
-  enPais, despuesDeLaCiudad, PROVINCIAS_AR, ENCARGADO, TRANSPORTE, TOPA, DEFENSAS_PAIS, LELO_COMERCIAL, LICITACION_SEGUNDA, PAIS, GRANDES,
+  enPais, despuesDeLaCiudad, PROVINCIAS_AR, ENCARGADO, TRANSPORTE, TOPA, MARCAS, DEFENSAS_PAIS, LELO_COMERCIAL, LICITACION_SEGUNDA, PAIS, GRANDES,
   TRAICIO_TEXTOS, elegirOrigen, nombreCiudad, pistaProvincia, abrirLocal, cambiarEncargado, asignarLelo, cambiarDefensaPais, costoDefensaPais,
   gastosLocalesDelMes, provinciasLibres, costoAbrirLocal, alquilerLocal, sueldoEncargado, ofertaPaisVigente, tomarOfertaPais, enCamino,
   costoTraslado, cumpleRequisito, puedeOfertarLicitacion, coberturaRRHH, tieneRRHH, horasCostura, elegirGenero,
@@ -406,7 +406,7 @@ function bloqueEstado(e) {
   } else if (enProvincia(e)) {
     const t = e.traicio;
     const valor = e.mejorDeLaProvincia ? 'Cerró' : t?.visible === null || t?.visible === undefined ? 'Sin noticias todavía' : `${t.visible}/100`;
-    rival = `<div class="stat"><div class="etiqueta">${TRAICIO.nombre} (${TRAICIO.empresa})</div><div class="valor" style="font-size:${t?.visible === null ? '.85rem' : '1.1rem'}">${valor}</div><div class="barra"><span style="width:${pct(e.mejorDeLaProvincia ? 0 : t?.visible || 0)}"></span></div>${t?.mesVisible && !e.mejorDeLaProvincia ? `<div class="detalle suave">Según La Voz de Adentro (${t.mesVisible.toLowerCase()})</div>` : ''}</div>`;
+    rival = `<div class="stat"><div class="etiqueta con-avatar" style="align-items:center">${imagen('judas', 'avatar mini')}<span>${TRAICIO.nombre} (${TRAICIO.empresa})</span></div><div class="valor" style="font-size:${t?.visible === null ? '.85rem' : '1.1rem'}">${valor}</div><div class="barra"><span style="width:${pct(e.mejorDeLaProvincia ? 0 : t?.visible || 0)}"></span></div>${t?.mesVisible && !e.mejorDeLaProvincia ? `<div class="detalle suave">Según La Voz de Adentro (${t.mesVisible.toLowerCase()})</div>` : ''}</div>`;
   } else {
     rival = `<div class="stat"><div class="etiqueta">Lelo (tu primo)</div><div class="valor">${Math.floor(e.primo.rep)}/100</div><div class="barra"><span style="width:${pct(e.primo.rep)}"></span></div></div>`;
   }
@@ -659,7 +659,7 @@ function bloqueProvincia(e) {
         <span><strong>${d.nombre}</strong> · ${plata(d.costo)} por mes<br><span class="suave">${d.detalle}</span></span>
         <input type="checkbox" data-defensa="${id}" ${e.defensas[id] ? 'checked' : ''}>
       </label>`).join('')}
-      <div class="subtitulo">Persona de seguridad</div>
+      <div class="subtitulo con-avatar" style="align-items:center">${imagen('seguridad', 'avatar mini', seg?.genero || 'hombre')}<span>Persona de seguridad</span></div>
       ${seg ? `<p class="suave">Cuida el taller de noche y no ocupa lugar en el equipo. Cobra ${plata(seg.sueldo)} por mes (la media es ${plata(mediaSeguridad(e))}). Si le pagás menos que la media, ${TRAICIO.nombre} la puede comprar y deja de avisarte.</p>
         <div class="alterna"><button class="chico" id="subirSeguridad">Subirle el sueldo</button><button class="chico" id="despedirSeguridad">Despedirla</button></div>`
       : `<p class="suave">Frena algunos sabotajes y te avisa cuando ${TRAICIO.nombre} le hace una oferta a alguien de tu equipo. Lo que te dice siempre es cierto. ${plata(SEGURIDAD.sueldo)} por mes.</p>
@@ -742,7 +742,7 @@ function bloquePais(e) {
       <h2>Defensas contra las marcas</h2>
       <p class="suave">${TOPA.nombre} no ataca: sube despacio y, si llega a 100, es la marca del país. Las otras cuatro atacan tus locales (cada ataque le saca un 10% de reputación a uno). Cada defensa frena la mitad del daño de su marca.</p>
       ${Object.entries(DEFENSAS_PAIS).map(([m, d]) => `<label class="interruptor">
-        <span><strong>${d.nombre}</strong> · contra ${{ gambeta: 'Gambeta Sport', penalazo: 'Penalazo', remeraFeliz: 'La Remera Feliz', estampados: 'Estampados del Plata' }[m]}${d.descuento ? '' : ` · ${plata(costoDefensaPais(e, m))} por mes`}<br><span class="suave">${d.detalle}</span></span>
+        ${imagen(m, 'avatar mini')}<span style="flex:1"><strong>${d.nombre}</strong> · contra ${{ gambeta: 'Gambeta Sport', penalazo: 'Penalazo', remeraFeliz: 'La Remera Feliz', estampados: 'Estampados del Plata' }[m]}${d.descuento ? '' : ` · ${plata(costoDefensaPais(e, m))} por mes`}<br><span class="suave">${d.detalle}</span></span>
         <input type="checkbox" data-defensa-pais="${m}" ${e.pais.defensas[m] ? 'checked' : ''}>
       </label>`).join('')}
     </div>`;
@@ -1475,6 +1475,11 @@ function iconoEvento(ev) {
   const t = ev.texto;
   const emoji = t.match(/^\p{Extended_Pictographic}/u);
   if (emoji && /^📰 InfoArg/u.test(t)) return { ico: imagen('infoarg', 'avatar mini'), texto: t.slice(emoji[0].length).trim() };
+  if (emoji && /^📰 La Voz de Adentro/u.test(t)) return { ico: imagen('vozAdentro', 'avatar mini'), texto: t.slice(emoji[0].length).trim() };
+  // Ataques y anuncios de las marcas del país: el logo de la marca. Sabotajes de Traicio: Talleres Judas.
+  const marca = emoji && /^(💥|📰|👂)/u.test(t) && Object.keys(MARCAS).find((m) => t.includes(MARCAS[m].nombre));
+  if (marca) return { ico: imagen(marca, 'avatar mini'), texto: t.slice(emoji[0].length).trim() };
+  if (emoji && /^(💥|👂)/u.test(t) && (t.includes(TRAICIO.nombre) || t.includes(TRAICIO.empresa))) return { ico: imagen('judas', 'avatar mini'), texto: t.slice(emoji[0].length).trim() };
   if (emoji) return { ico: emoji[0], texto: t.slice(emoji[0].length).trim() };
   const ico = ev.tipo === 'hito' ? '🏆' : ev.tipo === 'desastre' ? '💥' : ev.tipo === 'oportunidad' ? '✨' : ev.tipo === 'rumor' ? '👂'
     : /cuota|pagaste|sueldos|alquiler|gastos fijos/i.test(t) ? '🧾' : /te pagó|cobraste|cobraron/i.test(t) ? '💰'

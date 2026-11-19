@@ -48,6 +48,22 @@ export const IMAGENES = {
   remeraBordada: { archivo: 'remera-bordada.png', emoji: '👕', texto: 'Remera bordada' },
   chombaBordada: { archivo: 'chomba-bordada.png', emoji: '👔', texto: 'Chomba bordada' },
   mantel: { archivo: 'mantel.png', emoji: '🧺', texto: 'Mantel' },
+  seguridad: { archivo: 'seguridad.png', emoji: '🔦', texto: 'Persona de seguridad', genero: 'hombre' },
+  seguridadMujer: { archivo: 'seguridad-mujer.png', emoji: '🔦', texto: 'Persona de seguridad' },
+  vozAdentro: { archivo: 'voz-adentro.png', emoji: '📰', texto: 'La Voz de Adentro' },
+  judas: { archivo: 'judas.png', emoji: '🗡️', texto: 'Talleres Judas' },
+  // Marcas del país que atacan tus locales (mismas claves que MARCAS en data.js)
+  gambeta: { archivo: 'gambeta.png', emoji: '⚽', texto: 'Gambeta Sport' },
+  penalazo: { archivo: 'penalazo.png', emoji: '🥅', texto: 'Penalazo' },
+  remeraFeliz: { archivo: 'remera-feliz.png', emoji: '😉', texto: 'La Remera Feliz' },
+  estampados: { archivo: 'estampados-plata.png', emoji: '🖨️', texto: 'Estampados del Plata' },
+  // Mapa del país (para la animación de la semana: viajes por región y sobres de pedidos)
+  mapaCamion: { archivo: 'mapa-camion.png', emoji: '🚚', texto: 'Flete' },
+  mapaAvion: { archivo: 'mapa-avion.png', emoji: '✈️', texto: 'Avión' },
+  mapaAuto: { archivo: 'mapa-auto.png', emoji: '🚗', texto: 'El auto de tu amigo' },
+  mapaSobre: { archivo: 'mapa-sobre.png', emoji: '✉️', texto: 'Pedido' },
+  mapaLocal: { archivo: 'mapa-local.png', emoji: '📍', texto: 'Local' },
+  mapaBase: { archivo: 'mapa-base.png', emoji: '⭐', texto: 'Tu taller' },
 };
 
 const CARPETA = 'assets/img/';

@@ -4,7 +4,7 @@
 
 Mientras una imagen no exista, el juego muestra un emoji (o el dibujo hecho en código). No hace falta tenerlas todas para empezar: cada imagen que se suma reemplaza a su emoji.
 
-**Prompts listos para copiar:** los que faltan están en `docs/PROMPTS.md`, uno por bloque.
+**Prompts listos para copiar:** los que faltan están en `docs/PROMPTS.md`, uno por bloque. Los que ya se usaron quedan archivados en `docs/PROMPTS-ARCHIVO.md`.
 
 **Hombre o mujer:** cada empleado y cada encargado tiene su género guardado. Las imágenes de puesto que hay (operario, vendedor, diseñador, Recursos Humanos y encargado, hombres; costurera y bordadora, mujeres) se muestran solo a quien coincide; para el otro género hay una segunda versión (`operarioMujer`, `costureroHombre`, etc. en `arte.js`), y mientras no tenga imagen se ve su emoji.
 
@@ -55,6 +55,7 @@ Los avatares se ven en círculo: el personaje tiene que estar centrado, con la c
 | `bordador` | `bordador.png` | Persona sosteniendo un bastidor redondo con un escudo de club a medio bordar. |
 | `rrhh` | `rrhh.png` | Persona de camisa con una carpeta de legajos bajo el brazo y una taza de café, cara de "a ver, contame". |
 | `encargado` | `encargado.png` | Persona detrás de un mostrador con un llavero enorme, chaleco de comercio, sonrisa de vendedor. |
+| `seguridad` | `seguridad.png` (y `seguridad-mujer.png`) | Vigilador nocturno de unos 45, uniforme azul oscuro, gorra, linterna y termo con mate, cara de sueño. |
 
 ### Productos
 
@@ -83,6 +84,12 @@ Los avatares se ven en círculo: el personaje tiene que estar centrado, con la c
 | `topa` | `topa.png` | Logo de ficción de "Topa": una zapatilla clásica antigua con una pátina de "de toda la vida". Nada parecido a logos reales. |
 | `niko` | `niko.png` | Logo de ficción de "Niko": una pipa de fumar bien dibujada, de madera. |
 | `ardidos` | `ardidos.png` | Logo de ficción de "Ardidos": tres llamitas en fila. Sin tiras ni rayas paralelas. |
+| `gambeta` | `gambeta.png` | Logo de ficción de "Gambeta Sport": pelota gastada con líneas de movimiento en zigzag. |
+| `penalazo` | `penalazo.png` | Logo de ficción de "Penalazo": escudo con un arco y la red estirada por la pelota. |
+| `remeraFeliz` | `remera-feliz.png` | Logo de ficción de "La Remera Feliz": remera celeste que guiña un ojo, con etiqueta de oferta. |
+| `estampados` | `estampados-plata.png` | Logo de ficción de "Estampados del Plata": sello de madera con una ola plateada. |
+| `judas` | `judas.png` | Logo de ficción de "Talleres Judas": bolsita de monedas con una tijera cruzada atrás. |
+| `vozAdentro` | `voz-adentro.png` | Ícono de "La Voz de Adentro": diario doblado con un megáfono. |
 
 ## Parte 2 · Isométrico (solo la escena del taller)
 
@@ -128,6 +135,19 @@ Tamaño 512 × 512. Peso: menos de 60 KB. Todas a la misma escala (una persona m
 | `iso-puerta.png` | Puerta de madera de calle, cerrada, con picaporte dorado. |
 
 Estas piezas también son **botones**: en el juego, tocar cada una abre su menú (ver `docs/REGLAS.md`, 1.1). Por eso conviene que se vean claras y no muy chicas.
+
+## Parte 3 · Mapa del país (caricatura plana)
+
+Piezas para el mapa de la etapa país (`assets/img/`, originales en `herramientas/fuentes/mapa/`). Los vehículos miran a la derecha: el juego los da vuelta cuando van a la izquierda. Pensadas para la animación de la semana: de lunes a sábado sale un vehículo por región (NOA, NEA, Cuyo, Centro, Buenos Aires, Patagonia) y vuelven los sobres de pedidos de esa región; el domingo no hay viajes.
+
+| Nombre en `arte.js` | Archivo | Descripción |
+|---|---|---|
+| `mapaCamion` | `mapa-camion.png` | Camión de reparto (flete). La fuente miraba a la izquierda: se espejó. |
+| `mapaAvion` | `mapa-avion.png` | Avión de carga regordete. |
+| `mapaAuto` | `mapa-auto.png` | El auto familiar viejo del amigo, con cajas atadas en el techo. |
+| `mapaSobre` | `mapa-sobre.png` | Sobre de pedido con sello rojo y alitas. |
+| `mapaLocal` | `mapa-local.png` | Pin amarillo con una mini vidriera arriba. |
+| `mapaBase` | `mapa-base.png` | Pin dorado de tu taller, con chimenea y estrella. |
 
 ## Cómo cambiar los colores
 

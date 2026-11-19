@@ -7,7 +7,7 @@ const RUTA = 'assets/iso/';
 const TAM = {
   'iso-bordado': [600, 527], 'iso-cajas': [385, 506], 'iso-calandra': [600, 580], 'iso-celular': [383, 571],
   'iso-corcho': [420, 559], 'iso-costura': [600, 527], 'iso-empleada': [246, 675], 'iso-empleado': [297, 669],
-  'iso-gorras': [557, 659], 'iso-lelo': [219, 676], 'iso-pc': [548, 558], 'iso-plancha1m': [522, 660],
+  'iso-gorras': [557, 659], 'iso-lelo': [219, 676], 'iso-pc': [548, 558], 'iso-plancha1m': [600, 682],
   'iso-plancha30': [557, 659], 'iso-puerta': [261, 547], 'iso-tazas': [557, 660], 'iso-vos-hombre': [217, 662],
   'iso-vos-mujer': [238, 675],
   'lugar-casa': [824, 679], 'lugar-chico': [808, 673], 'lugar-galpon': [837, 698], 'lugar-grande': [828, 682], 'lugar-planta': [832, 689],

@@ -2528,7 +2528,8 @@ export function cambiarDefensa(e, id, activa) {
 export function contratarSeguridad(e) {
   if (!enProvincia(e)) return { ok: false, motivo: 'La persona de seguridad se contrata en la provincia.' };
   if (e.seguridad) return { ok: false, motivo: 'Ya tenés una persona de seguridad.' };
-  e.seguridad = { sueldo: mediaSeguridad(e), sobornada: false, semanasMes: 0 };
+  // genero: solo para la imagen (no usa el azar de la partida)
+  e.seguridad = { sueldo: mediaSeguridad(e), sobornada: false, semanasMes: 0, genero: e.semana % 2 ? 'mujer' : 'hombre' };
   return { ok: true, mensaje: `Contrataste una persona de seguridad para la noche (${plata$(e.seguridad.sueldo)} por mes). No ocupa lugar en el equipo.` };
 }
 
