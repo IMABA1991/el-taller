@@ -3,6 +3,8 @@
 Listos para copiar y pegar, uno por bloque. Cuando una imagen ya está en el juego, se borra de acá.
 Todos piden **fondo blanco liso**: se recorta mejor que el cuadriculado "transparente" que a veces dibuja Gemini.
 
+**Para descargar:** abrí la imagen en Gemini y usá **"Descargar en tamaño original"**. Las copias chicas (512 px) no alcanzan para el juego.
+
 ---
 
 ## A · Caricatura plana: la otra versión de cada puesto (hombre o mujer)
@@ -139,27 +141,29 @@ Ilustración isométrica a 30 grados, estilo maqueta de juguete con colores plan
 
 ### Gente (de pie, misma escala que las máquinas)
 
+La gente camina por el taller, así que va **sin base de madera debajo** (las máquinas sí pueden tenerla).
+
 **Vos (hombre)**
 ```
-Ilustración isométrica a 30 grados, estilo maqueta de juguete con colores planos y cálidos, luz desde arriba a la izquierda, sombras suaves de un tono, contornos suaves, vista desde la esquina inferior izquierda, un solo objeto centrado y aislado, fondo blanco liso, sin texto ni letras. Un joven de unos 19 años con delantal de trabajo, de pie, trabajando con las manos ocupadas.
+Ilustración isométrica a 30 grados, estilo maqueta de juguete con colores planos y cálidos, luz desde arriba a la izquierda, sombras suaves de un tono, contornos suaves, vista desde la esquina inferior izquierda, un solo objeto centrado y aislado, fondo blanco liso, sin texto ni letras. Solo la persona, sin mesa, sin muebles y sin base ni plataforma debajo: un joven de unos 19 años con delantal de trabajo, de pie, sosteniendo una taza recién sublimada.
 ```
 
 **Vos (mujer)**
 ```
-Ilustración isométrica a 30 grados, estilo maqueta de juguete con colores planos y cálidos, luz desde arriba a la izquierda, sombras suaves de un tono, contornos suaves, vista desde la esquina inferior izquierda, un solo objeto centrado y aislado, fondo blanco liso, sin texto ni letras. Una joven de unos 19 años con delantal de trabajo y el pelo atado, de pie, trabajando con las manos ocupadas.
+Ilustración isométrica a 30 grados, estilo maqueta de juguete con colores planos y cálidos, luz desde arriba a la izquierda, sombras suaves de un tono, contornos suaves, vista desde la esquina inferior izquierda, un solo objeto centrado y aislado, fondo blanco liso, sin texto ni letras. Solo la persona, sin mesa, sin muebles y sin base ni plataforma debajo: una joven de unos 19 años con delantal de trabajo y el pelo atado, de pie, sosteniendo una taza recién sublimada.
 ```
 
 **Lelo**
 ```
-Ilustración isométrica a 30 grados, estilo maqueta de juguete con colores planos y cálidos, luz desde arriba a la izquierda, sombras suaves de un tono, contornos suaves, vista desde la esquina inferior izquierda, un solo objeto centrado y aislado, fondo blanco liso, sin texto ni letras. Un joven de 19 años con flequillo y buzo con capucha amarillo, de pie, mirando el celular con sonrisa canchera.
+Ilustración isométrica a 30 grados, estilo maqueta de juguete con colores planos y cálidos, luz desde arriba a la izquierda, sombras suaves de un tono, contornos suaves, vista desde la esquina inferior izquierda, un solo objeto centrado y aislado, fondo blanco liso, sin texto ni letras. Solo la persona, sin base ni plataforma debajo: un joven de 19 años con flequillo y buzo con capucha amarillo, de pie, mirando el celular con sonrisa canchera.
 ```
 
 **Empleado**
 ```
-Ilustración isométrica a 30 grados, estilo maqueta de juguete con colores planos y cálidos, luz desde arriba a la izquierda, sombras suaves de un tono, contornos suaves, vista desde la esquina inferior izquierda, un solo objeto centrado y aislado, fondo blanco liso, sin texto ni letras. Un hombre joven con delantal azul y gorra, de pie, cargando una remera recién estampada.
+Ilustración isométrica a 30 grados, estilo maqueta de juguete con colores planos y cálidos, luz desde arriba a la izquierda, sombras suaves de un tono, contornos suaves, vista desde la esquina inferior izquierda, un solo objeto centrado y aislado, fondo blanco liso, sin texto ni letras. Solo la persona, sin base ni plataforma debajo: un hombre joven con delantal azul y gorra, de pie, cargando una remera recién estampada.
 ```
 
 **Empleada**
 ```
-Ilustración isométrica a 30 grados, estilo maqueta de juguete con colores planos y cálidos, luz desde arriba a la izquierda, sombras suaves de un tono, contornos suaves, vista desde la esquina inferior izquierda, un solo objeto centrado y aislado, fondo blanco liso, sin texto ni letras. Una mujer joven con delantal azul y el pelo atado, de pie, sosteniendo una taza recién sublimada con guantes térmicos.
+Ilustración isométrica a 30 grados, estilo maqueta de juguete con colores planos y cálidos, luz desde arriba a la izquierda, sombras suaves de un tono, contornos suaves, vista desde la esquina inferior izquierda, un solo objeto centrado y aislado, fondo blanco liso, sin texto ni letras. Solo la persona, sin base ni plataforma debajo: una mujer joven con delantal azul y el pelo atado, de pie, sosteniendo una taza recién sublimada con guantes térmicos.
 ```
